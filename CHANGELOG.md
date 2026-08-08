@@ -10,6 +10,7 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ### Ajout
 - **M4 — Raffinements UX** dans `app/gui.py` : autocomplétion (`Tab`), insertion de bloc 1-clic, gouttière de lignes, panneau « Réglages » (pause, vitesse, max chars, Whisper, `device`), génération non bloquante + export. `multi.generate` accepte `device`/`fp16` (plombés vers `cosyvoice_engine.load`).
+- **Configuration du dossier des fichiers voix** — nouvelle variable d'environnement `VOICEBUILDER_AUDIO_DIR` (défaut `~/Partages/voice`) via `config.VOIX_AUDIO_DIR` ; résolution des wav/txt élargie à `config.VOIX_SEARCH_DIRS`.
 - **M3 — Maquette GUI** : `app/gui.py` (éditeur Markdown + surlignage, panneau des voix, génération multi-fil, pause).
 - **Documentation** : `docs/UTILISATION.md` (CLI, GUI, format des voix, format taggé et section « Tags non-verbaux / émotions spécifiques à CosyVoice3 ») ; `TODO.md` et `ROADMAP.md` détaillés point par point (M3/M4) ; lien ajouté au `README.md`.
 - `README.md`, `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`.

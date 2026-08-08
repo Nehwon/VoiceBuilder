@@ -59,24 +59,30 @@ class Voices:
         return iter(self._by_name.values())
 
 
-def _resolve(path: str, base: Path) -> Path:
+def _resolve(path: str, bases) -> Path:
     p = Path(path)
     if p.is_absolute():
         return p
-    candidate = config.PROJECT_ROOT / path
-    if not candidate.exists():
-        candidate = base / path
-    return candidate
+    for b in bases:
+        candidate = Path(b) / path
+        if candidate.exists():
+            return candidate
+    return Path(bases[0]) / path
 
 
 def load_voix(path: Optional[Path] = None, voix_dir: Optional[Path] = None) -> Voices:
     """Charge ``voix.txt`` et construit chaque voix (wav + transcription).
 
     Le champ ``txt`` est optionnel : s'il est absent, on le déduit du ``wav`` en
-    remplaçant l'extension par ``.txt``. S'il n'existe toujours pas, erreur.
+    remplaçant l'extension par ``.txt``. S'il reste l'inexistant, erreur.
+
+    Les fichiers wav/txt sont cherchés, dans l'ordre, dans
+    ``config.VOIX_SEARCH_DIRS`` (projet, racine des voix, dossier audio dédié).
     """
     path = Path(path) if path else config.VOIX_FILE
-    base = voix_dir or config.VOIX_DIR
+    bases = list(config.VOIX_SEARCH_DIRS)
+    if voix_dir is not None:
+        bases.insert(0, Path(voix_dir))
     if not path.exists():
         raise FileNotFoundError(f"Fichier de voix introuvable : {path}")
 
@@ -94,13 +100,13 @@ def load_voix(path: Optional[Path] = None, voix_dir: Optional[Path] = None) -> V
                 raise ValueError(f"Le nom doit être entre crochets : {line}")
             name = raw_name[1:-1]
 
-            wav = _resolve(parts[1], base)
+            wav = _resolve(parts[1], bases)
             if not wav.exists():
                 raise FileNotFoundError(f"Voix wav introuvable : {wav}")
 
             txt: Optional[Path] = None
             if len(parts) >= 3 and parts[2]:
-                txt = _resolve(parts[2], base)
+                txt = _resolve(parts[2], bases)
             if txt is None:
                 txt = Path(str(wav)[: str(wav).rfind(".")] + ".txt")
             if not txt.exists():

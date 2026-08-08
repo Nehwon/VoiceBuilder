@@ -1,4 +1,5 @@
 """Chemins et valeurs par défaut du projet VoiceBuilder (moteur CosyVoice)."""
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parents[1]
@@ -22,6 +23,18 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 TOOLS_DIR = PROJECT_ROOT / "tools"
 
 VOIX_FILE = VOIX_DIR / "voix.txt"
+
+# Dossier des fichiers audio (wav) et de leurs transcriptions (txt) pour les voix.
+# Réglable via la variable d'environnement VOICEBUILDER_AUDIO_DIR.
+VOIX_AUDIO_DIR = Path(
+    os.environ.get("VOICEBUILDER_AUDIO_DIR") or Path.home() / "Partages" / "voice"
+)
+
+# Chemins de recherche, dans l'ordre, pour résoudre un wav/txt listé dans voix.txt :
+#   1) relatif au projet (PROJECT_ROOT/…)
+#   2) la racine des voix     (VOIX_DIR/…)
+#   3) le dossier audio dédié (VOIX_AUDIO_DIR/…)
+VOIX_SEARCH_DIRS = (PROJECT_ROOT, VOIX_DIR, VOIX_AUDIO_DIR)
 
 # --- Génération ---------------------------------------------------------------------
 DEFAULT_DEVICE = "cuda:0"

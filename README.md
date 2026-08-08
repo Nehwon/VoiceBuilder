@@ -72,6 +72,20 @@ Fichier de listage `voix/voix.txt`, une entrée par ligne :
 Au clonage, le prompt TTS =
 `"You are a helpful assistant.<|endofprompt|>" + texte_du_txt`.
 
+### Où ranger les fichiers .wav / .txt
+
+Le dossier contenant les **fichiers `wav`/`txt`** des voix se configure via la
+variable d'environnement `VOICEBUILDER_AUDIO_DIR` (défaut : `~/Partages/voice`).
+
+```bash
+export VOICEBUILDER_AUDIO_DIR=~/Partages/voice   # par exemple
+python -m tools.gen_multi_voix texte/x.md
+```
+
+Les chemins listés dans `voix.txt` sont alors résolus, dans l'ordre, parmi :
+`PROJECT_ROOT`, `voix/` (racine du projet), puis `VOICEBUILDER_AUDIO_DIR`
+(cf. `config.VOIX_SEARCH_DIRS`).
+
 ---
 
 ## Format du texte taggé

@@ -45,6 +45,25 @@ Fichier de listage `voix/voix.txt`, une entrée par ligne :
 Au clonage, le prompt TTS =
 `"You are a helpful assistant.<|endofprompt|>" + texte_du_txt`.
 
+#### Choix de l'emplacement des fichiers .wav/.txt
+
+Les fichiers audio et leurs transcriptions peuvent être stockés **en dehors** du
+projet. Leur dossier est réglé par la variable d'environnement
+`VOICEBUILDER_AUDIO_DIR` (défaut : `~/Partages/voice`) :
+
+```bash
+export VOICEBUILDER_AUDIO_DIR=~/Partages/voice
+```
+
+Les chemins de `voix.txt` sont résolus dans l'ordre : dossier du projet, `voix/`,
+puis ce dossier audio (`config.VOIX_SEARCH_DIRS`). Ex. une ligne simple :
+
+```
+[Michel], unirreductibleathee_phrase_01.wav
+```
+
+…est retrouvée dans `~/Partages/voice/` si elle s'y trouve.
+
 ---
 
 ## 3. Format du texte taggé
