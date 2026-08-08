@@ -114,6 +114,8 @@ et ajoute l'entrée dans `voix.txt`.
 
 ## Ressources
 
+- `docs/UTILISATION.md` — guide d'utilisation complet (CLI, GUI, format de texte
+  taggé, **tags non-verbaux / émotions CosyVoice3**).
 - `PROJET.md` — brief complet (vision, pipeline, contraintes, étapes).
 - `engine/tests` — (à venir) tests unitaires du pipeline.
 - Moteur : `CosyVoice3` (voir `~/Projets/CosyVoice`).

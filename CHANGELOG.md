@@ -9,7 +9,10 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 ## [0.2.0] — 2026-08-08
 
 ### Ajout
-- Documentation produit : `README.md`, `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`.
+- **M4 — Raffinements UX** dans `app/gui.py` : autocomplétion (`Tab`), insertion de bloc 1-clic, gouttière de lignes, panneau « Réglages » (pause, vitesse, max chars, Whisper, `device`), génération non bloquante + export. `multi.generate` accepte `device`/`fp16` (plombés vers `cosyvoice_engine.load`).
+- **M3 — Maquette GUI** : `app/gui.py` (éditeur Markdown + surlignage, panneau des voix, génération multi-fil, pause).
+- **Documentation** : `docs/UTILISATION.md` (CLI, GUI, format des voix, format taggé et section « Tags non-verbaux / émotions spécifiques à CosyVoice3 ») ; `TODO.md` et `ROADMAP.md` détaillés point par point (M3/M4) ; lien ajouté au `README.md`.
+- `README.md`, `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`.
 - Dépôt git configuré (`origin` → `ssh://gitea@gitea.lamachere.fr:2222/fabrice/VoiceBuilder.git`, branche `main`) et livrable poussé.
 
 ## [0.1.0] — 2026-08-08

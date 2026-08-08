@@ -36,6 +36,8 @@ def generate(
     pause: Optional[float] = None,
     speed: Optional[float] = None,
     verify: Optional[bool] = None,
+    device: Optional[str] = None,
+    fp16: Optional[bool] = None,
     verbose: bool = True,
 ) -> dict:
     """Génère l'audio complet pour un texte taggé et une liste de voix.
@@ -52,7 +54,7 @@ def generate(
     if inconnus:
         raise ValueError(f"Personnage(s) sans voix définie : {inconnus}")
 
-    model, sr = cosyvoice_engine.load()
+    model, sr = cosyvoice_engine.load(device=device, fp16=fp16)
     max_chars = config.DEFAULT_MAX_BLOCK_CHARS if max_block_chars is None else max_block_chars
     pause = config.DEFAULT_PAUSE if pause is None else pause
     if verify is None:

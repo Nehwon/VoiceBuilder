@@ -40,12 +40,17 @@ Légende :
   - [ ] Panneau des voix : liste depuis `voix.txt`, pré-écoute du `.wav`, lancement de `create_voix`.
   - [ ] Bouton génération multi-voix : progression + log par bloc (personnage, durée, nb sous-blocs).
   - [ ] Verdict. : blocs revérifiés / rapprochés, pré-écoute par segment, export.
-- [ ] **M4 — Affiner l'UX**
-  - [ ] Autocomplétion des noms de voix dans l'éditeur.
-  - [ ] Insertion d'un bloc `[Nom]:` en un clic.
-  - [ ] Numéros de ligne, pliage de paragraphes, navigation.
-  - [ ] Réglages globaux (vitesse, pause, device, fp16) — panneau avancé.
-  - [ ] Vérification en temps réel, export du montage.
+- [x] **M4 — Affiner l'UX**
+  - [x] **Autocomplétion des noms de voix** — touche `Tab` : complète `[Pré` → `[LeNarrateur]` (insensible à la casse) ; déclenchement uniquement après un `[`.
+  - [x] **Insertion d'un bloc `[Nom]:` en un clic** — bouton « Insérer [Nom]: » (reprend la voix sélectionnée dans le panneau).
+  - [x] **Numéros de ligne** — gouttière synchronisée avec le défilement de l'éditeur.
+  - [x] **Réglages globaux** — panneau « Réglages » : pause, vitesse, max chars/bloc, vérification Whisper, `device` ; plomberie `device`/`fp16` → `multi.generate` → `cosyvoice_engine.load`.
+  - [x] **Vérification / export** — génération en fil d'arrière-plan (UI non bloquée), statut + export du `.wav`.
+
+### Documentation d'utilisation
+- [x] `docs/UTILISATION.md` : CLI, GUI, voix (`voix.txt`), format de texte taggé.
+  - [x] Section « Tags non-verbaux / émotions spécifiques à CosyVoice3 » (point par point : émotions `<|ÉMOTION|>`, sons paralinguistiques `[sigh]`, etc., événements audio, correspondance OmniVoice).
+  - [x] `README.md` référence le guide ; `CHANGELOG.md` mis à jour.
 
 ---
 

@@ -42,12 +42,28 @@ transcription Whisper + mise à jour de `voix.txt`).
 **Objectif** : import de texte, éditeur Markdown surlignant les `[Nom]`, panneau
 des voix, génération + pré-écoute par bloc.
 **Livrable** : `app/gui.py`.
-**Statut** : planifié.
+**Statut** : ✔ Terminé.
 
 ### M4 — Raffinements UX
-**Objectif** : autocomplétion des noms de voix, réglages, vérification en temps
-réel, export fluide.
-**Statut** : planifié.
+**Objectif** : rendre l'édition et la génération confortables (autocomplétion,
+réglages, vérification).
+**Statut** : ✔ Terminé.
+
+Parcours fonctionnel (point par point) :
+- **Autocomplétion** — touche `Tab` dans l'éditeur : `[Pré` → `[LeNarrateur]`
+  (préfixe insensible à la casse, une seule voix plausible).
+- **Insertion rapide** — bouton « Insérer [Nom]: » ajoute le bloc de la voix
+  sélectionnée au panneau droit.
+- **Gouttière de lignes** — numéros synchronisés avec le défilement.
+- **Réglages** — boîte de dialogue : pause, vitesse, taille max de sous-bloc,
+  activation Whisper, `device` (cuda/cpu). `device`/`fp16` sont transmis au
+  moteur (`multi.generate` → `cosyvoice_engine.load`).
+- **Génération non bloquante** — fil d'arrière-plan + file d'attente, statut et
+  boîte de fin, export du montage `.wav`.
+
+Avec la **documentation d'utilisation** (`docs/UTILISATION.md`), dont la partie
+**« Tags non-verbaux / émotions spécifiques à CosyVoice3 »** détaillée point par
+point.
 
 ### M5 — Performance (optionnel)
 **Objectif** : réduire le temps de génération via vLLM ou TensorRT ; frontend de
