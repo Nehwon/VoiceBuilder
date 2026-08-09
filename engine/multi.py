@@ -39,11 +39,16 @@ def generate(
     device: Optional[str] = None,
     fp16: Optional[bool] = None,
     verbose: bool = True,
+    progress=None,
 ) -> dict:
     """Génère l'audio complet pour un texte taggé et une liste de voix.
 
     ``out`` : chemin WAV écrit. Renvoie un dict avec ``audio``, ``sample_rate``,
     ``duration``, ``blocs`` et ``out``.
+
+    ``progress`` : callback ``progress(dict)`` appelé à la fin de chaque bloc avec
+    ``{index, total, personnage, chars, duree}`` puis, une fois concaténé, avec
+    ``{duree: ..., blocs: [...]}`` (utile au GUI serveur).
     """
     if verbose:
         print(f"Voix disponibles : {voices.names()}")
@@ -75,6 +80,9 @@ def generate(
         blocs_report.append((pers, len(block), round(dur, 2)))
         if verbose:
             print(f"[{i}/{total}] {pers} ({len(block)} chars) -> {dur:.2f} s")
+        if progress:
+            progress({"index": i, "total": total, "personnage": pers,
+                      "chars": len(block), "duree": round(dur, 2)})
         parts.append(np.zeros(pause_n, dtype=np.float32))
 
     final = np.concatenate(parts)
@@ -89,4 +97,6 @@ def generate(
         cosyvoice_engine.save(final, sr, out)
         if verbose:
             print(f"\nEnregistré : {out} ({res['duration']} s)")
+    if progress:
+        progress({"duree": res["duration"], "blocs": blocs_report})
     return res

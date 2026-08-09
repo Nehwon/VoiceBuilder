@@ -1,0 +1,77 @@
+:root {
+  --bg: #14161b;
+  --panel: #1d2129;
+  --panel2: #232832;
+  --bor: #333a46;
+  --txt: #e6e8ee;
+  --dim: #8b93a3;
+  --acc: #cc5500;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--txt);
+}
+
+header {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--bor);
+}
+h1 { font-size: 18px; margin: 0; }
+.sous-titre { color: var(--dim); font-size: 13px; }
+.actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.doc-statut { color: var(--dim); font-size: 12px; }
+
+.banniere {
+  background: #4a1216; color: #ffb4b4; border-bottom: 1px solid #6b1d24;
+  padding: 8px 16px; display: flex; gap: 12px; align-items: center;
+}
+.banniere a { color: #ffd0d0; }
+
+main { display: grid; grid-template-columns: 1fr 340px; gap: 12px; padding: 12px 16px; }
+.col-edit, .col-droite > section { background: var(--panel); border: 1px solid var(--bor); border-radius: 8px; padding: 12px; }
+.col-droite { display: flex; flex-direction: column; gap: 12px; }
+.section-title { font-size: 13px; color: var(--dim); font-weight: 600; }
+
+#zone-editeur { border: 1px solid var(--bor); border-radius: 6px; background: var(--panel2); overflow: hidden; }
+
+/* Editor CodeMirror (thème sombre) */
+.CodeMirror {
+  height: 46vh; background: var(--panel2); color: var(--txt);
+  font: 13px/1.5 ui-monospace, monospace;
+}
+.CodeMirror-gutters { background: var(--panel); border-right: 1px solid var(--bor); }
+.CodeMirror-linenumber { color: var(--dim); }
+.CodeMirror-cursor { border-left: 1px solid var(--txt); }
+.CodeMirror-selected { background: #3a4354; }
+.CodeMirror .cm-property { color: var(--ac); font-weight: 700; }
+.CodeMirror .cm-operator { color: var(--dim); }
+.CodeMirror-placeholder { color: var(--dim); }
+
+.editor-preview { margin-top: 10px; }
+#montage { width: 100%; }
+.log { min-height: 70px; max-height: 160px; overflow: auto; background: #0e1014; border: 1px solid var(--bor); border-radius: 6px; padding: 8px; color: var(--dim); font-size: 12px; white-space: pre-wrap; }
+
+h2 { font-size: 14px; margin: 0 0 8px; }
+.liste-voix { list-style: none; padding: 0; margin: 0; max-height: 26vh; overflow: auto; }
+.liste-voix li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; }
+.liste-voix li:hover, .liste-voix li.sel { background: var(--panel2); }
+.liste-voix li button { background: none; border: none; color: var(--ac); cursor: pointer; font-size: 13px; }
+
+label { display: block; font-size: 12px; color: var(--dim); margin: 6px 0 2px; }
+input, select, button { font-size: 13px; }
+input[type="text"], input[type="number"], select {
+  width: 100%; background: var(--panel2); border: 1px solid var(--bor);
+  color: var(--txt); border-radius: 5px; padding: 6px; margin-top: 2px;
+}
+button {
+  background: var(--panel2); color: var(--txt); border: 1px solid var(--bor);
+  border-radius: 6px; padding: 7px 12px; cursor: pointer; margin-top: 8px;
+}
+button:hover { border-color: var(--ac); }
+button.primaire { background: var(--ac); border-color: var(--ac); color: #fff; font-weight: 600; }
+.grid-reglages { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }

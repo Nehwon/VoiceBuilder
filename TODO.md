@@ -34,8 +34,8 @@ Légende :
 
 ## Phase 2 — Interface graphique (GUI)
 
-- [ ] **M3 — Première maquille** (`app/gui.py`).
-  - [ ] Import d'un texte brut (`.md`/`.txt`) et création du fichier de voix si absent.
+- [ ] **M3 — Première maquette** (`app/gui.py`).
+  - [ ] Ouvrir un texte brut (`.md`/`.txt`) et création du fichier de voix si absent.
   - [ ] Éditeur Markdown : surlignage des `[Locuteur]:`, tags inline, prose narrateur.
   - [ ] Panneau des voix : liste depuis `voix.txt`, pré-écoute du `.wav`, lancement de `create_voix`.
   - [ ] Bouton génération multi-voix : progression + log par bloc (personnage, durée, nb sous-blocs).
@@ -80,23 +80,41 @@ réutilise le venv CosyVoice et le moteur `engine/` en process, peu de dépendan
 ajoutées, API REST typée avec génération en tâche de fond ; nginx ou caddy
 n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Python).
 
-- [ ] **M7 — Squelette serveur FastAPI** (`app/server.py`) : sert le frontend
+- [x] **M7 — Squelette serveur FastAPI** (`app/server.py`) : sert le frontend
       statique (HTML/CSS/JS) + API REST JSON ; `--host`/`--port` en CLI.
-- [ ] **M7.1 — API voix** : `GET /api/voix` (liste + état), `POST /api/voix` (nommage,
+- [x] **M7.1 — API voix** : `GET /api/voix` (liste + état), `POST /api/voix` (nommage,
       génération `voix.txt`), `GET /api/voix/<wav>` (pré-écoute).
-- [ ] **M7.2 — API génération** : `POST /api/generer` (texte taggé + réglages) en
-      tâche de fond, progression via `SSE`/`websocket`, récupération du montage.
-- [ ] **M7.3 — Frontend éditeur** : codeMirror/textarea avec surlignage `[Nom]:`,
-      autocomplétion des voix, insertion d'un bloc 1-clic, gouttière de lignes.
-- [ ] **M7.4 — Frontend réglages + dossier des voix** : parité @M6.1–M6.2 (dossier
-      `VOICEBUILDER_AUDIO_DIR` réglable + persistance + génération auto de `voix.txt`).
-- [ ] **M7.5 — Compatibilité** : config `server` (module venv `uvicorn`), `requirements`
+- [x] **M7.2 — API génération** : `POST /api/generer` (texte taggé + réglages) en
+      tâche de fond, progression via `SSE`, récupération du montage.
+- [x] **M7.3 — Frontend éditeur** : **CodeMirror** avec surlignage `[Nom]:`,
+      autocomplétion des voix (`Tab`), insertion d'un bloc 1-clic, numéros de ligne.
+- [x] **M7.4 — Frontend réglages + dossier des voix** : dossier
+      `VOICEBUILDER_AUDIO_DIR` réglable + persistance + génération auto de `voix.txt`.
+- [x] **M7.5 — Compatibilité** : module venv `uvicorn`, `requirements`
       (+ `fastapi`, `uvicorn`), doc et script de lancement.
 - [ ] (option) Déploiement derrière **nginx/caddy** en reverse proxy — non bloquant.
 
 ---
 
-## Phase 4 — Qualité & performance
+## Phase 4 — Gestion d'un document de projet (éditeur)
+
+- [ ] **M8 — Document de travail & auto-sauvegarde**
+  - [ ] **M8.1 — Ouvrir** un fichier du dossier projet (`.md`/`.txt`) dans
+        l'éditeur ; toute modification fait l'objet d'un **enregistrement
+        automatique** d'une **copie de travail** dans le dossier projet — sans
+        jamais modifier le **fichier d'origine**.
+- [ ] **M8.2 — Fichier des voix** :
+  - [ ] si `voix.txt` est absent, **vérifier que le dossier des voix** est
+        configuré (`VOICEBUILDER_AUDIO_DIR`) ;
+  - [ ] si non configuré : afficher une **erreur en haut de page** avec un
+        **lien vers la « Réglages »**, pour configurer le dossier ;
+  - [ ] à la configuration du dossier, **générer `voix.txt` dans le dossier du
+        projet** ; si **plusieurs fichiers portent le même nom**, les **numéroter**
+        (suffixe `_2`, `_3`, …).
+
+---
+
+## Phase 5 — Qualité & performance
 
 - [ ] M4.x — Benchmark fidélité : loi variation de `max_chars`, seuil de vérif.
 - [ ] M5 — (optionnel) accélération vLLM (~0.9–0.11) ou TensorRT pour la génération.

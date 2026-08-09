@@ -100,8 +100,9 @@ def default_nom(wav: Path) -> str:
 def generer_voix_txt(dossier=None, out=None) -> Path:
     """Génère ``voix.txt`` (une entrée par couple wav+txt du dossier).
 
-    Chaque ligne : ``[Nom] fichier.wav, fichier.txt`` (chemins du dossier).
+    Chaque entrée : ``[Nom] fichier.wav, fichier.txt`` (chemins du dossier).
     Ne génère que si ``voix.txt`` est absent, pour ne pas écraser l'existant.
+    Les noms par défaut identiques sont **numérotés** (``Nom``, ``Nom_2``, …).
     """
     dossier = Path(dossier) if dossier is not None else config.VOIX_AUDIO_DIR
     out = Path(out) if out else config.VOIX_FILE
@@ -109,9 +110,13 @@ def generer_voix_txt(dossier=None, out=None) -> Path:
         return out
 
     couples = collect_couples(dossier)
+    compteurs = {}
     lignes = []
     for wav, txt in couples:
-        nom = default_nom(wav)
+        base = default_nom(wav)
+        compteurs[base] = compteurs.get(base, 0) + 1
+        n = compteurs[base]
+        nom = base if n == 1 else f"{base}_{n}"
         lignes.append(f"[{nom}], {wav.name}, {txt.name}")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lignes) + ("\n" if lignes else ""), encoding="utf-8")

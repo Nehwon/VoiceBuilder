@@ -4,3 +4,5 @@ librosa>=0.10
 openai-whisper
 torch
 gradio>=4.0
+fastapi>=0.110
+uvicorn[standard]>=0.27
