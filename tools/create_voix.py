@@ -45,6 +45,12 @@ def main(argv=None) -> int:
     parser.add_argument("--out", default=None, help="WAV de sortie (défaut: voix/<slug>.wav)")
     parser.add_argument("--voix", default=None, help="Fichier voix.txt à enrichir")
     parser.add_argument("--no-transcribe", action="store_true", help="Ne pas transcrire")
+    parser.add_argument("--lang", default=None,
+                        help="Langue Whisper (défaut: config.WHISPER_LANG)")
+    parser.add_argument("--timestamps", action="store_true",
+                        help="Sortie horodatée `[0000.00 - 0005.28] texte` par segment")
+    parser.add_argument("--max-sec", type=float, default=30.0,
+                        help="Avertit si le segment dépasse cette durée (défaut 30 s)")
     args = parser.parse_args(argv)
 
     config.ensure_dirs()
@@ -55,7 +61,13 @@ def main(argv=None) -> int:
 
     print(f"Extraction [{args.start}..{args.stop}] s de {args.source}")
     audio, sr = extract_segment(args.source, args.start, args.stop)
-    print(f"  segment : {len(audio)/sr:.2f} s @ {sr} Hz")
+    duree = len(audio) / sr
+    print(f"  segment : {duree:.2f} s @ {sr} Hz")
+
+    if args.max_sec and duree > args.max_sec:
+        print(f"⚠️  Segment de {duree:.1f} s > {args.max_sec:.0f} s : "
+              f"fidélité du clone réduite sur les segments longs.",
+              file=sys.stderr)
 
     import soundfile as sf
     sf.write(str(out), audio, sr)
@@ -63,9 +75,13 @@ def main(argv=None) -> int:
 
     text = ""
     if not args.no_transcribe:
-        print(f"Transcription (Whisper)…")
-        text = verifier.transcribe(audio, sr).strip()
-        print(f"  texte : {text}")
+        lang = args.lang or config.WHISPER_LANG
+        print(f"Transcription (Whisper, {lang})…")
+        if args.timestamps:
+            text = verifier.transcribe_timestamped(audio, sr, lang=lang).strip()
+        else:
+            text = verifier.transcribe(audio, sr, lang=lang).strip()
+        print(f"  texte : {text!r}")
 
     txt = out.with_suffix(".txt")
     txt.write_text(text + "\n" if text else "", encoding="utf-8")

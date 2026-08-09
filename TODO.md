@@ -26,9 +26,9 @@ Légende :
 
 ## Phase 1 — Assistant de voix & fixtures
 
-- [ ] M2.1 — Option `--lang` pour Whisper, sortie horodatée (`[0000.00 - 0005.28] …`) en option.
-- [ ] M2.2 — Limite/alerte si le segment dépasse ~30 s (fidélité du clone).
-- [ ] M2.3 — Générer un CLI exemple (échantillon de test + `voix.txt` de démo) pour valider M0/M1 de bout en bout.
+- [x] M2.1 — Option `--lang` pour Whisper, sortie horodatée (`[0000.00 - 0005.28] …`) en option.
+- [x] M2.2 — Limite/alerte si le segment dépasse ~30 s (fidélité du clone).
+- [x] M2.3 — Générer un CLI exemple (échantillon de test + `voix.txt` de démo) pour valider M0/M1 de bout en bout.
 
 ---
 

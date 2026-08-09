@@ -24,11 +24,39 @@ def _load_model():
     return whisper.load_model(config.WHISPER_MODEL, device="cuda")
 
 
-def transcribe(audio: np.ndarray, sample_rate: int) -> str:
-    """Transcrit un audio mono float32 (rééchantillonné à 16 kHz pour whisper)."""
+def transcribe(audio: np.ndarray, sample_rate: int, lang: str | None = None) -> str:
+    """Transcrit un audio mono float32 (rééchantillonné à 16 kHz pour whisper).
+
+    ``lang`` surcharge la langue par défaut (``config.WHISPER_LANG``).
+    """
     y = librosa.resample(audio, orig_sr=sample_rate, target_sr=16000).astype(np.float32)
     model = _load_model()
-    return model.transcribe(y, language=config.WHISPER_LANG, fp16=False)["text"]
+    return model.transcribe(y, language=lang or config.WHISPER_LANG, fp16=False)["text"]
+
+
+def _estamp(t: float) -> str:
+    """Formate une durée en ``MM:SS.centièmes`` pour ``[0000.00 - 0005.28]``."""
+    m, s = divmod(int(t), 60)
+    cs = int((t - int(t)) * 100)
+    return f"{m:02d}{s:02d}.{cs:02d}"
+
+
+def transcribe_timestamped(
+    audio: np.ndarray, sample_rate: int, lang: str | None = None
+) -> str:
+    """Transcription par segments, chaque ligne préfixée ``[MMSS.cc - MMSS.cc] texte``.
+
+    Le format horodaté reste ignoré au parsing de ``voix.py`` (``_strip_timestamps``).
+    """
+    y = librosa.resample(audio, orig_sr=sample_rate, target_sr=16000).astype(np.float32)
+    model = _load_model()
+    res = model.transcribe(y, language=lang or config.WHISPER_LANG, fp16=False)
+    lignes = []
+    for seg in res["segments"]:
+        lignes.append(
+            f"[{_estamp(seg['start'])} - {_estamp(seg['end'])}] {seg['text'].strip()}"
+        )
+    return "\n".join(lignes)
 
 
 def coverage(text: str, audio: np.ndarray, sample_rate: int) -> float:
