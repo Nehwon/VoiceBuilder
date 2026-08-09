@@ -130,9 +130,35 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ---
 
+## Phase 5 — Qualité & performance
+
 - [ ] M4.x — Benchmark fidélité : loi variation de `max_chars`, seuil de vérif.
 - [ ] M5 — (optionnel) accélération vLLM (~0.9–0.11) ou TensorRT pour la génération.
 - [ ] M5.x — Frontend de normalisation (`wetext`/`ttsfrd`) pour améliorer la prosodie FR (sinon `text_frontend=False`).
+
+---
+
+## Phase 6 — Assistant voix avancé (extraction, éditeur wav, clonage)
+
+> À faire — **non développé** (noté à l'issue de la session du 2026-08-10, sera
+> traité un autre jour).
+
+- [ ] **M11 — Test bout en bout minimal**
+  - [ ] Couvrir le scénario : **une phrase par balise, une voix par balise**,
+        génération de la voix et **ouverture de l'espace de montage**.
+- [ ] **M12 — Espace de montage**
+  - [ ] Développer l'**espace de montage** (lecture de l'ensemble, navigation par
+        bloc).
+- [ ] **M13 — Onglet « Voix »**
+  - [ ] **Extraction d'une piste son depuis une vidéo** (nouvel onglet « Voix »).
+  - [ ] **Conversion de la piste au bon format `.wav`** (après upload).
+  - [ ] **Éditeur de forme d'onde (style Audacity)** pour **extraire une voix
+        (10–20 s)** depuis la piste convertie.
+  - [ ] **Transcription d'un `.wav`** (extrait complet ou phrase unique) — Whisper.
+  - [ ] **Synchroniser la transcription avec l'éditeur wav** pour une sélection
+        efficace de l'extrait.
+  - [ ] **Enregistrer la voix** sous forme d'un **couple `.wav` / `.txt`** pour le
+        clonage (et mise à jour de `voix.txt`).
 
 ---
 
