@@ -1,0 +1,14 @@
+[Astronogeek], Astronogeek_phrase_01.wav, Astronogeek_phrase_01.txt
+[Gachiakuta], Gachiakuta_phrase_01.wav, Gachiakuta_phrase_01.txt
+[Thepromisedneverland], Thepromisedneverland_phrase_01.wav, Thepromisedneverland_phrase_01.txt
+[Thepromisedneverland], Thepromisedneverland_phrase_02.wav, Thepromisedneverland_phrase_02.txt
+[Thepromisedneverland], Thepromisedneverland_phrase_03.wav, Thepromisedneverland_phrase_03.txt
+[Arthurhennes], arthurhennes_phrase_01.wav, arthurhennes_phrase_01.txt
+[Christophepauly], christophepauly_phrase_01.wav, christophepauly_phrase_01.txt
+[Epense], epense_phrase_01.wav, epense_phrase_01.txt
+[Gmilgram], gmilgram_phrase_01.wav, gmilgram_phrase_01.txt
+[Micode], micode_phrase_01.wav, micode_phrase_01.txt
+[Superama], superama_phrase_01.wav, superama_phrase_01.txt
+[Sushinihiliste], sushinihiliste_phrase_01.wav, sushinihiliste_phrase_01.txt
+[Sylarticho], sylarticho_phrase_01.wav, sylarticho_phrase_01.txt
+[Unirreductibleathee], unirreductibleathee_phrase_01.wav, unirreductibleathee_phrase_01.txt

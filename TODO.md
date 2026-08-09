@@ -54,7 +54,49 @@ Légende :
 
 ---
 
-## Phase 3 — Qualité & performance
+## Phase 2.5 — GUI web (Gradio) & gestion du dossier des voix
+
+- [ ] **M6 — GUI web (Gradio)** (`app/web_app.py`) : éditeur de texte taggé, panneau
+      des voix, génération multi-voix, réglages et assistant voix dans le navigateur.
+- [ ] **M6.1 — Réglage du dossier des voix** : choix du répertoire des fichiers
+      `.wav`/`.txt` (`VOICEBUILDER_AUDIO_DIR`) côté UI, avec persistance.
+- [ ] **M6.2 — Auto-génération de `voix.txt`** : si absent, le générer depuis le
+      dossier configuré (une entrée par coupe `.wav` + `.txt`, nom par défaut déduit
+      du nom de fichier).
+- [ ] **M6.3 — Nommage des voix existantes** : dans l'assistant voix, attribuer un
+      `[Nom]` personnage aux voix déjà présentes dans le dossier (et non encore
+      nommées) et l'écrire dans `voix.txt`.
+
+---
+
+## Phase 3 — GUI sur serveur HTTP local (FastAPI)
+
+Refonte de l'interface web sur un **petit serveur HTTP local** avec un frontend
+dédié (au lieu de Gradio) : serveur applicatif + pages statiques servies par ce
+même serveur ; nginx/caddy seulement en reverse-proxy optionnel en face.
+
+**Choix retenu : Python + FastAPI (uvicorn)** (proposé comme le meilleur) —
+réutilise le venv CosyVoice et le moteur `engine/` en process, peu de dépendances
+ajoutées, API REST typée avec génération en tâche de fond ; nginx ou caddy
+n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Python).
+
+- [ ] **M7 — Squelette serveur FastAPI** (`app/server.py`) : sert le frontend
+      statique (HTML/CSS/JS) + API REST JSON ; `--host`/`--port` en CLI.
+- [ ] **M7.1 — API voix** : `GET /api/voix` (liste + état), `POST /api/voix` (nommage,
+      génération `voix.txt`), `GET /api/voix/<wav>` (pré-écoute).
+- [ ] **M7.2 — API génération** : `POST /api/generer` (texte taggé + réglages) en
+      tâche de fond, progression via `SSE`/`websocket`, récupération du montage.
+- [ ] **M7.3 — Frontend éditeur** : codeMirror/textarea avec surlignage `[Nom]:`,
+      autocomplétion des voix, insertion d'un bloc 1-clic, gouttière de lignes.
+- [ ] **M7.4 — Frontend réglages + dossier des voix** : parité @M6.1–M6.2 (dossier
+      `VOICEBUILDER_AUDIO_DIR` réglable + persistance + génération auto de `voix.txt`).
+- [ ] **M7.5 — Compatibilité** : config `server` (module venv `uvicorn`), `requirements`
+      (+ `fastapi`, `uvicorn`), doc et script de lancement.
+- [ ] (option) Déploiement derrière **nginx/caddy** en reverse proxy — non bloquant.
+
+---
+
+## Phase 4 — Qualité & performance
 
 - [ ] M4.x — Benchmark fidélité : loi variation de `max_chars`, seuil de vérif.
 - [ ] M5 — (optionnel) accélération vLLM (~0.9–0.11) ou TensorRT pour la génération.

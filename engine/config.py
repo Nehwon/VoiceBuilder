@@ -36,6 +36,17 @@ VOIX_AUDIO_DIR = Path(
 #   3) le dossier audio dédié (VOIX_AUDIO_DIR/…)
 VOIX_SEARCH_DIRS = (PROJECT_ROOT, VOIX_DIR, VOIX_AUDIO_DIR)
 
+
+def set_audio_dir(path) -> None:
+    """Change au runtime le dossier des fichiers wav/txt des voix.
+
+    Met à jour ``VOIX_AUDIO_DIR`` et ``VOIX_SEARCH_DIRS`` (utilisé par le GUI web
+    pour rendre ce dossier réglable depuis l'interface).
+    """
+    global VOIX_AUDIO_DIR, VOIX_SEARCH_DIRS
+    VOIX_AUDIO_DIR = Path(path).expanduser()
+    VOIX_SEARCH_DIRS = (PROJECT_ROOT, VOIX_DIR, VOIX_AUDIO_DIR)
+
 # --- Génération ---------------------------------------------------------------------
 DEFAULT_DEVICE = "cuda:0"
 DEFAULT_SPEED = 1.0

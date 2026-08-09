@@ -70,6 +70,68 @@ def _resolve(path: str, bases) -> Path:
     return Path(bases[0]) / path
 
 
+def collect_couples(dossier=None) -> List[tuple]:
+    """Couples ``(wav, txt)`` d'un dossier (``*.wav`` + ``*.txt`` associé).
+
+    Si ``dossier`` est absent, on prend ``config.VOIX_AUDIO_DIR``.
+    """
+    dossier = Path(dossier) if dossier is not None else config.VOIX_AUDIO_DIR
+    if not dossier.is_dir():
+        return []
+    couples = []
+    for wav in sorted(dossier.glob("*.wav")):
+        txt = wav.with_suffix(".txt")
+        if txt.exists():
+            couples.append((wav, txt))
+    return couples
+
+
+def default_nom(wav: Path) -> str:
+    """Nom de voix par défaut à partir du nom de fichier ``.wav``.
+
+    Retire un suffixe `_phrase_NNN` puis met en casse titre. L'utilisateur peut
+    ensuite renommer via l'assistant.
+    """
+    import re
+    base = re.sub(r"_phrase_?\d+$", "", wav.stem, flags=re.IGNORECASE)
+    return base.replace("_", " ").strip().title() or wav.stem
+
+
+def generer_voix_txt(dossier=None, out=None) -> Path:
+    """Génère ``voix.txt`` (une entrée par couple wav+txt du dossier).
+
+    Chaque ligne : ``[Nom] fichier.wav, fichier.txt`` (chemins du dossier).
+    Ne génère que si ``voix.txt`` est absent, pour ne pas écraser l'existant.
+    """
+    dossier = Path(dossier) if dossier is not None else config.VOIX_AUDIO_DIR
+    out = Path(out) if out else config.VOIX_FILE
+    if out.exists():
+        return out
+
+    couples = collect_couples(dossier)
+    lignes = []
+    for wav, txt in couples:
+        nom = default_nom(wav)
+        lignes.append(f"[{nom}], {wav.name}, {txt.name}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lignes) + ("\n" if lignes else ""), encoding="utf-8")
+    return out
+
+
+def ecrire_voix_txt(entries, out=None) -> Path:
+    """Écrit (écrase) ``voix.txt`` à partir d'une liste ``[(nom, wav, txt)]``."""
+    out = Path(out) if out else config.VOIX_FILE
+    out.parent.mkdir(parents=True, exist_ok=True)
+    lignes = []
+    for nom, wav, txt in entries:
+        nom = (nom or "").strip()
+        if not nom:
+            continue
+        lignes.append(f"[{nom}], {Path(wav).name}, {Path(txt).name}")
+    out.write_text("\n".join(lignes) + ("\n" if lignes else ""), encoding="utf-8")
+    return out
+
+
 def load_voix(path: Optional[Path] = None, voix_dir: Optional[Path] = None) -> Voices:
     """Charge ``voix.txt`` et construit chaque voix (wav + transcription).
 
