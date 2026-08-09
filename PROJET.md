@@ -173,17 +173,19 @@ pilotés indifféremment — dans la lignée de l'existant `voicebuilder/`.
 
 ## 8. Étapes
 
-- [ ] **M0** — Structurer `engine/` : portage de la logique validée (bloc adaptatif +
+- [x] **M0** — Structurer `engine/` : portage de la logique validée (bloc adaptatif +
       vérif) en module réutilisable.
-- [ ] **M1** — `parse_text` + `regrouper` + `multi.py` : générer un montage multi-voix
-      depuis `texte/x.md` + `voix/voix.txt` (CLI, équivalent `gen_multi_voix.py`
-      d'OmniVoice sur moteur CosyVoice).
-- [ ] **M2** — Assistant « create-voix » (segment + transcription Whisper).
-- [ ] **M3** — Première interface GUI web (Gradio) : import, éditeur Markdown avec
-      surlignage des `[Nom]`, panneau des voix, génération et pré-écoute par bloc.
-- [ ] **M4** — Affiner l'UX : autocomplétion, réglages, vérification en temps réel,
-      export.
-- [ ] **M5** — (optionnel) accélération vLLM.
+- [x] **M1** — `parse_texte` + `regrouper` + `multi.py` : générer un montage multi-voix
+      depuis `texte/x.md` + `voix/voix.txt` (CLI `tools/gen_multi_voix.py`).
+- [x] **M2** — Assistant « create-voix » (`tools/create_voix.py` : segment +
+      transcription Whisper).
+- [ ] **M2.1–M2.3** — Raffinements de l'assistant : option `--lang`, alerte si le
+      segment dépasse ~30 s, CLI/démo de bout en bout.
+- [x] **M3** — Interface **GUI web (Gradio)** (`app/web_app.py`) : éditeur Markdown
+      avec surlignage des `[Nom]`, panneau des voix, génération et pré-écoute par bloc.
+- [x] **M4** — Affiner l'UX : autocomplétion, insertion 1-clic, réglages (pause,
+      vitesse, max chars, Whisper, `device`), génération non bloquante + export.
+- [ ] **M5** — (optionnel) accélération vLLM / TensorRT pour la génération
 
 ## 9. Critères de succès
 
