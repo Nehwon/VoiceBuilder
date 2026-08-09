@@ -1,8 +1,8 @@
 [Astronogeek], Astronogeek_phrase_01.wav, Astronogeek_phrase_01.txt
 [Gachiakuta], Gachiakuta_phrase_01.wav, Gachiakuta_phrase_01.txt
 [Thepromisedneverland], Thepromisedneverland_phrase_01.wav, Thepromisedneverland_phrase_01.txt
-[Thepromisedneverland], Thepromisedneverland_phrase_02.wav, Thepromisedneverland_phrase_02.txt
-[Thepromisedneverland], Thepromisedneverland_phrase_03.wav, Thepromisedneverland_phrase_03.txt
+[Thepromisedneverland_2], Thepromisedneverland_phrase_02.wav, Thepromisedneverland_phrase_02.txt
+[Thepromisedneverland_3], Thepromisedneverland_phrase_03.wav, Thepromisedneverland_phrase_03.txt
 [Arthurhennes], arthurhennes_phrase_01.wav, arthurhennes_phrase_01.txt
 [Christophepauly], christophepauly_phrase_01.wav, christophepauly_phrase_01.txt
 [Epense], epense_phrase_01.wav, epense_phrase_01.txt

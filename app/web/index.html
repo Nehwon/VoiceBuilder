@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,63 +11,157 @@
   <header>
     <h1>🎙️ VoiceBuilder</h1>
     <span class="sous-titre">CosyVoice3 · édition multi-voix</span>
-    <div class="actions">
-      <label for="sel-doc">Document :</label>
-      <select id="sel-doc"></select>
-      <button id="btn-ouvrir">Ouvrir</button>
-      <span id="doc-statut" class="doc-statut"></span>
+    <nav class="onglets">
+      <button id="tab-edit" class="actif">Éditeur</button>
+      <button id="tab-montage" disabled>Montage</button>
+    </nav>
+    <div class="header-btns">
+      <button id="btn-aide" title="Aide à la mise en forme">❓</button>
+      <button id="btn-theme" title="Basculer le thème clair/sombre">🌙</button>
+      <button id="btn-reglages" title="Réglages">⚙️ Réglages</button>
     </div>
   </header>
 
   <div id="banniere" class="banniere" hidden>
     <span id="banniere-msg"></span>
-    <a id="banniere-lien" href="#reglages">→ Régler le dossier des voix</a>
+    <a id="banniere-lien" href="#">→ Régler le dossier des voix</a>
   </div>
 
-  <main>
+  <div id="barre-doc" class="barre-doc">
+    <label>Document
+      <select id="sel-doc"></select>
+    </label>
+    <button id="btn-ouvrir">Ouvrir</button>
+    <button id="btn-nouveau" title="Ouvrir un document vierge dans le projet">＋ Nouveau</button>
+    <button id="btn-fichier">📁 Fichier local…</button>
+    <input type="file" id="file-local" accept=".md,.txt,text/*" hidden />
+    <button id="btn-sauver" title="Enregistrer le contenu dans le projet">💾 Enregistrer dans le projet</button>
+    <span id="doc-statut" class="doc-statut"></span>
+  </div>
+
+  <main id="vue-edit" class="vue">
     <section class="col-edit">
-      <label class="section-title">Texte taggé</label>
-      <div id="zone-editeur"></div>
-      <div class="editor-preview">
-        <label class="section-title">Aperçu du montage</label>
-        <audio id="montage" controls></audio>
+      <div class="box-editeur">
+        <div class="toolbar-wysiwyg">
+          <button id="btn-personnages" title="Gérer les personnages et leurs voix">Personnages…</button>
+          <span class="sep"></span>
+          <div id="perso-boutons" class="perso-boutons"></div>
+        </div>
+        <div id="zone-editeur"></div>
       </div>
-      <pre id="log" class="log"></pre>
-      <div class="actions">
-        <button id="inserer" class="primaire">Insérer [Nom]:</button>
+      <div class="barre-boutons">
         <button id="generer" class="primaire">Générer</button>
       </div>
     </section>
+  </main>
 
-    <aside class="col-droite">
-      <section>
-        <h2>Voix (<span id="n-voix">0</span>)</h2>
-        <ul id="liste-voix" class="liste-voix"></ul>
-      </section>
-
-      <section id="reglages">
-        <h2>Réglages</h2>
-        <label>Dossier des voix
-          <input id="audio-dir" type="text" />
-        </label>
-        <button id="btn-dir">Appliquer le dossier</button>
-
-        <div class="grid-reglages">
-          <label>Pause (s)<input id="pause" type="number" step="0.05" value="0.5" /></label>
-          <label>Vitesse<input id="vitesse" type="number" step="0.05" value="1.0" /></label>
-          <label>Max chars<input id="maxchars" type="number" step="1" value="260" /></label>
-          <label><input id="verify" type="checkbox" checked /> Vérif Whisper</label>
-          <label>Device
-            <select id="device">
-              <option value="cuda:0">cuda:0</option>
-              <option value="cpu">cpu</option>
-            </select>
-          </label>
-        </div>
-        <button id="btn-save">Enregistrer réglages</button>
-      </section>
+  <main id="vue-montage" class="vue aside-vue" hidden>
+    <section class="montage">
+      <h2>Montage généré</h2>
+      <audio id="montage" controls></audio>
+      <h3>Détail des blocs</h3>
+      <pre id="log" class="log"></pre>
     </section>
   </main>
+
+  <!-- Modal : aide à la mise en forme -->
+  <div id="modal-aide" class="modal" hidden>
+    <div class="modal-boite">
+      <h2>Aide à la mise en forme</h2>
+      <p>Le texte est découpé en <em>blocs</em>. Chaque bloc est annoncé par un
+        personnage entre crochets, suivi de ses répliques.</p>
+      <h3>Structure</h3>
+      <pre>[Narrateur]: Il était une fois un royaume lointain.
+[Roi]: Qui ose pénétrer dans mon antre ?
+[Chevalier]: Moi, sire.</pre>
+      <h3>Règles</h3>
+      <ul>
+        <li>Chaque <code>[Personnage]:</code> ouvre un bloc lu par la voix associée au personnage.</li>
+        <li>Toutes les lignes qui suivent une balise sont lues à la suite par ce personnage, jusqu'à la balise suivante — aucune ligne n'est ignorée.</li>
+        <li>Une ligne qui ne commence pas par une balise reprend donc la voix en cours (celle du dernier personnage cité).</li>
+        <li>Les lignes débutant par <code>#</code> sont des commentaires (ignorés du montage).</li>
+        <li>L'éditeur complète la balise avec la touche <kbd>Tab</kbd>.</li>
+      </ul>
+      <h3>Réglages de lecture</h3>
+      <ul>
+        <li><strong>Pause</strong> : silence (s) entre deux blocs.</li>
+        <li><strong>Vitesse</strong> : facteur de vitesse de la synthèse.</li>
+        <li><strong>Max chars</strong> : longueur maximale découpée par bloc de synthèse.</li>
+        <li><strong>Vérif Whisper</strong> : contrôle l'énoncé par transcription après génération.</li>
+      </ul>
+      <div class="modal-actions">
+        <button id="btn-aide-fermer">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : réglages -->
+  <div id="modal-reglages" class="modal" hidden>
+    <div class="modal-boite">
+      <h2>Réglages</h2>
+
+      <label>Dossier des voix
+        <input id="audio-dir" type="text" />
+      </label>
+      <button id="btn-dir">Appliquer le dossier</button>
+
+      <div class="grid-reglages">
+        <label>Pause (s)<input id="pause" type="number" step="0.05" value="0.5" /></label>
+        <label>Vitesse<input id="vitesse" type="number" step="0.05" value="1.0" /></label>
+        <label>Max chars<input id="maxchars" type="number" step="1" value="260" /></label>
+        <label><input id="verify" type="checkbox" checked /> Vérif Whisper</label>
+        <label>Device
+          <select id="device">
+            <option value="cuda:0">cuda:0</option>
+            <option value="cpu">cpu</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="btn-modal-fermer">Fermer</button>
+        <button id="btn-save" class="primaire">Enregistrer réglages</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : personnages → voix -->
+  <div id="modal-personnages" class="modal" hidden>
+    <div class="modal-boite modal-large">
+      <h2>Personnages du récit</h2>
+      <p class="modal-sub">Chaque personnage est associé à une voix. La balise <code>[Personnage]:</code> sera
+        lue par la voix choisie, et un bouton du personnage apparaîtra dans la barre d'outils.</p>
+      <table class="table-perso">
+        <thead>
+          <tr><th>Personnage</th><th>Voix</th><th></th></tr>
+        </thead>
+        <tbody id="perso-lignes"></tbody>
+      </table>
+      <button id="btn-perso-ajouter" class="secondaire">＋ Ajouter un personnage</button>
+      <div class="modal-actions">
+        <button id="btn-perso-fermer">Fermer</button>
+        <button id="btn-perso-save" class="primaire">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : nom de document (Nouveau / Enregistrer) -->
+  <div id="modal-nom" class="modal" hidden>
+    <div class="modal-boite">
+      <h2 id="nom-titre">Nom du document</h2>
+      <label>Nom (extension .md ou .txt)
+        <input id="nom-input" type="text" placeholder="histoire.md" />
+      </label>
+      <div class="modal-actions">
+        <button id="btn-nom-annuler">Annuler</button>
+        <button id="btn-nom-ok" class="primaire">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <footer class="pied-de-page">with ❤️ by Nehwonlm</footer>
 
   <script src="/web/vendor/codemirror.min.js"></script>
   <script src="/web/vendor/mode_tagged.js"></script>

@@ -6,6 +6,34 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ---
 
+## [0.4.0] — 2026-08-10
+
+### Changement
+- **GUI serveur FastAPI (Phase 3, M7)** — `app/server.py` (uvicorn) devient
+  l'interface principale : sert le frontend statique (`app/web/`) + une API REST
+  JSON, avec génération en tâche de fond et progression `SSE`. Gradio
+  (`app/web_app.py`) reste disponible mais n'est plus l'interface de référence.
+- **Personnages par document** — le texte porte désormais des balises
+  **personnage** (`[Narrateur]:`) ; chaque personnage est associé à une voix via
+  une **modal** (tableau Personnage | Voix). Le mapping est sauvegardé **par
+  document** dans un fichier **`<nomdutexte>.map`** (CSV `voix,personnage`) posé
+  dans `texte/`. La barre d'outils affiche un **bouton par personnage**.
+- **Moteur** — `multi.generate(..., personnages=)` résout personnage→voix à la
+  génération ; `load_voix`/`_lire_csv_mapping` relisent le `.map`. Balise
+  cohérente : les lignes entre deux balises sont lues avec la voix en cours
+  (aucune ligne de contenu ignorée).
+- **UX frontend** — modales in-app pour Réglages, Aide et Personnages (plus
+  aucune `alert()` navigateur) ; notifications en **toast** ; **thème clair par
+  défaut** + bascule clair/sombre (choix mémorisé) ; **pied de page fixe** ;
+  **lecteur/montage dans l'onglet « Montage »** (actif seulement après une
+  génération) ; **éditeur plein cadre** s'arrêtant à 1 em du footer.
+- **Gestion des documents** — ouverture d'un **fichier local**, boutons
+  **＋ Nouveau** (document vierge) et **💾 Enregistrer dans le projet** (le
+  contenu importé devient un document `texte/` avec copie de travail + `.map`).
+- **`voix.txt`** — les noms en doublon sont automatiquement numérotés
+  (`Nom`, `Nom_2`, `Nom_3`), rendant visibles les variantes d'une même voix.
+- Frontend servi avec `Cache-Control: no-store` (pas d'assets obsolètes en cache).
+
 ## [0.3.0] — 2026-08-09
 
 ### Changement

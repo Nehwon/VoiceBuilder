@@ -31,6 +31,7 @@ def _synthesize_for(
 def generate(
     texte_path: str,
     voices: Voices,
+    personnages: Optional[dict] = None,
     out: Optional[str] = None,
     max_block_chars: Optional[int] = None,
     pause: Optional[float] = None,
@@ -43,6 +44,11 @@ def generate(
 ) -> dict:
     """Génère l'audio complet pour un texte taggé et une liste de voix.
 
+    Les balises du texte sont des **noms de personnages**. ``personnages`` est un
+    mapping ``{personnage: nom_de_voix}``. S'il est absent, on suppose que chaque
+    personnage porte le même nom qu'une voix (mapping identité, comportement
+    historique de l'outil).
+
     ``out`` : chemin WAV écrit. Renvoie un dict avec ``audio``, ``sample_rate``,
     ``duration``, ``blocs`` et ``out``.
 
@@ -53,9 +59,12 @@ def generate(
     if verbose:
         print(f"Voix disponibles : {voices.names()}")
 
-    segments = parse_texte(_read_text(texte_path), voices.names())
+    if personnages is None:
+        personnages = {n: n for n in voices.names()}
+
+    segments = parse_texte(_read_text(texte_path), list(personnages))
     blocs = regrouper(segments)
-    inconnus = {pers for pers, _ in blocs if pers not in voices}
+    inconnus = {pers for pers, _ in blocs if pers not in personnages}
     if inconnus:
         raise ValueError(f"Personnage(s) sans voix définie : {inconnus}")
 
@@ -70,7 +79,10 @@ def generate(
     blocs_report: List[Tuple[str, int, float]] = []
     total = len(blocs)
     for i, (pers, block) in enumerate(blocs, 1):
-        voice = voices.get(pers)
+        voix_nom = personnages[pers]
+        if voix_nom not in voices:
+            raise ValueError(f"Voix introuvable pour le personnage « {pers} » : {voix_nom}")
+        voice = voices.get(voix_nom)
         block_chars = voice.max_block_chars or max_chars
         block_speed = voice.speed if voice.speed is not None else (speed or config.DEFAULT_SPEED)
 

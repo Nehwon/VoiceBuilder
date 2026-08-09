@@ -22,6 +22,7 @@ import queue
 import sys
 import tempfile
 import threading
+import csv
 from pathlib import Path
 
 import uvicorn
@@ -43,6 +44,15 @@ _PERSISTANCE = config.PROJECT_ROOT / "voicebuilder_settings.json"
 _BROUILLONS = config.TEXTE_DIR / "brouillons"
 
 app = FastAPI(title="VoiceBuilder", version="0.1.0")
+
+
+@app.middleware("http")
+async def _frontend_no_store(request, call_next):
+    """Empêche le cache navigateur sur le frontend (dev : toujours à jour)."""
+    response = await call_next(request)
+    if request.url.path.startswith(("/web/", "/")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def _charger_persistance() -> dict:
@@ -110,6 +120,7 @@ class NommageIn(BaseModel):
 
 class GenererIn(BaseModel):
     texte: str
+    personnages: dict[str, str] = {}
     pause: float = 0.5
     vitesse: float = 1.0
     max_chars: int = 260
@@ -117,10 +128,19 @@ class GenererIn(BaseModel):
     device: str = "cuda:0"
 
 
+class PersonnagesSaveIn(BaseModel):
+    fichier: str
+    personnages: dict[str, str]
+
+
 class DocumentOuvrirIn(BaseModel):
     fichier: str
 
 class DocumentSaveIn(BaseModel):
+    fichier: str
+    contenu: str
+
+class DocumentSauverIn(BaseModel):
     fichier: str
     contenu: str
 
@@ -213,7 +233,7 @@ def api_generer(payload: GenererIn):
     def _run():
         try:
             res = multi.generate(
-                str(tmp), _voix(), out=str(sortie),
+                str(tmp), _voix(), personnages=payload.personnages, out=str(sortie),
                 pause=payload.pause, speed=payload.vitesse,
                 max_block_chars=payload.max_chars,
                 verify=payload.verify, device=payload.device,
@@ -315,6 +335,98 @@ def api_enregistrer(payload: DocumentSaveIn):
     brouillon = _BROUILLONS / payload.fichier
     brouillon.write_text(payload.contenu, encoding="utf-8")
     return {"enregistre": brouillon.name}
+
+
+@app.post("/api/document/sauver")
+def api_document_sauver(payload: DocumentSauverIn):
+    """Enregistre un document dans le projet (créer ou écraser) + copie de travail.
+
+    Permet de sauver dans ``texte/`` un contenu venu d'un fichier local ou d'une
+    session neuve, en tant que véritable document de projet.
+    """
+    nom = payload.fichier.strip()
+    if not nom or nom.startswith("."):
+        raise HTTPException(400, "Nom de document invalide.")
+    p = (config.TEXTE_DIR / nom).resolve()
+    if not p.is_relative_to(config.TEXTE_DIR.resolve()):
+        raise HTTPException(400, "Fichier hors du dossier projet.")
+    if p.suffix not in (".md", ".txt"):
+        raise HTTPException(400, "Extension autorisée : .md ou .txt")
+    p.write_text(payload.contenu, encoding="utf-8")
+    _BROUILLONS.mkdir(parents=True, exist_ok=True)
+    brouillon = _BROUILLONS / p.name
+    brouillon.write_text(payload.contenu, encoding="utf-8")
+    return {"fichier": p.name, "brouillon": brouillon.name}
+
+
+def _fichier_personnages(fichier: str) -> Path:
+    """Chemin du mapping personnage→voix pour un document du projet.
+
+    Le mapping est un fichier ``nomdutexte.map`` (CSV) posé à côté du texte
+    dans ``texte/`` — ex. ``texte/exemple_demo.md`` → ``texte/exemple_demo.map``.
+    Contenu (CSV, en-tête compris) : ``voix,personnage`` sur deux colonnes.
+    """
+    _chemin_projet(fichier)                       # valide le nom
+    return config.TEXTE_DIR / (Path(fichier).stem + ".map")
+
+
+def _lire_csv_mapping(p: Path) -> dict:
+    """Lit un ``.map`` CSV en dict ``{personnage: voix}`` (tolérant à l'ordre)."""
+    mapping: dict[str, str] = {}
+    with open(p, encoding="utf-8", newline="") as f:
+        rows = list(csv.reader(f))
+    if not rows or not rows[0]:
+        return mapping
+    header = [c.strip().lower() for c in rows[0]]
+    try:
+        i_pers = header.index("personnage")
+        i_voix = header.index("voix")
+    except ValueError:
+        return mapping
+    for row in rows[1:]:
+        if len(row) < 2:
+            continue
+        pers = row[i_pers].strip()
+        voix = row[i_voix].strip()
+        if pers and voix:
+            mapping[pers] = voix
+    return mapping
+
+
+def _ecrire_csv_mapping(p: Path, mapping: dict) -> None:
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["voix", "personnage"])
+        for pers, voix in mapping.items():
+            if pers.strip() and voix:
+                w.writerow([voix, pers])
+
+
+@app.get("/api/document/personnages")
+def api_personnages_get(fichier: str):
+    _chemin_projet(fichier)
+    p = _fichier_personnages(fichier)
+    personnages = {}
+    if p.exists():
+        try:
+            personnages = _lire_csv_mapping(p)
+        except (OSError, csv.Error):
+            personnages = {}
+    voix = []
+    try:
+        voix = _voix().names()
+    except Exception:  # noqa: BLE001
+        voix = []
+    return {"fichier": fichier, "personnages": personnages, "voix": voix}
+
+
+@app.post("/api/document/personnages")
+def api_personnages_save(payload: PersonnagesSaveIn):
+    p = _fichier_personnages(payload.fichier)
+    propre = {k: v for k, v in payload.personnages.items() if k.strip() and v}
+    _ecrire_csv_mapping(p, propre)
+    return {"fichier": payload.fichier, "personnages": propre}
 
 
 # ---------------------------------------------------------------------------

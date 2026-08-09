@@ -65,6 +65,22 @@ Avec la **documentation d'utilisation** (`docs/UTILISATION.md`), dont la partie
 **« Tags non-verbaux / émotions spécifiques à CosyVoice3 »** détaillée point par
 point.
 
+### M7/M8 — GUI sur serveur HTTP local (FastAPI)
+**Objectif** : remplacer l'interface par un petit serveur local (Python+FastAPI)
+servant un frontend dédié + une API REST, avec une vraie gestion du document de
+projet (auto-sauvegarde d'une copie de travail, bannière si dossier des voix manquant).
+**Livrables** : `app/server.py`, `app/web/` (frontend CodeMirror, modales, thème
+clair/sombre), endpoints `/api/*` (voix, config, generation SSE, documents).
+**Statut** : ✔ Terminé.
+
+### M9/M10 — Personnages & montage (production éditoriale)
+**Objectif** : baliser le texte par **personnage** et associer chaque personnage à
+une voix, le mapping étant persistant **par document** (fichier `.map`, CSV) ;
+monter le résultat dans un **onglet « Montage »** dédié.
+**Livrables** : modal « Personnages », bouton par personnage dans la barre
+d'outils, `multi.generate(personnages=)`, `app/server.py` (`/api/document/personnages`).
+**Statut** : ✔ Terminé.
+
 ### M5 — Performance (optionnel)
 **Objectif** : réduire le temps de génération via vLLM ou TensorRT ; frontend de
 normalisation (`wetext`/`ttsfrd`) pour la prosodie FR.

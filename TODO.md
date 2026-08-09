@@ -34,12 +34,11 @@ Légende :
 
 ## Phase 2 — Interface graphique (GUI)
 
-- [ ] **M3 — Première maquette** (`app/gui.py`).
-  - [ ] Ouvrir un texte brut (`.md`/`.txt`) et création du fichier de voix si absent.
-  - [ ] Éditeur Markdown : surlignage des `[Locuteur]:`, tags inline, prose narrateur.
-  - [ ] Panneau des voix : liste depuis `voix.txt`, pré-écoute du `.wav`, lancement de `create_voix`.
-  - [ ] Bouton génération multi-voix : progression + log par bloc (personnage, durée, nb sous-blocs).
-  - [ ] Verdict. : blocs revérifiés / rapprochés, pré-écoute par segment, export.
+> Réalisé via le **GUI serveur FastAPI** (Phase 3/4) et le GUI Gradio (Phase 2.5) :
+> l'ancien `app/gui.py` (tkinter) a été supprimé.
+- [x] **M3 — GUI** : ouvrir un texte brut (`.md`/`.txt`), éditeur avec surlignage
+      des `[Locuteur]:`, panneau des voix (liste + pré-écoute), génération avec
+      progression + log par bloc, vérification et export.
 - [x] **M4 — Affiner l'UX**
   - [x] **Autocomplétion des noms de voix** — touche `Tab` : complète `[Pré` → `[LeNarrateur]` (insensible à la casse) ; déclenchement uniquement après un `[`.
   - [x] **Insertion d'un bloc `[Nom]:` en un clic** — bouton « Insérer [Nom]: » (reprend la voix sélectionnée dans le panneau).
@@ -56,14 +55,14 @@ Légende :
 
 ## Phase 2.5 — GUI web (Gradio) & gestion du dossier des voix
 
-- [ ] **M6 — GUI web (Gradio)** (`app/web_app.py`) : éditeur de texte taggé, panneau
+- [x] **M6 — GUI web (Gradio)** (`app/web_app.py`) : éditeur de texte taggé, panneau
       des voix, génération multi-voix, réglages et assistant voix dans le navigateur.
-- [ ] **M6.1 — Réglage du dossier des voix** : choix du répertoire des fichiers
+- [x] **M6.1 — Réglage du dossier des voix** : choix du répertoire des fichiers
       `.wav`/`.txt` (`VOICEBUILDER_AUDIO_DIR`) côté UI, avec persistance.
-- [ ] **M6.2 — Auto-génération de `voix.txt`** : si absent, le générer depuis le
+- [x] **M6.2 — Auto-génération de `voix.txt`** : s'il est absent, le générer depuis le
       dossier configuré (une entrée par coupe `.wav` + `.txt`, nom par défaut déduit
       du nom de fichier).
-- [ ] **M6.3 — Nommage des voix existantes** : dans l'assistant voix, attribuer un
+- [x] **M6.3 — Nommage des voix existantes** : dans l'assistant voix, attribuer un
       `[Nom]` personnage aux voix déjà présentes dans le dossier (et non encore
       nommées) et l'écrire dans `voix.txt`.
 
@@ -98,23 +97,38 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ## Phase 4 — Gestion d'un document de projet (éditeur)
 
-- [ ] **M8 — Document de travail & auto-sauvegarde**
-  - [ ] **M8.1 — Ouvrir** un fichier du dossier projet (`.md`/`.txt`) dans
+- [x] **M8 — Document de travail & auto-sauvegarde**
+  - [x] **M8.1 — Ouvrir** un fichier du dossier projet (`.md`/`.txt`) dans
         l'éditeur ; toute modification fait l'objet d'un **enregistrement
-        automatique** d'une **copie de travail** dans le dossier projet — sans
-        jamais modifier le **fichier d'origine**.
-- [ ] **M8.2 — Fichier des voix** :
-  - [ ] si `voix.txt` est absent, **vérifier que le dossier des voix** est
+        automatique** d'une **copie de travail** dans `texte/brouillons/` — sans
+        jamais modifier le **fichier d'origine** (`POST /api/document/*`).
+- [x] **M8.2 — Fichier des voix** :
+  - [x] si `voix.txt` est absent, **vérifier que le dossier des voix** est
         configuré (`VOICEBUILDER_AUDIO_DIR`) ;
-  - [ ] si non configuré : afficher une **erreur en haut de page** avec un
-        **lien vers la « Réglages »**, pour configurer le dossier ;
-  - [ ] à la configuration du dossier, **générer `voix.txt` dans le dossier du
+  - [x] si non configuré : afficher une **bannière d'erreur en haut de page** avec
+        un **lien vers « Réglages »**, pour configurer le dossier ;
+  - [x] à la configuration du dossier, **générer `voix.txt` dans le dossier du
         projet** ; si **plusieurs fichiers portent le même nom**, les **numéroter**
         (suffixe `_2`, `_3`, …).
 
 ---
 
-## Phase 5 — Qualité & performance
+## Phase 4.5 — Personnages & montage (production éditoriale)
+
+> Le texte se balise par **personnage**, mappé à une voix, et le montage vit dans
+> un onglet dédié.
+- [x] **M9 — Mapping personnage → voix par document**
+  - [x] La balise du texte porte le **personnage** (`[Narrateur]:`), associé à une
+        voix via une **modal « Personnages »** (tableau Personnage | Voix).
+  - [x] Un **bouton par personnage** dans la barre d'outils insère sa balise.
+  - [x] Persistance **par document** dans `texte/<nomdutexte>.map` (**CSV**
+        `voix,personnage`), relu à l'ouverture du document.
+  - [x] `multi.generate(..., personnages=)` résout personnage→voix à la génération
+        ; les lignes sans balise sont lues avec la voix en cours (aucune perte).
+- [x] **M10 — Onglet « Montage »** : lecteur audio + détail des blocs, actif
+      uniquement après une génération avec du contenu dans l'éditeur.
+
+---
 
 - [ ] M4.x — Benchmark fidélité : loi variation de `max_chars`, seuil de vérif.
 - [ ] M5 — (optionnel) accélération vLLM (~0.9–0.11) ou TensorRT pour la génération.
