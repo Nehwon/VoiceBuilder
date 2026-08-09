@@ -29,6 +29,8 @@ VoiceBuilder/
 │   ├── voix.py              # voix.txt
 │   ├── tagging.py           # parse du format taggé
 │   └── config.py            # chemins + valeurs par défaut
+├── app/
+│   └── web_app.py    # GUI web (Gradio)
 ├── voix/            # voix.txt + paires .wav/.txt
 ├── texte/           # projets d'écriture taggés
 ├── output/          # montages produits
@@ -37,8 +39,8 @@ VoiceBuilder/
     └── create_voix.py       # assistant de création de voix
 ```
 
-Le backend est exposé en bibliothèque (`engine/`) pour être piloté indifféremment
-par une CLI ou une GUI (`app/`).
+Le backend est exposé en bibliothèque (`engine/`), piloté indifféremment par une
+CLI ou par la **GUI web** (`app/web_app.py`, Gradio).
 
 ---
 
@@ -100,7 +102,18 @@ Les chemins listés dans `voix.txt` sont alors résolus, dans l'ordre, parmi :
 
 ## Usage
 
-### Génération multi-voix (M1)
+### GUI web (Gradio)
+
+```bash
+python -m app.web_app --host 127.0.0.1 --port 7860
+# puis ouvrir http://127.0.0.1:7860
+```
+
+Onglets : **Éditeur** (texte taggé + montage), **Réglages** (pause, vitesse, taille
+de bloc, Whisper, `device`), **Assistant voix** (extraction + transcription d'un
+extrait). Options CLI : `--host`, `--port`, `--share`.
+
+### Génération multi-voix (M1, CLI)
 
 ```bash
 python -m tools.gen_multi_voix texte/chapitre.md \

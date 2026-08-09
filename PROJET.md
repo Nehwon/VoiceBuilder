@@ -101,7 +101,13 @@ taille de sous-bloc max/min, seuil de vérification (défaut 0.85).
 
 ---
 
-## 5. L'interface (GUI)
+## 5. L'interface (GUI web)
+
+Le GUI est une **application web** bâtie sur **Gradio** (`app/web_app.py`).
+Elle expose dans le navigateur l'édition du texte taggé, le panneau des voix, les
+réglages et la génération multi-voix (le backend `engine/` est appelé côté
+serveur). Expérience équivalente (et portable) à une GUI native, sans frontend
+séparé.
 
 Priorités de l'écran principal :
 
@@ -119,6 +125,11 @@ Priorités de l'écran principal :
    - **pré-écoute par segment** et **export** du montage final.
 5. **Réglages** : vitesse globale, pause, device, fp16 (panneau avancé).
 
+```bash
+python -m app.web_app --host 127.0.0.1 --port 7860   # GUI web (Gradio)
+# ouvrir http://127.0.0.1:7860
+```
+
 ---
 
 ## 6. Architecture cible
@@ -126,23 +137,24 @@ Priorités de l'écran principal :
 ```
 VoiceBuilder/
 ├── PROJET.md                  # ce document
-├── app/                       # GUI (voir §5)
-│   └── gui.py                 #   fenêtre principale (éditeur + panneaux)
+├── app/                       # GUI web (voir §5)
+│   └── web_app.py             #   application Gradio (éditeur + panneaux)
 ├── engine/                    # backend — moteur CosyVoice + logique
 │   ├── cosyvoice_engine.py    #   wrapper AutoModel (CosyVoice3), zero_shot
 │   ├── adaptive.py            #   découpage adaptatif vérifié (cf. boutique script)
 │   ├── multi.py               #   pipeline multi-voix (parse, regrouper, concat)
 │   ├── voix.py                #   chargement/parsing de voix.txt
-│   └── verify.py              #   vérification par transcription Whisper
+│   └── verifier.py            #   vérification par transcription Whisper
 ├── voix/                      # voix.txt + paires .wav/.txt
 ├── texte/                     # projets d'écriture taggés
 ├── output/                    # montages audio produits
 └── tools/
+    ├── gen_multi_voix.py      # génération multi-voix (CLI)
     └── create_voix.py         # assistant création de voix (CLI)
 ```
 
-Backend exposé comme bibliothèque (API propre) pour être piloté indifféremment par un
-GUI ou une CLI — dans la lignée de l'existant `voicebuilder/`.
+Backend (CLI) et **GUI web** (Gradio) exposés en bibliothèque (`engine/`) pour être
+pilotés indifféremment — dans la lignée de l'existant `voicebuilder/`.
 
 ---
 
@@ -167,8 +179,8 @@ GUI ou une CLI — dans la lignée de l'existant `voicebuilder/`.
       depuis `texte/x.md` + `voix/voix.txt` (CLI, équivalent `gen_multi_voix.py`
       d'OmniVoice sur moteur CosyVoice).
 - [ ] **M2** — Assistant « create-voix » (segment + transcription Whisper).
-- [ ] **M3** — Premier maquillage GUI : import, éditeur Markdown avec surlignage des
-      `[Nom]`, génération et pré-élection par bloc.
+- [ ] **M3** — Première interface GUI web (Gradio) : import, éditeur Markdown avec
+      surlignage des `[Nom]`, panneau des voix, génération et pré-écoute par bloc.
 - [ ] **M4** — Affiner l'UX : autocomplétion, réglages, vérification en temps réel,
       export.
 - [ ] **M5** — (optionnel) accélération vLLM.

@@ -177,14 +177,15 @@ python -m tools.gen_multi_voix texte/chapitre.md \
 Options : `--voix`, `--pause`, `--vitesse`, `--max-chars`, `--no-verify`,
 `--texte-dir`. Sans `-o`, sortie `output/<nom-du-fichier>.wav`.
 
-### GUI
+### GUI web (Gradio)
 
 ```bash
-python -m app.gui
+python -m app.web_app --host 127.0.0.1 --port 7860   # puis ouvrir http://127.0.0.1:7860
 ```
 
-Éditeur Markdown (surlignage des `[Nom]:`), panneau des voix, bouton **Générer**
-(choix du `.wav`), champ `pause`, barre de progression/statut.
+Onglets **Éditeur** (texte taggé, insertion `[Nom]:`, bouton **Générer**, aperçu du
+montage), **Réglages** (pause, vitesse, max chars/bloc, vérification, `device`) et
+**Assistant voix** (extraction + transcription Whisper d'un extrait).
 
 ---
 

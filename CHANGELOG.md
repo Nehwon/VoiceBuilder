@@ -6,6 +6,17 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ---
 
+## [0.3.0] — 2026-08-09
+
+### Changement
+- **GUI web (Gradio)** — `app/web_app.py` remplace la GUI native : onglets
+  Éditeur / Réglages / Assistant voix, génération multi-voix via `engine/`.
+- **Suppression** du backend **Go** (`gui/`, prototype Fyne) et de la GUI
+  tkinter `app/gui.py` ; l'application web les remplace.
+- `requirements.txt` : ajout de `gradio>=4.0`.
+- Mise à jour de `README.md`, `PROJET.md` (§5 interface, §6 architecture) et
+  `docs/UTILISATION.md` (§GUI web) pour refléter la GUI web.
+
 ## [0.2.0] — 2026-08-08
 
 ### Ajout

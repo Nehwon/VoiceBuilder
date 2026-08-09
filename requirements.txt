@@ -3,3 +3,4 @@ soundfile>=0.12
 librosa>=0.10
 openai-whisper
 torch
+gradio>=4.0
