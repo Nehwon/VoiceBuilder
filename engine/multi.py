@@ -28,6 +28,21 @@ def _synthesize_for(
     )
 
 
+def load(device: Optional[str] = None, fp16: Optional[bool] = None):
+    """Ré-export du chargement (une seule fois) du modèle CosyVoice3."""
+    return cosyvoice_engine.load(device=device, fp16=fp16)
+
+
+def synth_bloc(
+    voice, text: str, model, sample_rate, block_chars=None, speed=None, verify=None,
+) -> np.ndarray:
+    """Synthetise un seul bloc pour une voix (réutilisable pour la régénération)."""
+    block_chars = voice.max_block_chars or block_chars or config.DEFAULT_MAX_BLOCK_CHARS
+    spd = voice.speed if voice.speed is not None else (speed or config.DEFAULT_SPEED)
+    chk = config.VERIFY_ENABLED if verify is None else verify
+    return _synthesize_for(text, model, sample_rate, voice, block_chars, spd, chk)
+
+
 def generate(
     texte_path: str,
     voices: Voices,
@@ -39,6 +54,7 @@ def generate(
     verify: Optional[bool] = None,
     device: Optional[str] = None,
     fp16: Optional[bool] = None,
+    block_dir: Optional[str] = None,
     verbose: bool = True,
     progress=None,
 ) -> dict:
@@ -76,7 +92,10 @@ def generate(
     pause_n = int(pause * sr)
 
     parts: List[np.ndarray] = []
-    blocs_report: List[Tuple[str, int, float]] = []
+    blocs_report: List[dict] = []
+    block_dir = Path(block_dir) if block_dir else None
+    if block_dir:
+        block_dir.mkdir(parents=True, exist_ok=True)
     total = len(blocs)
     for i, (pers, block) in enumerate(blocs, 1):
         voix_nom = personnages[pers]
@@ -89,7 +108,15 @@ def generate(
         audio = _synthesize_for(block, model, sr, voice, block_chars, block_speed, verify)
         parts.append(audio)
         dur = len(audio) / sr
-        blocs_report.append((pers, len(block), round(dur, 2)))
+        info = {
+            "id": i, "personnage": pers, "voix": voix_nom, "texte": block,
+            "chars": len(block), "duree": round(dur, 2),
+        }
+        if block_dir:
+            wav = block_dir / f"bloc_{i}.wav"
+            cosyvoice_engine.save(audio, sr, str(wav))
+            info["wav"] = str(wav)
+        blocs_report.append(info)
         if verbose:
             print(f"[{i}/{total}] {pers} ({len(block)} chars) -> {dur:.2f} s")
         if progress:
@@ -110,5 +137,5 @@ def generate(
         if verbose:
             print(f"\nEnregistré : {out} ({res['duration']} s)")
     if progress:
-        progress({"duree": res["duration"], "blocs": blocs_report})
+        progress({"duree": res["duration"], "blocs": len(blocs_report)})
     return res

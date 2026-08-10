@@ -54,7 +54,8 @@ DEFAULT_PAUSE = 0.5          # silence (s) entre deux blocs de locuteurs
 DEFAULT_FP16 = False
 
 # Découpage adaptatif (validé expérimentalement) :
-DEFAULT_MAX_BLOCK_CHARS = 260      # longueur max cible d'un bloc avant drop
+DEFAULT_MAX_BLOCK_CHARS = 600      # longueur max cible d'un bloc (fusionner plus de
+                                   # texte par lot → moins de ruptures de ton)
 DEFAULT_MIN_BLOCK_WORDS = 8        # en dessous, on ne re-split plus
 
 # --- Vérification (Whisper) -----------------------------------------------------------

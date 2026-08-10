@@ -178,6 +178,8 @@ button {
 }
 button:hover { border-color: var(--acc); }
 button.primaire { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+button.primaire:disabled, button:disabled { opacity: .55; cursor: not-allowed; }
+button.primaire.en-cours { background: var(--dim); border-color: var(--dim); }
 button.secondaire { border-color: var(--bor); }
 .grid-reglages { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
 
@@ -223,3 +225,19 @@ button.secondaire { border-color: var(--bor); }
 .toast[hidden] { display: none; }
 .toast.ok { border-left-color: #3fa24f; }
 .toast.erreur { border-left-color: #d33; }
+
+/* ---------------------------------------------------------------- montage / blocs */
+.montage audio { width: 100%; margin: 8px 0; }
+.montage-toolbar { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+.montage-toolbar button { margin-top: 0; }
+.montage-bloc-select { margin: 12px 0 8px; }
+.montage-bloc-select select { width: 100%; padding: 6px; }
+.bloc-panel {
+  background: var(--panel2); border: 1px solid var(--bor);
+  border-radius: 6px; padding: 10px 12px; margin: 10px 0;
+}
+.bloc-panel[hidden] { display: none; }
+.bloc-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+.bloc-actions button { margin: 0; }
+.bloc-detail { color: var(--dim); font-size: 12px; margin-top: 8px; }
+.montage .log { margin-top: 6px; max-height: 200px; overflow: auto; }

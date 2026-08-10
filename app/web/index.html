@@ -13,7 +13,7 @@
     <span class="sous-titre">CosyVoice3 · édition multi-voix</span>
     <nav class="onglets">
       <button id="tab-edit" class="actif">Éditeur</button>
-      <button id="tab-montage" disabled>Montage</button>
+      <button id="tab-montage">Montage</button>
     </nav>
     <div class="header-btns">
       <button id="btn-aide" title="Aide à la mise en forme">❓</button>
@@ -55,11 +55,32 @@
     </section>
   </main>
 
-  <main id="vue-montage" class="vue aside-vue" hidden>
+  <main id="vue-montage" class="vue" hidden>
     <section class="montage">
       <h2>Montage généré</h2>
       <audio id="montage" controls></audio>
-      <h3>Détail des blocs</h3>
+
+      <div class="montage-toolbar">
+        <button id="btn-concat" class="primaire">🔄 Re-créer le montage</button>
+        <span id="montage-info"></span>
+      </div>
+
+      <h3>Blocs (locuteur / durée)</h3>
+      <div class="montage-bloc-select">
+        <label for="sel-bloc">Bloc</label>
+        <select id="sel-bloc"></select>
+      </div>
+
+      <div id="bloc-panel" class="bloc-panel">
+        <div class="bloc-actions">
+          <button id="btn-bloc-regenerer">Regénérer ce bloc</button>
+          <button id="btn-bloc-diviser">Diviser ce bloc</button>
+        </div>
+        <audio id="bloc-audio" controls></audio>
+        <div id="bloc-detail" class="bloc-detail"></div>
+      </div>
+
+      <h3>Log de génération</h3>
       <pre id="log" class="log"></pre>
     </section>
   </main>
@@ -108,7 +129,7 @@
       <div class="grid-reglages">
         <label>Pause (s)<input id="pause" type="number" step="0.05" value="0.5" /></label>
         <label>Vitesse<input id="vitesse" type="number" step="0.05" value="1.0" /></label>
-        <label>Max chars<input id="maxchars" type="number" step="1" value="260" /></label>
+        <label>Max chars<input id="maxchars" type="number" step="1" value="600" /></label>
         <label><input id="verify" type="checkbox" checked /> Vérif Whisper</label>
         <label>Device
           <select id="device">

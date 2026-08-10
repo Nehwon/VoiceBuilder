@@ -34,20 +34,15 @@ function mountVue(nom) {
   $("tab-edit").classList.toggle("actif", nom === "edit");
   $("tab-montage").classList.toggle("actif", nom === "montage");
   if (nom === "edit" && cm) cm.refresh();
+  if (nom === "montage" && montageId) chargerBlocs();
 }
 $("tab-edit").addEventListener("click", () => mountVue("edit"));
-$("tab-montage").addEventListener("click", () => {
-  if (!$("tab-montage").disabled) mountVue("montage");
-});
+$("tab-montage").addEventListener("click", () => mountVue("montage"));
 
-// l'onglet Montage n'est accessible que s'il y a un résultat ET de l'éditeur
+// l'onglet Montage est toujours accessible (le contenu dépend du résultat)
 function majMontage() {
   const actif = !!(montageId && cm && cm.getValue().trim());
-  $("tab-montage").disabled = !actif;
-  if (!actif) {
-    $("tab-montage").classList.remove("actif");
-    if ($("vue-montage") && !$("vue-montage").hidden) mountVue("edit");
-  }
+  $("tab-montage").classList.toggle("actif", $("vue-montage") && !$("vue-montage").hidden);
 }
 
 // ---------------------------------------------------------------- notifications (in-app)
@@ -114,7 +109,7 @@ function initEditeur() {
     placeholder: "[Narrateur]: …",
     extraKeys: { Tab: completer },
   });
-  cm.on("change", () => { autoEnregistrer(); majMontage(); });
+  cm.on("change", () => { autoEnregistrer(); majMontage(); majBoutonGenerer(); });
 }
 
 // ---------------------------------------------------------------- autocomplétion (Tab)
@@ -286,9 +281,15 @@ function majBoutonsPerso() {
     b.textContent = pers;
     b.title = `Insérer la balise [${pers}]: (voix : ${personnages[pers] || "—"})`;
     b.onclick = () => {
-      let t = cm.getValue();
-      if (t && !t.endsWith("\n")) t += "\n";
-      cm.setValue(t + `[${pers}]: `);
+      const ins = `[${pers}]: `;
+      const sel = cm.getSelection();
+      const pos = cm.getCursor();
+      if (!sel) {
+        cm.replaceRange(ins, pos);
+      } else {
+        const { from, to } = cm.listSelections()[0];
+        cm.replaceRange(ins + sel, from, to);
+      }
       cm.focus();
     };
     box.appendChild(b);
@@ -385,9 +386,57 @@ $("btn-save").addEventListener("click", () =>
   notifier("Réglages utilisés côté serveur à la génération.", "ok"));
 
 // ---------------------------------------------------------------- génération
+async function sauvegarderAvantGeneration() {
+  if (!docCourant) return;                 // fichier local : rien à écrire côté serveur
+  const contenu = cm.getValue();
+  await fetch("/api/document/enregistrer", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fichier: docCourant.fichier, contenu }),
+  });
+  persisterPersonnages();                  // mapping → fichier .map du doc
+}
+
+let generationActive = false;
+let contenuGenere = null;   // contenu éditeur au moment de la génération
+
+function majBoutonGenerer() {
+  const peutRegenerer = !generationActive && contenuGenere !== null &&
+    contenuGenere !== cm.getValue();
+  if (generationActive) {
+    setGenererEtat(false, "Génération en cours…");
+  } else if (contenuGenere === null) {
+    setGenererEtat(true, "Générer");
+  } else if (peutRegenerer) {
+    setGenererEtat(true, "Générer");
+  } else {
+    setGenererEtat(false, "Généré");
+  }
+}
+
+function setGenererEtat(actif, libelle) {
+  $("generer").disabled = !actif;
+  $("generer").textContent = libelle;
+  $("generer").classList.toggle("en-cours", !actif);
+}
+
 $("generer").addEventListener("click", async () => {
+  if (generationActive) return;
+  generationActive = true;
+  contenuGenere = null;
+  majBoutonGenerer();
   $("log").textContent = "Lancement…\n";
   $("montage").src = "";
+  const terminer = () => {
+    generationActive = false;
+    majBoutonGenerer();
+  };
+  try {
+    await sauvegarderAvantGeneration();
+  } catch {
+    terminer();
+    notifier("Échec de la sauvegarde avant génération.", "err");
+    return;
+  }
   const r = await fetch("/api/generer", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -402,8 +451,9 @@ $("generer").addEventListener("click", async () => {
   });
   if (!r.ok) {
     const m = (await r.json()).detail;
-    $("log").textContent += m;
+    $("log").textContent += `\n❌ ${m}\n`;
     notifier(m, "err");
+    terminer();
     return;
   }
   const { id } = await r.json();
@@ -427,7 +477,102 @@ $("generer").addEventListener("click", async () => {
     const d = JSON.parse(e.data).error;
     $("log").textContent += `\n❌ ${d}\n`;
   });
-  ev.addEventListener("end", () => ev.close());
+  ev.addEventListener("end", () => {
+    ev.close();
+    contenuGenere = cm.getValue();
+    generationActive = false;
+    majBoutonGenerer();
+  });
+});
+
+// ---------------------------------------------------------------- montage : blocs
+let montageBlocs = [];
+
+async function chargerBlocs() {
+  if (!montageId) return;
+  try {
+    const r = await fetch(`/api/generer/${montageId}/blocs`);
+    if (!r.ok) { notifier("Impossible de charger les blocs.", "err"); return; }
+    const d = await r.json();
+    montageBlocs = d.blocs || [];
+    $("montage-info").textContent = `Durée totale : ${d.duree} s · ${montageBlocs.length} bloc(s)`;
+    remplirSelBlocs();
+    majPanelBloc();
+  } catch { notifier("Erreur au chargement des blocs.", "err"); }
+}
+
+function remplirSelBlocs() {
+  const sel = $("sel-bloc");
+  const courant = sel.value;
+  sel.innerHTML = "";
+  montageBlocs.forEach((b, i) => {
+    const o = document.createElement("option");
+    o.value = b.id;
+    o.textContent = `${i + 1}. ${b.personnage} — ${b.duree} s (${b.chars} chars)`;
+    sel.appendChild(o);
+  });
+  if ([...sel.options].find((o) => o.value === courant)) sel.value = courant;
+  else sel.selectedIndex = 0;
+}
+
+function blocCourant() {
+  const id = parseInt($("sel-bloc").value, 10);
+  return montageBlocs.find((b) => b.id === id) || null;
+}
+
+function majPanelBloc() {
+  const b = blocCourant();
+  if (!b) {
+    $("bloc-panel").hidden = true;
+    return;
+  }
+  $("bloc-panel").hidden = false;
+  $("bloc-audio").src = `/api/generer/${montageId}/bloc/${b.id}/wav`;
+  const extra = b.texte ? `\n« ${b.texte.slice(0, 90)}${b.texte.length > 90 ? "…" : ""} »` : "";
+  $("bloc-detail").textContent =
+    `Personnage : ${b.personnage} · voix : ${b.voix} · ${b.duree} s${extra}`;
+}
+
+$("sel-bloc").addEventListener("change", majPanelBloc);
+
+async function actionBloc(url, msg) {
+  const b = blocCourant();
+  if (!b) return;
+  $("btn-bloc-regenerer").disabled = true;
+  $("btn-bloc-diviser").disabled = true;
+  try {
+    const r = await fetch(url, { method: "POST" });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    await chargerBlocs();
+    if (msg) notifier(msg, "ok");
+  } catch { notifier("Action bloc échouée.", "err"); }
+  finally {
+    $("btn-bloc-regenerer").disabled = false;
+    $("btn-bloc-diviser").disabled = false;
+  }
+}
+
+$("btn-bloc-regenerer").addEventListener("click", () =>
+  actionBloc(`/api/generer/${montageId}/bloc/${blockId()}/regenerer`, "Bloc régénéré."));
+$("btn-bloc-diviser").addEventListener("click", () =>
+  actionBloc(`/api/generer/${montageId}/bloc/${blockId()}/diviser`, "Bloc divisé en deux."));
+
+function blockId() {
+  const b = blocCourant();
+  return b ? b.id : "";
+}
+
+$("btn-concat").addEventListener("click", async () => {
+  $("btn-concat").disabled = true;
+  try {
+    const r = await fetch(`/api/generer/${montageId}/concatener`, { method: "POST" });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const d = await r.json();
+    $("montage").src = `/api/generer/${montageId}/result`;
+    $("montage-info").textContent = `Durée totale : ${d.duree} s · ${montageBlocs.length} bloc(s)`;
+    notifier("Montage re-créé.", "ok");
+  } catch { notifier("Concatenation échouée.", "err"); }
+  finally { $("btn-concat").disabled = false; }
 });
 
 // ---------------------------------------------------------------- état (dossier des voix)

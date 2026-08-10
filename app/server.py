@@ -33,7 +33,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from engine import config, multi, voix
+from engine import config, cosyvoice_engine, multi, voix
 from engine.voix import load_voix
 
 # ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ class GenererIn(BaseModel):
     personnages: dict[str, str] = {}
     pause: float = 0.5
     vitesse: float = 1.0
-    max_chars: int = 260
+    max_chars: int = 600
     verify: bool = True
     device: str = "cuda:0"
 
@@ -224,10 +224,14 @@ def api_generer(payload: GenererIn):
 
     jid = next(_jobid)
     sortie = config.OUTPUT_DIR / f"montage_{jid}.wav"
+    bloc_dir = config.OUTPUT_DIR / f"blocs_{jid}"
     sortie.parent.mkdir(parents=True, exist_ok=True)
     q: "queue.Queue[tuple]" = queue.Queue()
     job = {"status": "running", "queue": q, "result": None,
-           "error": None, "tmp": tmp, "out": sortie}
+           "error": None, "tmp": tmp, "out": sortie, "bloc_dir": str(bloc_dir),
+           "pause": payload.pause, "vitesse": payload.vitesse,
+           "max_chars": payload.max_chars, "verify": payload.verify,
+           "device": payload.device, "personnages": payload.personnages}
     _jobs[jid] = job
 
     def _run():
@@ -237,10 +241,12 @@ def api_generer(payload: GenererIn):
                 pause=payload.pause, speed=payload.vitesse,
                 max_block_chars=payload.max_chars,
                 verify=payload.verify, device=payload.device,
-                fp16=False, verbose=False,
+                block_dir=str(bloc_dir), fp16=False, verbose=False,
                 progress=lambda b: q.put(("bloc", b)),
             )
             job["result"] = res
+            job["blocs"] = res.get("blocs", [])
+            job["sample_rate"] = res.get("sample_rate")
             job["status"] = "done"
         except Exception as exc:  # noqa: BLE001
             job["error"] = str(exc)
@@ -267,7 +273,8 @@ def api_stream(jid: int):
                 yield ": ping\n\n"
                 continue
             if kind == "bloc":
-                yield f"event: bloc\ndata: {json.dumps(data)}\n\n"
+                if "index" in data:
+                    yield f"event: bloc\ndata: {json.dumps(data)}\n\n"
             elif kind == "done":
                 break
         if job["error"]:
@@ -275,7 +282,7 @@ def api_stream(jid: int):
         elif job["result"]:
             r = job["result"]
             data = json.dumps({
-                "duree": r["duration"], "out": r["out"], "blocs": r["blocs"],
+                "duree": r["duration"], "out": r["out"], "blocs": r.get("blocs", []),
             })
             yield f"event: result\ndata: {data}\n\n"
         yield "event: end\ndata: {}\n\n"
@@ -290,6 +297,128 @@ def api_result(jid: int):
         raise HTTPException(404, "Résultat indisponible.")
     return FileResponse(job["out"], media_type="audio/wav",
                         filename=Path(job["out"]).name)
+
+
+def _job_done(jid: int) -> dict:
+    job = _jobs.get(jid)
+    if not job or job["status"] != "done":
+        raise HTTPException(404, "Travail indisponible.")
+    return job
+
+
+@app.get("/api/generer/{jid}/blocs")
+def api_blocs(jid: int):
+    job = _job_done(jid)
+    return {"blocs": job.get("blocs", []), "out": job["out"],
+            "duree": job["result"]["duration"]}
+
+
+@app.get("/api/generer/{jid}/bloc/{bid}/wav")
+def api_bloc_wav(jid: int, bid: int):
+    job = _job_done(jid)
+    bloc = next((b for b in job.get("blocs", []) if b["id"] == bid), None)
+    if not bloc or not Path(bloc["wav"]).exists():
+        raise HTTPException(404, "Bloc indisponible.")
+    return FileResponse(bloc["wav"], media_type="audio/wav",
+                        filename=f"bloc_{bid}.wav")
+
+
+@app.post("/api/generer/{jid}/bloc/{bid}/regenerer")
+def api_bloc_regenerer(jid: int, bid: int):
+    """Re-synthétise un seul bloc (même personnage/voix règlages du job)."""
+    job = _job_done(jid)
+    bloc = next((b for b in job.get("blocs", []) if b["id"] == bid), None)
+    if not bloc:
+        raise HTTPException(404, "Bloc inconnu.")
+    try:
+        voix = _voix().get(bloc["voix"])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Voix « {bloc['voix']} » introuvable : {exc}")
+    model, sr = multi.load(device=job["device"], fp16=False)
+    audio = multi.synth_bloc(voix, bloc["texte"], model, sr,
+                             block_chars=job["max_chars"],
+                             speed=job["vitesse"], verify=job["verify"])
+    cosyvoice_engine.save(audio, sr, bloc["wav"])
+    bloc["duree"] = round(len(audio) / sr, 2)
+    return {"bloc": bloc}
+
+
+_PONC = ".!?"
+
+
+def _decouper_phrase(texte: str) -> list[str]:
+    """Découpe ``texte`` en phrases aux fins de ponctuation (à la fin d'une phrase)."""
+    import re
+    phrases = [p.strip() for p in re.split(r"(?<=[.!?])\s+", texte.strip()) if p.strip()]
+    return phrases or [texte.strip()]
+
+
+def _diviser_bloc(bloc: dict) -> list[dict]:
+    """Divise un bloc en deux au milieu d'une phrase ; garde personnage/voix."""
+    phrases = _decouper_phrase(bloc["texte"])
+    if len(phrases) < 2:
+        # pas de vraie coupe de phrase : on coupe au milieu du texte
+        mid = max(1, len(bloc["texte"]) // 2)
+        a, b = bloc["texte"][:mid].strip(), bloc["texte"][mid:].strip()
+        return [dict(bloc, texte=a), dict(bloc, texte=b)]
+    mid = len(phrases) // 2
+    return [dict(bloc, texte=" ".join(phrases[:mid])),
+            dict(bloc, texte=" ".join(phrases[mid:]))]
+
+
+@app.post("/api/generer/{jid}/bloc/{bid}/diviser")
+def api_bloc_diviser(jid: int, bid: int):
+    """Divise un bloc en deux (à la fin d'une phrase) et re-synthétise les deux moitiés."""
+    job = _job_done(jid)
+    blocs = job.get("blocs", [])
+    idx = next((i for i, b in enumerate(blocs) if b["id"] == bid), None)
+    if idx is None:
+        raise HTTPException(404, "Bloc inconnu.")
+    original = blocs[idx]
+    try:
+        voix = _voix().get(original["voix"])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Voix « {original['voix']} » introuvable : {exc}")
+    model, sr = multi.load(device=job["device"], fp16=False)
+
+    halves = _diviser_bloc(original)
+    nextid = max(b["id"] for b in blocs) + 1
+    results = []
+    for h, suffix in zip(halves, (nextid, nextid + 1)):
+        audio = multi.synth_bloc(voix, h["texte"], model, sr,
+                                 block_chars=job["max_chars"],
+                                 speed=job["vitesse"], verify=job["verify"])
+        wav = str(Path(original["wav"]).with_name(f"bloc_{suffix}.wav"))
+        cosyvoice_engine.save(audio, sr, wav)
+        results.append({"id": suffix, "personnage": original["personnage"],
+                        "voix": original["voix"], "texte": h["texte"],
+                        "chars": len(h["texte"]), "duree": round(len(audio) / sr, 2),
+                        "wav": wav})
+    blocs[idx:idx + 1] = results
+    return {"blocs": blocs}
+
+
+@app.post("/api/generer/{jid}/concatener")
+def api_concatener(jid: int):
+    """Re-monte le montage complet depuis les blocs courants (ordre + pauses)."""
+    job = _job_done(jid)
+    blocs = job.get("blocs", [])
+    if not blocs:
+        raise HTTPException(400, "Aucun bloc à concaténer.")
+    sr = job.get("sample_rate")
+    model, sr = multi.load(device=job["device"], fp16=False)
+    pause_n = int(job.get("pause", 0.5) * sr)
+    import numpy as _np
+    import soundfile as _sf
+    parts = []
+    for b in blocs:
+        data, _ = _sf.read(b["wav"], dtype="float32")
+        parts.append(data)
+        parts.append(_np.zeros(pause_n, dtype=_np.float32))
+    final = _np.concatenate(parts)
+    cosyvoice_engine.save(final, sr, job["out"])
+    job["result"]["duration"] = round(len(final) / sr, 2)
+    return {"duree": job["result"]["duration"], "out": job["out"]}
 
 
 # ---------------------------------------------------------------------------

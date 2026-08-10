@@ -30,4 +30,4 @@ fi
 
 echo "Lancement de VoiceBuilder (GUI)… (venv: $PY)"
 echo "Fichiers voix : $VOICEBUILDER_AUDIO_DIR"
-exec "$PY" -m app.gui
+exec "$PY" -m app.server "$@"
