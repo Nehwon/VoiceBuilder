@@ -57,8 +57,8 @@ def main(argv=None) -> int:
     )
     print(f"\nDurée totale : {res['duration']} s")
     print(f"Blocs : {len(res['blocs'])}")
-    for pers, chars, dur in res["blocs"]:
-        print(f"  - {pers}: {chars} chars, {dur} s")
+    for bloc in res["blocs"]:
+        print(f"  - {bloc['personnage']}: {bloc['chars']} chars, {bloc['duree']} s")
     return 0
 
 

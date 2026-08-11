@@ -1,0 +1,54 @@
+# Dossier des fichiers .wav/.txt des voix (défaut : dossier frère vb-voice).
+# Surcharger :  AUDIO_SRC_DIR=/chemin/vers/voix docker compose up
+x-audio-volume: &audio-volume "${AUDIO_SRC_DIR:-../vb-voice}:/data/voice:ro"
+
+services:
+  # GUI FastAPI — http://127.0.0.1:8000
+  gui:
+    build: .
+    image: voicebuilder:latest
+    container_name: voicebuilder-gui
+    command: python -m app.server --host 0.0.0.0 --port 8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - VOICEBUILDER_AUDIO_DIR=/data/voice
+    volumes:
+      - ./voix:/app/voix:ro
+      - ./texte:/app/texte
+      - ./output:/app/output
+      # Modèle CosyVoice3 (9 Go) monté depuis l'hôte
+      - ./vendor/CosyVoice/pretrained_models:/app/vendor/CosyVoice/pretrained_models:ro
+      # Dossier des fichiers .wav/.txt des voix (réglé par VOICEBUILDER_AUDIO_DIR)
+      - *audio-volume
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # CLI — génération multi-voix dans le conteneur
+  #   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
+  cli:
+    build: .
+    image: voicebuilder:latest
+    profiles: ["cli"]
+    command: ["python", "-m", "tools.gen_multi_voix"]
+    environment:
+      - VOICEBUILDER_AUDIO_DIR=/data/voice
+    volumes:
+      - ./voix:/app/voix:ro
+      - ./texte:/app/texte
+      - ./output:/app/output
+      - ./vendor/CosyVoice/pretrained_models:/app/vendor/CosyVoice/pretrained_models:ro
+      - *audio-volume
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

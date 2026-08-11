@@ -55,6 +55,34 @@ function notifier(msg, type) {
   notifier._t = setTimeout(() => { t.hidden = true; }, 3500);
 }
 
+// ---------------------------------------------------------------- modal d'erreur
+const modalErreur = $("modal-erreur");
+function afficherErreur(msg) {
+  $("erreur-msg").textContent = msg || "Erreur inconnue.";
+  ouvrirModal(modalErreur);
+}
+$("btn-erreur-fermer").addEventListener("click", () => fermerModal(modalErreur));
+
+// ---------------------------------------------------------------- progression
+const $progBar = $("progression-remplie");
+function majProgression(index, total, personnage, duree) {
+  const pct = total > 0 ? Math.round((index / total) * 100) : 0;
+  $progBar.style.width = pct + "%";
+  $("progression-compteur").textContent = `${pct}%`;
+  $("progression-label").textContent =
+    personnage ? `Bloc ${index}/${total} — ${personnage}${duree ? ` · ${duree} s` : ""}` : "Génération en cours…";
+}
+function demarrerProgression() {
+  $("progression").hidden = false;
+  $progBar.style.width = "0%";
+  $("progression-compteur").textContent = "0%";
+  $("progression-label").textContent = "Lancement de la génération…";
+}
+function terminerProgression() {
+  $("progression").hidden = true;
+  $progBar.style.width = "0%";
+}
+
 // ---------------------------------------------------------------- modals
 function ouvrirModal(el) { el.hidden = false; document.body.classList.add("modal-open"); }
 function fermerModal(el) { el.hidden = true; document.body.classList.remove("modal-open"); }
@@ -68,12 +96,12 @@ $("btn-modal-fermer").addEventListener("click", () => fermerModal(modalReglages)
 $("btn-aide").addEventListener("click", () => ouvrirModal(modalAide));
 $("btn-aide-fermer").addEventListener("click", () => fermerModal(modalAide));
 
-[modalReglages, modalAide, modalPerso, modalNom].forEach((m) =>
+[modalReglages, modalAide, modalPerso, modalNom, modalErreur].forEach((m) =>
   m.addEventListener("click", (e) => { if (e.target === m) fermerModal(m); }));
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!modalNom.hidden) { annulerNom(); return; }
-    [modalReglages, modalAide, modalPerso].forEach((m) => { if (!m.hidden) fermerModal(m); });
+    [modalReglages, modalAide, modalPerso, modalErreur].forEach((m) => { if (!m.hidden) fermerModal(m); });
   }
 });
 
@@ -297,6 +325,24 @@ function majBoutonsPerso() {
 }
 
 // ---------------------------------------------------------------- modal personnages
+// Tags non-verbaux CosyVoice3 : jamais traités comme des personnages.
+const TAGS_NON_VERBAUX = new Set([
+  "sigh", "laughter", "breath", "quick_breath", "cough", "clucking",
+  "hissing", "lipsmack", "noise", "vocalized-noise", "accent", "mn", "stop",
+]);
+
+function detecterPersonnagesTexte(texte) {
+  const trouves = [];
+  for (const ligne of (texte || "").split("\n")) {
+    const m = ligne.match(/^\s*\[([^\]]+)\]/);
+    if (!m) continue;
+    const nom = m[1].trim();
+    if (!nom || TAGS_NON_VERBAUX.has(nom.toLowerCase())) continue;
+    if (!trouves.includes(nom)) trouves.push(nom);
+  }
+  return trouves;
+}
+
 function ouvrirPerso() {
   if (!voixDispo.length) {
     notifier("Aucune voix disponible : vérifie le dossier des voix (Réglages).", "err");
@@ -310,8 +356,12 @@ $("btn-personnages").addEventListener("click", ouvrirPerso);
 function remplirLignesPerso() {
   const tbody = $("perso-lignes");
   tbody.innerHTML = "";
-  const persos = Object.keys(personnages).length ? Object.keys(personnages) : [""];
-  for (const pers of persos) {
+  // personnages du texte + ceux déjà affectés (union, sans doublon)
+  const duTexte = detecterPersonnagesTexte(cm ? cm.getValue() : "");
+  const noms = duTexte.slice();
+  for (const n of Object.keys(personnages)) if (!noms.includes(n)) noms.push(n);
+  if (!noms.length) noms.push("");
+  for (const pers of noms) {
     ajouterLignePerso(pers, personnages[pers] || "");
   }
 }
@@ -426,15 +476,32 @@ $("generer").addEventListener("click", async () => {
   majBoutonGenerer();
   $("log").textContent = "Lancement…\n";
   $("montage").src = "";
+  demarrerProgression();
   const terminer = () => {
     generationActive = false;
     majBoutonGenerer();
+    terminerProgression();
   };
+  const persosTexte = detecterPersonnagesTexte(cm.getValue());
+  const sansVoix = persosTexte.filter((p) => !personnages[p]);
+  if (!persosTexte.length || sansVoix.length) {
+    terminer();
+    const message = !persosTexte.length
+      ? "Aucun personnage détecté dans le texte. Ajoute des balises [Personnage]: puis affecte une voix à chacun."
+      : "Personnage(s) sans voix définie : " + sansVoix.join(", ") + ". Affecte une voix dans la liste des personnages.";
+    $("log").textContent += `\n❌ ${message}\n`;
+    notifier(message, "err");
+    afficherErreur(message);
+    remplirLignesPerso();
+    ouvrirModal(modalPerso);
+    return;
+  }
   try {
     await sauvegarderAvantGeneration();
   } catch {
     terminer();
     notifier("Échec de la sauvegarde avant génération.", "err");
+    afficherErreur("Échec de la sauvegarde avant génération.");
     return;
   }
   const r = await fetch("/api/generer", {
@@ -450,19 +517,32 @@ $("generer").addEventListener("click", async () => {
     }),
   });
   if (!r.ok) {
-    const m = (await r.json()).detail;
+    let m = "Erreur lors du lancement de la génération.";
+    try { m = (await r.json()).detail || m; } catch { /* corps non JSON */ }
     $("log").textContent += `\n❌ ${m}\n`;
     notifier(m, "err");
+    afficherErreur(m);
     terminer();
     return;
   }
   const { id } = await r.json();
 
   const ev = new EventSource(`/api/generer/${id}/stream`);
+  let fini = false;
+  const fin = () => {
+    if (fini) return;
+    fini = true;
+    ev.close();
+    contenuGenere = cm.getValue();
+    generationActive = false;
+    majBoutonGenerer();
+    terminerProgression();
+  };
   ev.addEventListener("bloc", (e) => {
     const b = JSON.parse(e.data);
     $("log").textContent +=
       `[${b.index}/${b.total}] ${b.personnage} (${b.chars} chars) — ${b.duree} s\n`;
+    majProgression(b.index, b.total, b.personnage, b.duree);
   });
   ev.addEventListener("result", (e) => {
     const res = JSON.parse(e.data);
@@ -474,15 +554,14 @@ $("generer").addEventListener("click", async () => {
     mountVue("montage");
   });
   ev.addEventListener("error", (e) => {
-    const d = JSON.parse(e.data).error;
-    $("log").textContent += `\n❌ ${d}\n`;
+    if (e.data) {
+      const d = JSON.parse(e.data).error;
+      $("log").textContent += `\n❌ ${d}\n`;
+      notifier(d, "err");
+      afficherErreur(d);
+    }
   });
-  ev.addEventListener("end", () => {
-    ev.close();
-    contenuGenere = cm.getValue();
-    generationActive = false;
-    majBoutonGenerer();
-  });
+  ev.addEventListener("end", fin);
 });
 
 // ---------------------------------------------------------------- montage : blocs

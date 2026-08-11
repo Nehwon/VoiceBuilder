@@ -2,7 +2,7 @@
 
 > Document d'orientation. Ce projet, initialement un **backend** de clonage de voix
 > basé sur **OpenVoice v2 + MeloTTS** (`voicebuilder/`, `README.md`), est réorienté
-> vers le **moteur CosyVoice3** (validé dans `~/Projets/CosyVoice`) et prend une
+> vers le **moteur CosyVoice3** (validé dans le sous-module `vendor/CosyVoice`) et prend une
 > dimension **GUI d'édition multi-voix**. Le backend OpenVoice reste consultable
 > comme historique ; le moteur actif est désormais CosyVoice.
 
@@ -18,7 +18,7 @@ Construire un outil local **d'écriture et de production audio multi-voix** :
 > timbre — sans perte de contenu, avec une tonalité cohérente d'un segment à l'autre.
 
 Le moteur (CosyVoice3-0.5B) et la logique de génération **ont été validés
-expérimentalement** dans `~/Projets/CosyVoice` :
+expérimentalement** dans le sous-module `vendor/CosyVoice` :
 - clonage zéro-shot à partir d'un **`.wav` + sa transcription `.txt`**,
 - découpage en **blocs adaptatifs** avec **vérification automatique** pour ne perdre
   **aucune partie** du texte, tout en maximisant la **longueur des blocs** (moins de
@@ -76,7 +76,7 @@ La qualité prosodique est portée par CosyVoice3.
 
 ## 4. Pipeline de génération multi-voix (logique validée)
 
-Reprend la chaîne éprouvée dans `~/Projets/CosyVoice` et la rend **multi-voix** :
+Reprend la chaîne éprouvée dans `vendor/CosyVoice` et la rend **multi-voix** :
 
 ```
 parse_texte(chapter.md, voix)                # -> [(personnage, texte), ...]
@@ -148,6 +148,7 @@ VoiceBuilder/
 ├── voix/                      # voix.txt + paires .wav/.txt
 ├── texte/                     # projets d'écriture taggés
 ├── output/                    # montages audio produits
+├── vendor/CosyVoice/          # moteur CosyVoice en sous-module git (à intégrer)
 └── tools/
     ├── gen_multi_voix.py      # génération multi-voix (CLI)
     └── create_voix.py         # assistant création de voix (CLI)
@@ -168,6 +169,11 @@ pilotés indifféremment — dans la lignée de l'existant `voicebuilder/`.
   absence, `text_frontend=False` + token `"<|endofprompt|>"` inséré manuellement.
 - **Fidélité** : le clonage dépend du `.wav` de référence (max ~30 s), du timbre et de
   la prosodie du locuteur modèle.
+- **Intégration du moteur** : CosyVoice est un **sous-module git** du projet
+  (`vendor/CosyVoice`), plus un clone voisin, pour une installation reproductible.
+- **Portabilité / GPU** : un **conteneur Docker avec accès GPU** (NVIDIA
+  `nvidia-container-toolkit`) doit être fourni pour déployer le moteur et le GUI
+  FastAPI (cf. `TODO.md` §Phase 7).
 
 ---
 
@@ -186,6 +192,8 @@ pilotés indifféremment — dans la lignée de l'existant `voicebuilder/`.
 - [x] **M4** — Affiner l'UX : autocomplétion, insertion 1-clic, réglages (pause,
       vitesse, max chars, Whisper, `device`), génération non bloquante + export.
 - [ ] **M5** — (optionnel) accélération vLLM / TensorRT pour la génération
+- [x] **M14** — CosyVoice intégré en **sous-module git** (`vendor/CosyVoice`), `engine/config.py` ajusté.
+- [~] **M15** — **Conteneur Docker avec GPU** (NVIDIA Container Toolkit) : `Dockerfile` + `docker-compose.yml`, moteur + GUI FastAPI (image buildée, pipeline validé ; génération bout-en-bout à confirmer sur hôte avec toolkit).
 
 ## 9. Critères de succès
 

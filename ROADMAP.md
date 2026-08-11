@@ -86,6 +86,19 @@ d'outils, `multi.generate(personnages=)`, `app/server.py` (`/api/document/person
 normalisation (`wetext`/`ttsfrd`) pour la prosodie FR.
 **Statut** : exploration.
 
+### M14/M15 — Packaging & infra (sous-module CosyVoice + Docker GPU)
+**Objectif** : intégrer **CosyVoice comme sous-module git du projet** (`vendor/CosyVoice`,
+fini le clone voisin dans `~/Projets/CosyVoice`) et fournir un **conteneur Docker avec
+prise en charge GPU** (nvidia-container-toolkit) pour le moteur et le GUI
+FastAPI, portable sur toute machine équipée d'un GPU NVIDIA.
+**Livrables** : sous-module `vendor/CosyVoice` + `engine/config.py` ajusté ;
+`Dockerfile` + `docker-compose.yml` (montages `voix/`, `texte/`, `output/`,
+modèle CosyVoice3) ; génération complète validée dans le conteneur.
+**Statut** : M14 ✔ terminé · M15 ✔ image buildée + pipeline validé dans le
+conteneur (import torch `cu130` OK, CLI charge le modèle) — la génération de
+bout en bout reste à confirmer sur un hôte équipé de `nvidia-container-toolkit`
+(`TODO.md` §Phase 7).
+
 ---
 
 ## Critères de succès (définition de « done »)

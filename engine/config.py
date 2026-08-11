@@ -4,8 +4,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
-# --- Moteur CosyVoice (repo voisin) ----------------------------------------------
-COSYVOICE_ROOT = Path.home() / "Projets" / "CosyVoice"
+# --- Moteur CosyVoice (sous-module git) -------------------------------------
+COSYVOICE_ROOT = PROJECT_ROOT / "vendor" / "CosyVoice"
 COSYVOICE_VENV = COSYVOICE_ROOT / "venv"
 MATCHA_TTS_DIR = COSYVOICE_ROOT / "third_party" / "Matcha-TTS"
 
@@ -27,7 +27,8 @@ VOIX_FILE = VOIX_DIR / "voix.txt"
 # Dossier des fichiers audio (wav) et de leurs transcriptions (txt) pour les voix.
 # Réglable via la variable d'environnement VOICEBUILDER_AUDIO_DIR.
 VOIX_AUDIO_DIR = Path(
-    os.environ.get("VOICEBUILDER_AUDIO_DIR") or Path.home() / "Partages" / "voice"
+    os.environ.get("VOICEBUILDER_AUDIO_DIR")
+    or Path.home() / "Projets" / "Personnel (Fabrice)" / "vb-voice"
 )
 
 # Chemins de recherche, dans l'ordre, pour résoudre un wav/txt listé dans voix.txt :

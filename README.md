@@ -35,6 +35,7 @@ VoiceBuilder/
 ├── voix/            # voix.txt + paires .wav/.txt
 ├── texte/           # documents taggés + <nom>.map (personnages→voix, CSV)
 ├── output/          # montages produits
+├── vendor/CosyVoice/  # moteur CosyVoice en sous-module git (à intégrer)
 └── tools/
     ├── gen_multi_voix.py    # CLI génération multi-voix
     └── create_voix.py       # assistant de création de voix
@@ -51,8 +52,17 @@ le frontend Gradio (`app/web_app.py`) restant disponible en alternative.
 - Python 3.10+
 - Les dépendances dans `requirements.txt` :
   `numpy`, `soundfile`, `librosa`, `openai-whisper`, `torch`.
-- Le dépôt CosyVoice (`~/Projets/CosyVoice`) et son venv, contenant le modèle
-  `Fun-CosyVoice3-0.5B`. Les chemins sont dans `engine/config.py`.
+- Le moteur **CosyVoice** en **sous-module git** (`vendor/CosyVoice`, voir
+  `TODO.md` §Phase 7) avec son venv et le modèle `Fun-CosyVoice3-0.5B`. Les
+  chemins sont dans `engine/config.py`.
+
+Pour récupérer le moteur après un clone :
+
+```bash
+git submodule update --init --recursive   # clone CosyVoice dans vendor/
+./scripts/apply_cosyvoice_patches.sh      # ré-applique les patches locaux
+./scripts/setup.sh                        # vérifie venv + modèle
+```
 
 ---
 
@@ -170,7 +180,30 @@ Extrait le segment, le transcrit avec Whisper, écrit le `.wav`+`.txt` dans `voi
 et ajoute l'entrée dans `voix.txt`.
 
 > Les exemples supposent d'utiliser l'interpréteur du venv CosyVoice
-> (`~/Projets/CosyVoice/venv/bin/python`).
+> (`vendor/CosyVoice/venv/bin/python`).
+
+---
+
+## Déploiement en conteneur Docker (GPU)
+
+Le moteur (sous-module `vendor/CosyVoice`) et le GUI FastAPI sont
+**conteneurisables avec prise en charge GPU** (NVIDIA `nvidia-container-toolkit`) :
+
+```bash
+# Prérequis hôte : NVIDIA driver + nvidia-container-toolkit
+docker compose up --build        # serveur sur http://127.0.0.1:8000
+```
+
+- **GPU** : CUDA 13 (torch `cu130`) depuis les wheels pip ; pas de base
+  `nvidia/cuda` (un NCCL système entrerait en conflit avec torch cu130).
+- **Dossier des voix** : `../vb-voice` par défaut (dossier frère du projet) ;
+  surcharger avec `AUDIO_SRC_DIR=/chemin/vers/voix docker compose up`.
+- Sans `nvidia-container-toolkit` sur l'hôte, `torch.cuda.is_available()` est
+  `False` et la génération échoue (`Attempting to deserialize object on a CUDA
+  device`) — le toolkit est requis.
+
+Voir `Dockerfile` et `docker-compose.yml` ; les montages couvrent `voix/`,
+`texte/`, `output/` et le modèle CosyVoice3 (détails `TODO.md` §Phase 7, M15).
 
 ---
 
@@ -180,4 +213,4 @@ et ajoute l'entrée dans `voix.txt`.
   taggé, **tags non-verbaux / émotions CosyVoice3**).
 - `PROJET.md` — brief complet (vision, pipeline, contraintes, étapes).
 - `engine/tests` — (à venir) tests unitaires du pipeline.
-- Moteur : `CosyVoice3` (voir `~/Projets/CosyVoice`).
+- Moteur : `CosyVoice3` (voir `vendor/CosyVoice`).

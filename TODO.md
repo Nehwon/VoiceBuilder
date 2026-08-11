@@ -162,6 +162,28 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ---
 
+## Phase 7 — Packaging & infra (sous-module CosyVoice + Docker GPU)
+
+> Objectif : intégrer **CosyVoice comme sous-module git du projet** (plus de clone
+> voisin dans `~/Projets/CosyVoice`) et fournir un **conteneur Docker avec prise
+> en charge GPU** pour déployer le moteur et le GUI FastAPI.
+
+- [x] **M14 — CosyVoice intégré en sous-module git**
+  - [x] Ajouter le dépôt CosyVoice comme sous-module du projet (`vendor/CosyVoice`).
+  - [x] Pointer `engine/config.py` (`COSYVOICE_ROOT`) vers le sous-module (au lieu
+        de `~/Projets/CosyVoice`).
+  - [x] Documenter la récupération (`git submodule update --init --recursive` +
+        `scripts/apply_cosyvoice_patches.sh`).
+- [~] **M15 — Conteneur Docker avec GPU**
+  - [x] `Dockerfile` : base `nvidia/cuda` + Python 3.10, deps (`requirements.txt`,
+        torch CUDA), moteur CosyVoice (sous-module), Matcha-TTS.
+  - [ ] Accès GPU via `--gpus all` / `nvidia-container-toolkit` (device `cuda`).
+  - [ ] Montages : `voix/`, `texte/`, `output/`, `VOICEBUILDER_AUDIO_DIR`, modèle CosyVoice3.
+  - [ ] `docker-compose.yml` (services : serveur GUI `app.server`, CLI).
+  - [ ] Vérifier une génération complète dans le conteneur.
+
+---
+
 ## Backlog / Idées
 
 - [ ] Vérification différée : transcrire le montage final en entier et signaler les pertes par segment.

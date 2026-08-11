@@ -1,0 +1,26 @@
+# --- Dépendances / artefacts locaux ---
+vendor/CosyVoice/venv
+vendor/CosyVoice/pretrained_models
+
+# --- Git ---
+.git
+vendor/CosyVoice/.git
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+
+# --- Données / sorties ---
+output/
+texte/brouillons/
+historique/
+*.wav
+*.mp3
+
+# --- Env / IDE ---
+.venv/
+.env
+.idea/
+.vscode/
+*.code-workspace

@@ -4,7 +4,10 @@ Usage complet : CLI, GUI, format de texte taggé, et en particulier le jeu de
 **tags non-verbaux / émotions spécifiques à CosyVoice3**.
 
 Prérequis techniques : moteur **CosyVoice3** (`Fun-CosyVoice3-0.5B`) et son venv
-(`~/Projets/CosyVoice`) ; chemins dans `engine/config.py`.
+(`vendor/CosyVoice/venv`, sous-module git) ; chemins dans `engine/config.py`.
+Un **conteneur Docker GPU** est disponible pour un déploiement portable
+(cf. `TODO.md` §Phase 7) ; nécessite `nvidia-container-toolkit` sur l'hôte et
+le dossier des voix monté via `AUDIO_SRC_DIR` (défaut `../vb-voice`).
 
 ---
 
@@ -28,7 +31,7 @@ python -m tools.create_voix SOURCE.wav --nom LeNarrateur --start 12.5 --stop 30
 
 Une voix = un **échantillon `.wav`** (~5–30 s, sans musique) + sa **transcription
 `.txt`** exacte. Gardez l'échantillon **inférieur à 30 s** (limite de l'extraction
-des tokens vocaux, cf. `~/Projets/CosyVoice/cosyvoice/cli/frontend.py`).
+des tokens vocaux, cf. `vendor/CosyVoice/cosyvoice/cli/frontend.py`).
 
 Fichier de listage `voix/voix.txt`, une entrée par ligne :
 
@@ -90,7 +93,7 @@ Règles (`engine/tagging.py`) :
 ## 4. Tags non-verbaux / émotions spécifiques à CosyVoice3
 
 CosyVoice3 reconnaît des **tokens spéciaux** dans son vocabulaire
-(`~/Projets/CosyVoice/cosyvoice/tokenizer/tokenizer.py`). À écrire **bruts, dans
+(`vendor/CosyVoice/cosyvoice/tokenizer/tokenizer.py`). À écrire **bruts, dans
 le texte du bloc**.
 
 ### 4.1 Émotions — forme `<|ÉMOTION|>` (recommandé)

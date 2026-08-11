@@ -14,7 +14,7 @@ Validation de bout en bout du pipeline (M0/M1) avec un échantillon de test.
 ```bash
 # 1. Vérification du découpage (sans générer d'audio)
 #    (à exécuter depuis la racine du projet)
-~/Projets/CosyVoice/venv/bin/python - <<'PY'
+~/VoiceBuilder/vendor/CosyVoice/venv/bin/python - <<'PY'
 import sys
 sys.path.insert(0, '.')
 from pathlib import Path
@@ -27,7 +27,7 @@ for pers, bloc in regrouper(parse_texte(text, load_voix().names())):
 PY
 
 # 2. Génération complète d'un montage
-~/Projets/CosyVoice/venv/bin/python -m tools.gen_multi_voix texte/exemple_demo.md \
+~/VoiceBuilder/vendor/CosyVoice/venv/bin/python -m tools.gen_multi_voix texte/exemple_demo.md \
     -o output/exemple_demo.wav --vitesse 1.0 --pause 0.45
 ```
 

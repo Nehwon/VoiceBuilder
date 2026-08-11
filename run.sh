@@ -10,8 +10,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PY=""
 
-# Interpréteur : préfère le venv CosyVoice, sinon python du système.
-for cand in "$HOME/Projets/CosyVoice/venv/bin/python" "python3"; do
+# Interpréteur : préfère le venv du sous-module CosyVoice, sinon python du système.
+for cand in "$ROOT/vendor/CosyVoice/venv/bin/python" "python3"; do
     if command -v "$cand" >/dev/null 2>&1 || [ -x "$cand" ]; then
         PY="$cand"
         break

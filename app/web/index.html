@@ -39,6 +39,16 @@
     <span id="doc-statut" class="doc-statut"></span>
   </div>
 
+  <div id="progression" class="progression" hidden>
+    <div class="progression-info">
+      <span id="progression-label">Génération en cours…</span>
+      <span id="progression-compteur"></span>
+    </div>
+    <div class="progression-barre">
+      <div id="progression-remplie"></div>
+    </div>
+  </div>
+
   <main id="vue-edit" class="vue">
     <section class="col-edit">
       <div class="box-editeur">
@@ -176,6 +186,18 @@
       <div class="modal-actions">
         <button id="btn-nom-annuler">Annuler</button>
         <button id="btn-nom-ok" class="primaire">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : erreur -->
+  <div id="modal-erreur" class="modal" hidden>
+    <div class="modal-boite modal-erreur">
+      <h2>⚠️ Erreur</h2>
+      <p class="modal-sub">La génération ou l'action demandée a échoué :</p>
+      <pre id="erreur-msg" class="erreur-msg"></pre>
+      <div class="modal-actions">
+        <button id="btn-erreur-fermer" class="primaire">Fermer</button>
       </div>
     </div>
   </div>

@@ -6,6 +6,18 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ---
 
+## [Unreleased]
+
+### Ajout — Packaging & infra
+- **CosyVoice en sous-module git** : le moteur est désormais intégré au projet
+  (`vendor/CosyVoice`) au lieu d'un clone voisin (`~/Projets/CosyVoice`) ;
+  `engine/config.py` pointe vers le sous-module. Récupération :
+  `git submodule update --init --recursive` + `scripts/apply_cosyvoice_patches.sh`.
+- **Conteneur Docker avec GPU** (M15) : `Dockerfile` + `docker-compose.yml`
+  (NVIDIA `nvidia-container-toolkit`) pour le moteur et le GUI FastAPI — en cours.
+- Objectifs documentés dans `TODO.md` (§Phase 7, M14/M15), `ROADMAP.md`,
+  `PROJET.md` et `README.md`.
+
 ## [0.4.0] — 2026-08-10
 
 ### Changement

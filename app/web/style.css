@@ -214,6 +214,36 @@ button.secondaire { border-color: var(--bor); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .modal-actions button { margin: 0; }
 
+/* ---------------------------------------------------------------- progression de génération */
+.progression {
+  flex: 0 0 auto;
+  padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--bor);
+}
+.progression[hidden] { display: none; }
+.progression-info {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--dim); margin-bottom: 6px;
+}
+.progression-compteur, #progression-compteur { font-weight: 600; color: var(--txt); }
+.progression-barre {
+  height: 8px; border-radius: 4px; overflow: hidden;
+  background: var(--panel2); border: 1px solid var(--bor);
+}
+#progression-remplie {
+  height: 100%; width: 0%;
+  background: var(--acc); transition: width 0.25s ease;
+}
+
+/* ---------------------------------------------------------------- modal erreur */
+.modal-erreur { border-left: 4px solid #d33; }
+.modal-erreur h2 { color: #d33; }
+.erreur-msg {
+  background: var(--panel2); border: 1px solid var(--bor); border-radius: 6px;
+  padding: 10px; color: var(--txt); font-family: ui-monospace, monospace;
+  font-size: 12px; white-space: pre-wrap; max-height: 40vh; overflow: auto;
+  margin: 8px 0 0;
+}
+
 /* ---------------------------------------------------------------- toast */
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
