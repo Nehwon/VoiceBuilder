@@ -219,3 +219,7 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       retéléchargeables) ; pour le reste (**voix**, **projets**, **cache**),
       permettre d'ajouter un **dépôt git (GitHub, Gitea, GitLab)** pour une
       **sauvegarde automatique** ou / et un accès "google drive / nextcloud / etc." pour sauvegarder en archives.
+
+### Important 
+- [ ] Supprimer les modèles de l'image : il doivent être recharger par l'utilisateur directement depuis l'interface au premier lancement.
+      Sauf si l'utilisateur utilise un volume qui comprends déjà les modèles.
