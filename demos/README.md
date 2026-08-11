@@ -7,7 +7,7 @@ Validation de bout en bout du pipeline (M0/M1) avec un échantillon de test.
 - `../texte/exemple_demo.md` — un texte taggé multi-personnages (prose non
   attribuée = locuteur précédent, plusieurs voix distinctes).
 - `../voix/voix.txt` — les voix (couples `.wav` + `.txt`) du dossier
-  `VOICEBUILDER_AUDIO_DIR` (défaut `~/Partages/voice`).
+  `VOICEBUILDER_AUDIO_DIR` (défaut `~/Projets/Personnel (Fabrice)/vb-voice`).
 
 ## Test de bout en bout (parse → blocs → voix)
 

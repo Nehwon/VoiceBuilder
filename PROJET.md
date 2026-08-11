@@ -39,9 +39,9 @@ Fichier de listage (`voix/voix.txt`), une entrée par ligne :
 
 ```
 # [NomPersonnage] wav, txt[, pause_pré][, vitesse]
-[LeNarrateur], Partages/voice/superama.wav, Partages/voice/superama.txt
-[Michel],      Partages/voice/unirreductibleathee_phrase_01.wav,
-                       Partages/voice/unirreductibleathee_phrase_01.txt
+[LeNarrateur], vb-voice/superama.wav, vb-voice/superama.txt
+[Michel],      vb-voice/unirreductibleathee_phrase_01.wav,
+                       vb-voice/unirreductibleathee_phrase_01.txt
 [Kaël-An],     echantillons/kael_an.wav, echantillons/kael_an.txt
 [Lambda1],     echantillons/lambda_01.wav, echantillons/lambda_01.txt
 ```
@@ -103,11 +103,12 @@ taille de sous-bloc max/min, seuil de vérification (défaut 0.85).
 
 ## 5. L'interface (GUI web)
 
-Le GUI est une **application web** bâtie sur **Gradio** (`app/web_app.py`).
-Elle expose dans le navigateur l'édition du texte taggé, le panneau des voix, les
-réglages et la génération multi-voix (le backend `engine/` est appelé côté
-serveur). Expérience équivalente (et portable) à une GUI native, sans frontend
-séparé.
+Le GUI est une **application web** bâtie sur un **serveur HTTP local FastAPI**
+(`app/server.py`), qui sert un frontend dédié (`app/web/`, éditeur CodeMirror) +
+une API REST/SSE ; une interface alternative **Gradio** (`app/web_app.py`) reste
+disponible. L'édition du texte taggé, le panneau des voix, les réglages et la
+génération multi-voix se font dans le navigateur (le backend `engine/` est
+appelé côté serveur).
 
 Priorités de l'écran principal :
 
@@ -126,7 +127,9 @@ Priorités de l'écran principal :
 5. **Réglages** : vitesse globale, pause, device, fp16 (panneau avancé).
 
 ```bash
-python -m app.web_app --host 127.0.0.1 --port 7860   # GUI web (Gradio)
+python -m app.server --host 0.0.0.0 --port 8000   # GUI serveur FastAPI (référence)
+# ouvrir http://127.0.0.1:8000
+python -m app.web_app --host 127.0.0.1 --port 7860 # GUI web Gradio (alternative)
 # ouvrir http://127.0.0.1:7860
 ```
 
@@ -138,24 +141,27 @@ python -m app.web_app --host 127.0.0.1 --port 7860   # GUI web (Gradio)
 VoiceBuilder/
 ├── PROJET.md                  # ce document
 ├── app/                       # GUI web (voir §5)
-│   └── web_app.py             #   application Gradio (éditeur + panneaux)
+│   ├── server.py              #   GUI serveur FastAPI (interface de référence)
+│   ├── web/                   #   frontend statique (HTML/CSS/JS + CodeMirror)
+│   └── web_app.py             #   GUI web Gradio (alternative)
 ├── engine/                    # backend — moteur CosyVoice + logique
 │   ├── cosyvoice_engine.py    #   wrapper AutoModel (CosyVoice3), zero_shot
-│   ├── adaptive.py            #   découpage adaptatif vérifié (cf. boutique script)
+│   ├── adaptive.py            #   découpage adaptatif vérifié
 │   ├── multi.py               #   pipeline multi-voix (parse, regrouper, concat)
 │   ├── voix.py                #   chargement/parsing de voix.txt
 │   └── verifier.py            #   vérification par transcription Whisper
 ├── voix/                      # voix.txt + paires .wav/.txt
 ├── texte/                     # projets d'écriture taggés
 ├── output/                    # montages audio produits
-├── vendor/CosyVoice/          # moteur CosyVoice en sous-module git (à intégrer)
+├── vendor/CosyVoice/          # moteur CosyVoice en sous-module git
 └── tools/
     ├── gen_multi_voix.py      # génération multi-voix (CLI)
     └── create_voix.py         # assistant création de voix (CLI)
 ```
 
-Backend (CLI) et **GUI web** (Gradio) exposés en bibliothèque (`engine/`) pour être
-pilotés indifféremment — dans la lignée de l'existant `voicebuilder/`.
+Backend (CLI) et **GUI web** (serveur FastAPI en référence, Gradio en
+alternative) exposés en bibliothèque (`engine/`) pour être pilotés
+indifféremment — dans la lignée de l'existant `voicebuilder/`.
 
 ---
 
@@ -185,7 +191,7 @@ pilotés indifféremment — dans la lignée de l'existant `voicebuilder/`.
       depuis `texte/x.md` + `voix/voix.txt` (CLI `tools/gen_multi_voix.py`).
 - [x] **M2** — Assistant « create-voix » (`tools/create_voix.py` : segment +
       transcription Whisper).
-- [ ] **M2.1–M2.3** — Raffinements de l'assistant : option `--lang`, alerte si le
+- [x] **M2.1–M2.3** — Raffinements de l'assistant : option `--lang`, alerte si le
       segment dépasse ~30 s, CLI/démo de bout en bout.
 - [x] **M3** — Interface **GUI web (Gradio)** (`app/web_app.py`) : éditeur Markdown
       avec surlignage des `[Nom]`, panneau des voix, génération et pré-écoute par bloc.

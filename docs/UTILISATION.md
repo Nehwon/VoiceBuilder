@@ -37,7 +37,7 @@ Fichier de listage `voix/voix.txt`, une entrée par ligne :
 
 ```
 # [Nom] wav, txt[, pause_pré][, vitesse][, max_chars]
-[LeNarrateur],  Partages/voice/superama.wav, Partages/voice/superama.txt
+[LeNarrateur],  vb-voice/superama.wav, vb-voice/superama.txt
 [Kaël-An],      echantillons/kael_an.wav,     echantillons/kael_an.txt, 0.3, 1.0, 200
 ```
 

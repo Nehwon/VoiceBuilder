@@ -218,4 +218,4 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [ ] Le volume **système** (modèles) n'est pas prioritaire (modèles
       retéléchargeables) ; pour le reste (**voix**, **projets**, **cache**),
       permettre d'ajouter un **dépôt git (GitHub, Gitea, GitLab)** pour une
-      **sauvegarde automatique**.
+      **sauvegarde automatique** ou / et un accès "google drive / nextcloud / etc." pour sauvegarder en archives.

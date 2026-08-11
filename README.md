@@ -35,7 +35,7 @@ VoiceBuilder/
 ├── voix/            # voix.txt + paires .wav/.txt
 ├── texte/           # documents taggés + <nom>.map (personnages→voix, CSV)
 ├── output/          # montages produits
-├── vendor/CosyVoice/  # moteur CosyVoice en sous-module git (à intégrer)
+├── vendor/CosyVoice/  # moteur CosyVoice en sous-module git
 └── tools/
     ├── gen_multi_voix.py    # CLI génération multi-voix
     └── create_voix.py       # assistant de création de voix
@@ -92,10 +92,11 @@ Au clonage, le prompt TTS =
 ### Où ranger les fichiers .wav / .txt
 
 Le dossier contenant les **fichiers `wav`/`txt`** des voix se configure via la
-variable d'environnement `VOICEBUILDER_AUDIO_DIR` (défaut : `~/Partages/voice`).
+variable d'environnement `VOICEBUILDER_AUDIO_DIR` (défaut :
+`~/Projets/Personnel (Fabrice)/vb-voice`).
 
 ```bash
-export VOICEBUILDER_AUDIO_DIR=~/Partages/voice   # par exemple
+export VOICEBUILDER_AUDIO_DIR=~/Projets/Personnel\ \(Fabrice\)/vb-voice
 python -m tools.gen_multi_voix texte/x.md
 ```
 

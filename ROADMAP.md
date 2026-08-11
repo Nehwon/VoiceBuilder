@@ -38,7 +38,7 @@ transcription Whisper + mise à jour de `voix.txt`).
 **Livrable** : `tools/create_voix.py`.
 **Statut** : ✔ Terminé (raffinements M2.1–M2.3 à suivre, voir TODO).
 
-### M3 — Première maquille GUI
+### M3 — Première maquette GUI
 **Objectif** : import de texte, éditeur Markdown surlignant les `[Nom]`, panneau
 des voix, génération + pré-écoute par bloc.
 **Livrable** : `app/gui.py`.

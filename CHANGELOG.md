@@ -13,10 +13,22 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
   (`vendor/CosyVoice`) au lieu d'un clone voisin (`~/Projets/CosyVoice`) ;
   `engine/config.py` pointe vers le sous-module. Récupération :
   `git submodule update --init --recursive` + `scripts/apply_cosyvoice_patches.sh`.
-- **Conteneur Docker avec GPU** (M15) : `Dockerfile` + `docker-compose.yml`
-  (NVIDIA `nvidia-container-toolkit`) pour le moteur et le GUI FastAPI — en cours.
-- Objectifs documentés dans `TODO.md` (§Phase 7, M14/M15), `ROADMAP.md`,
-  `PROJET.md` et `README.md`.
+- **Conteneur Docker avec GPU** (M15) : `Dockerfile` (base `ubuntu:22.04` +
+  torch `cu130`, sans `nvidia-nccl-cu12` pour éviter un conflit NCCL) +
+  `docker-compose.yml` (services GUI/CLI, GPU via `nvidia-container-toolkit`,
+  dossier des voix réglable via `AUDIO_SRC_DIR`). Image **buildée et pipeline
+  validé** dans le conteneur (import torch OK, CLI charge le modèle) — la
+  génération de bout en bout reste à confirmer sur un hôte avec le toolkit.
+- **CI/CD retiré** : un workflow GitHub Actions a été testé puis **supprimé** —
+  l'image Docker (~21 Go) dépasse l'espace disque des runners GitHub
+  (« no space left on device »). Le build reste local via `docker compose build`.
+- **GUI** — détection des balises `[Personnage]` du texte (ajoutées au modal
+  « Personnages »), **validation avant génération** : aucun personnage ou
+  personnage sans voix → `afficherErreur` + ouverture du modal.
+- **Sauvegarde git** : `origin` pousse vers **deux dépôts** (gitea +
+  GitHub `Nehwon/VoiceBuilder`, remote `backup`), conformément à `AGENTS.md`.
+- Objectifs documentés dans `TODO.md` (§Phase 7, M14/M15, backlog cache/
+  volumes/import-export), `ROADMAP.md`, `PROJET.md` et `README.md`.
 
 ## [0.4.0] — 2026-08-10
 
@@ -61,7 +73,7 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ### Ajout
 - **M4 — Raffinements UX** dans `app/gui.py` : autocomplétion (`Tab`), insertion de bloc 1-clic, gouttière de lignes, panneau « Réglages » (pause, vitesse, max chars, Whisper, `device`), génération non bloquante + export. `multi.generate` accepte `device`/`fp16` (plombés vers `cosyvoice_engine.load`).
-- **Configuration du dossier des fichiers voix** — nouvelle variable d'environnement `VOICEBUILDER_AUDIO_DIR` (défaut `~/Partages/voice`) via `config.VOIX_AUDIO_DIR` ; résolution des wav/txt élargie à `config.VOIX_SEARCH_DIRS`.
+- **Configuration du dossier des fichiers voix** — nouvelle variable d'environnement `VOICEBUILDER_AUDIO_DIR` (défaut `~/Projets/Personnel (Fabrice)/vb-voice`) via `config.VOIX_AUDIO_DIR` ; résolution des wav/txt élargie à `config.VOIX_SEARCH_DIRS`.
 - **M3 — Maquette GUI** : `app/gui.py` (éditeur Markdown + surlignage, panneau des voix, génération multi-fil, pause).
 - **Documentation** : `docs/UTILISATION.md` (CLI, GUI, format des voix, format taggé et section « Tags non-verbaux / émotions spécifiques à CosyVoice3 ») ; `TODO.md` et `ROADMAP.md` détaillés point par point (M3/M4) ; lien ajouté au `README.md`.
 - `README.md`, `TODO.md`, `ROADMAP.md`, `CHANGELOG.md`.
