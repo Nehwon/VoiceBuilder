@@ -189,3 +189,33 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [ ] Vérification différée : transcrire le montage final en entier et signaler les pertes par segment.
 - [ ] Pré-cache des prompts `wav+txt` par voix.
 - [ ] Détection automatique des limites de segment (VAD) pour `create_voix`.
+
+### Cache de la dernière génération
+
+> Le logiciel doit **conserver la dernière génération** pour qu'une reprise de
+> session ne force pas à régénérer tout le projet (mauvaise expérience).
+
+- [ ] **M16 — Cache de génération par projet** : garder la dernière génération
+      disponible, persistée et relue à l'ouverture du projet.
+- [ ] Le cache n'est vidé que dans **deux cas** :
+  1. l'utilisateur **demande une nouvelle génération** depuis la page d'édition ;
+  2. l'utilisateur **supprime le cache du projet** via un bouton en barre de
+     tâche, à droite d'« Enregistrer » : **« Supprimer la génération »**, avec un
+     **modal de mise en garde** demandant de taper `yes` et de cocher une case
+     « Je comprends que je vais tout supprimer ».
+
+### Docker — volumes persistants
+
+- [ ] Dans la définition du **conteneur Docker**, exposer un **volume** (en
+      priorité) pour le cache de génération.
+- [ ] **Conseiller** à l'utilisateur de mettre en place des volumes pour
+      l'ensemble : **système** (modèles), **voix**, **projets** et **cache**.
+
+### Import / export des configurations & volumes
+
+- [ ] Fournir un moyen d'**importer / exporter** les configurations et les
+      volumes : soit via **git**, soit en **fichier téléchargé**.
+- [ ] Le volume **système** (modèles) n'est pas prioritaire (modèles
+      retéléchargeables) ; pour le reste (**voix**, **projets**, **cache**),
+      permettre d'ajouter un **dépôt git (GitHub, Gitea, GitLab)** pour une
+      **sauvegarde automatique**.
