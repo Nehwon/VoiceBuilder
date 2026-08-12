@@ -190,6 +190,34 @@ Onglets **Éditeur** (texte taggé, insertion `[Nom]:`, bouton **Générer**, ap
 montage), **Réglages** (pause, vitesse, max chars/bloc, vérification, `device`) et
 **Assistant voix** (extraction + transcription Whisper d'un extrait).
 
+### GUI serveur (référence — FastAPI)
+
+```bash
+python -m app.server --host 0.0.0.0 --port 8000   # puis ouvrir http://127.0.0.1:8000
+```
+
+Éditeur **plein écran** : barre d'outils avec un bouton par personnage, documents
+du projet ou **fichier local**, boutons **＋ Nouveau** / **💾 Enregistrer dans le
+projet**, réglages / aide / personnages en modales, thème clair/sombre via `🌙`.
+Au premier lancement, le **modèle CosyVoice3** est téléchargé depuis le panneau
+« 🧠 Modèles » (source ModelScope ou Hugging Face) si le volume ne le contient pas
+déjà (cf. `TODO.md` Phase 7).
+
+L'onglet **Montage** se débloque après une génération et est organisé en deux
+colonnes :
+- **À gauche** — le **montage global** (lecteur de l'ensemble + bouton
+  « 🔄 Re-créer le montage » + durée totale) et le **log de génération**.
+- **À droite** — une **liste à ascenseur des blocs générés**. Chaque bloc est une
+  carte contenant :
+  - le **lecteur audio** du bloc ;
+  - le **texte** complet de la réplique sous le lecteur ;
+  - un en-tête `N. Personnage · durée · nb de chars · voix` ;
+  - les boutons **Regénérer ce bloc** et **Diviser ce bloc** (re-synthèse d'une
+    moitié en cas de perte de contenu à la vérification).
+
+Les actions affectent immédiatement le montage global (« Re-créer » le
+réassemble après une modification de blocs).
+
 ---
 
 ## 6. Vérification et qualité

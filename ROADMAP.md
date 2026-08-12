@@ -78,7 +78,9 @@ clair/sombre), endpoints `/api/*` (voix, config, generation SSE, documents).
 une voix, le mapping étant persistant **par document** (fichier `.map`, CSV) ;
 monter le résultat dans un **onglet « Montage »** dédié.
 **Livrables** : modal « Personnages », bouton par personnage dans la barre
-d'outils, `multi.generate(personnages=)`, `app/server.py` (`/api/document/personnages`).
+d'outils, `multi.generate(personnages=)`, `app/server.py` (`/api/document/personnages`),
+onglet « Montage » (montage global + **liste à ascenseur de lecteurs par bloc**
+: une carte audio + texte + actions Régénérer/Diviser).
 **Statut** : ✔ Terminé.
 
 ### M5 — Performance (optionnel)

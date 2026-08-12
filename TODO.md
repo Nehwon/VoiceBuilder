@@ -125,8 +125,9 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         `voix,personnage`), relu à l'ouverture du document.
   - [x] `multi.generate(..., personnages=)` résout personnage→voix à la génération
         ; les lignes sans balise sont lues avec la voix en cours (aucune perte).
-- [x] **M10 — Onglet « Montage »** : lecteur audio + détail des blocs, actif
-      uniquement après une génération avec du contenu dans l'éditeur.
+- [x] **M10 — Onglet « Montage »** : actif après une génération ; montage
+      global (lecteur + log) à gauche et **liste à ascenseur de lecteurs par
+      bloc** (une carte audio + texte + actions Régénérer/Diviser) à droite.
 
 ---
 

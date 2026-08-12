@@ -33,6 +33,10 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
   ModelScope/Hugging Face, progression SSE) dans le volume inscriptible
   `cov3-models` ou un dossier pré-rempli (`MODEL_DIR`). Détection automatique
   de présence (`GET /api/modeles`), `COSYVOICE_MODEL_DIR` réglable par env.
+- **GUI Montage** — refonte de l'onglet « Montage » : montage global (lecteur +
+  log) à gauche et **liste à ascenseur de lecteurs par bloc** à droite (une
+  carte audio + texte complet + en-tête personnage/durée/voix + actions
+  Régénérer/Diviser), en remplacement du sélecteur unique de bloc.
 - Objectifs documentés dans `TODO.md` (§Phase 7, M14/M15, backlog cache/
   volumes/import-export), `ROADMAP.md`, `PROJET.md` et `README.md`.
 

@@ -154,8 +154,9 @@ python -m app.server --host 0.0.0.0 --port 8000
 L'éditeur est **plein écran** : barre d'outils avec un bouton par personnage,
 ouverte de documents (projet ou **fichier local**), boutons **＋ Nouveau** et
 **💾 Enregistrer dans le projet**, réglages / aide / personnages en modales.
-L'onglet **Montage** se débloque après une génération. Thème clair/sombre
-via `🌙`.
+L'onglet **Montage** se débloque après une génération : montage global (lecteur
++ log) à gauche, et à droite une **liste à ascenseur** avec un **lecteur par
+bloc** (texte + actions Régénérer/Diviser). Thème clair/sombre via `🌙`.
 
 ### GUI web (Gradio — alternative)
 

@@ -123,7 +123,9 @@ Priorités de l'écran principal :
 4. **Génération multi-voix** : bouton lançant la pipeline du §4, avec :
    - **progression & log** : voyant par bloc (personnage, durée, nb de sous-blocs) ;
    - **vérification visible** : blocs revérifiés / rapprochés ;
-   - **pré-écoute par segment** et **export** du montage final.
+   - **onglet « Montage »** : montage global (lecteur + log) à gauche, et à
+     droite une **liste à ascenseur de lecteurs par bloc** (une carte audio +
+     texte + actions Régénérer/Diviser) ; **export** du montage final.
 5. **Réglages** : vitesse globale, pause, device, fp16 (panneau avancé).
 
 ```bash
