@@ -4,3 +4,4 @@ output/
 historique/
 .venv/
 texte/brouillons/
+.env

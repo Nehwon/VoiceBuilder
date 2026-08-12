@@ -27,6 +27,12 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
   personnage sans voix → `afficherErreur` + ouverture du modal.
 - **Sauvegarde git** : `origin` pousse vers **deux dépôts** (gitea +
   GitHub `Nehwon/VoiceBuilder`, remote `backup`), conformément à `AGENTS.md`.
+- **Modèles hors image** (backlog « Important ») : le modèle CosyVoice3 n'est
+  plus attendu dans l'image Docker — téléchargeable au **premier lancement**
+  depuis l'interface (« 🧠 Modèles », `engine/modeles.py`, source
+  ModelScope/Hugging Face, progression SSE) dans le volume inscriptible
+  `cov3-models` ou un dossier pré-rempli (`MODEL_DIR`). Détection automatique
+  de présence (`GET /api/modeles`), `COSYVOICE_MODEL_DIR` réglable par env.
 - Objectifs documentés dans `TODO.md` (§Phase 7, M14/M15, backlog cache/
   volumes/import-export), `ROADMAP.md`, `PROJET.md` et `README.md`.
 

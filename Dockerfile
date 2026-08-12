@@ -52,8 +52,13 @@ RUN python3.10 -m venv /opt/venv \
 RUN bash /app/scripts/apply_cosyvoice_patches.sh
 
 # --- Volumes (dossier des voix réglable) ---
-ENV VOICEBUILDER_AUDIO_DIR=/app/voix
-VOLUME ["/app/output", "/app/texte", "/app/voix", "/app/vendor/CosyVoice/pretrained_models"]
+# Le modèle CosyVoice3 est volontairement HORS image : téléchargé au premier
+# lancement depuis l'interface dans /models (volume inscriptible), ou monté
+# depuis un volume/dossier pré-rempli. Voir docker-compose.yml (MODEL_DIR).
+ENV VOICEBUILDER_AUDIO_DIR=/app/voix \
+    COSYVOICE_MODEL_DIR=/models \
+    COSYVOICE_MODEL_SOURCE=modelscope
+VOLUME ["/app/output", "/app/texte", "/app/voix", "/models"]
 
 EXPOSE 8000
 

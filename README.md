@@ -64,6 +64,15 @@ git submodule update --init --recursive   # clone CosyVoice dans vendor/
 ./scripts/setup.sh                        # vérifie venv + modèle
 ```
 
+### Le modèle CosyVoice3
+
+Le modèle (~11 Go) n'est **pas** fourni avec le projet : il est téléchargé au
+**premier lancement** depuis l'interface (panneau « 🧠 Modèles », source
+ModelScope ou Hugging Face, avec progression). Localement il est rangé dans
+`vendor/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B` (réglable via
+`COSYVOICE_MODEL_DIR`) ; s'il est déjà présent, il est détecté et rien n'est
+re-téléchargé.
+
 ---
 
 ## Les voix (`voix/`)
@@ -195,16 +204,27 @@ Le moteur (sous-module `vendor/CosyVoice`) et le GUI FastAPI sont
 docker compose up --build        # serveur sur http://127.0.0.1:8000
 ```
 
+Les volumes et la source du modèle se configurent via un fichier `.env`
+(copier `.env.example`, voir les variables `AUDIO_SRC_DIR`, `MODEL_DIR`,
+`COSYVOICE_MODEL_SOURCE`) ou en ligne de commande :
+
 - **GPU** : CUDA 13 (torch `cu130`) depuis les wheels pip ; pas de base
   `nvidia/cuda` (un NCCL système entrerait en conflit avec torch cu130).
 - **Dossier des voix** : `../vb-voice` par défaut (dossier frère du projet) ;
-  surcharger avec `AUDIO_SRC_DIR=/chemin/vers/voix docker compose up`.
+  surcharger avec `AUDIO_SRC_DIR=/chemin/vers/voix` (cf. `.env`).
+- **Modèle CosyVoice3 (~11 Go)** : volontairement **hors image** — téléchargé
+  au **premier lancement** depuis l'interface (panneau « 🧠 Modèles », source
+  ModelScope ou Hugging Face, progression) dans le volume inscriptible
+  `cov3-models`. Pour le ranger sur l'hôte, pré-remplir par
+  `MODEL_DIR=/chemin/vers/le/modele` (détection automatique : rien n'est
+  re-téléchargé si le volume contient déjà le modèle).
 - Sans `nvidia-container-toolkit` sur l'hôte, `torch.cuda.is_available()` est
   `False` et la génération échoue (`Attempting to deserialize object on a CUDA
   device`) — le toolkit est requis.
 
 Voir `Dockerfile` et `docker-compose.yml` ; les montages couvrent `voix/`,
-`texte/`, `output/` et le modèle CosyVoice3 (détails `TODO.md` §Phase 7, M15).
+`texte/`, `output/` et le modèle CosyVoice3 hors image (détails `TODO.md`
+§Phase 7, M15).
 
 ---
 

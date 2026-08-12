@@ -95,7 +95,9 @@ FastAPI, portable sur toute machine équipée d'un GPU NVIDIA.
 `Dockerfile` + `docker-compose.yml` (montages `voix/`, `texte/`, `output/`,
 modèle CosyVoice3) ; génération complète validée dans le conteneur.
 **Statut** : M14 ✔ terminé · M15 ✔ image buildée + pipeline validé dans le
-conteneur (import torch `cu130` OK, CLI charge le modèle) — la génération de
+conteneur (import torch `cu130` OK, CLI charge le modèle) — **modèle hors image** :
+téléchargé au premier lancement depuis l'interface (`engine/modeles.py`, volume
+`cov3-models`) ou monté depuis un volume pré-rempli. La génération de
 bout en bout reste à confirmer sur un hôte équipé de `nvidia-container-toolkit`
 (`TODO.md` §Phase 7).
 

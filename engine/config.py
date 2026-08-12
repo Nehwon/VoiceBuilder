@@ -10,8 +10,20 @@ COSYVOICE_VENV = COSYVOICE_ROOT / "venv"
 MATCHA_TTS_DIR = COSYVOICE_ROOT / "third_party" / "Matcha-TTS"
 
 # Modèle par défaut (multilingue : français, en, zh, ja...)
-COSYVOICE_MODEL_DIR = COSYVOICE_ROOT / "pretrained_models" / "Fun-CosyVoice3-0.5B"
+# Réglable via la variable d'environnement COSYVOICE_MODEL_DIR (utile si le
+# modèle est rangé hors du sous-module, ex. un volume Docker dédié).
+_COSYVOICE_MODEL_DIR_DEFAULT = COSYVOICE_ROOT / "pretrained_models" / "Fun-CosyVoice3-0.5B"
+COSYVOICE_MODEL_DIR = Path(
+    os.environ.get("COSYVOICE_MODEL_DIR")
+    or _COSYVOICE_MODEL_DIR_DEFAULT
+)
 COSYVOICE2_MODEL_DIR = COSYVOICE_ROOT / "pretrained_models" / "CosyVoice2-0.5B"
+
+# Source de téléchargement du modèle au premier lancement (engine/modeles.py).
+#   - "modelscope" : FunAudioLLM/Fun-CosyVoice3-0.5B-2512 (défaut, source officielle)
+#   - "huggingface": FunAudioLLM/Fun-CosyVoice3-0.5B-2512 (miroir, si réseau bloqué)
+MODEL_SOURCE = os.environ.get("COSYVOICE_MODEL_SOURCE", "modelscope")
+MODEL_ID_COSYVOICE3 = "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
 
 # Prompt système requis par CosyVoice3 avant la transcription de référence.
 COSYVOICE3_SYSTEM_PROMPT = "You are a helpful assistant.<|endofprompt|>"
@@ -47,6 +59,16 @@ def set_audio_dir(path) -> None:
     global VOIX_AUDIO_DIR, VOIX_SEARCH_DIRS
     VOIX_AUDIO_DIR = Path(path).expanduser()
     VOIX_SEARCH_DIRS = (PROJECT_ROOT, VOIX_DIR, VOIX_AUDIO_DIR)
+
+
+def set_model_dir(path) -> None:
+    """Change au runtime le dossier du modèle CosyVoice3.
+
+    Utile quand le modèle est rangé hors du sous-module (volume Docker, autre
+    disque, etc.) ou téléchargé depuis l'interface.
+    """
+    global COSYVOICE_MODEL_DIR
+    COSYVOICE_MODEL_DIR = Path(path).expanduser()
 
 # --- Génération ---------------------------------------------------------------------
 DEFAULT_DEVICE = "cuda:0"

@@ -175,11 +175,13 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [x] Documenter la récupération (`git submodule update --init --recursive` +
         `scripts/apply_cosyvoice_patches.sh`).
 - [~] **M15 — Conteneur Docker avec GPU**
-  - [x] `Dockerfile` : base `nvidia/cuda` + Python 3.10, deps (`requirements.txt`,
+  - [x] `Dockerfile` : base `ubuntu:22.04` + Python 3.10, deps (`requirements.txt`,
         torch CUDA), moteur CosyVoice (sous-module), Matcha-TTS.
-  - [ ] Accès GPU via `--gpus all` / `nvidia-container-toolkit` (device `cuda`).
-  - [ ] Montages : `voix/`, `texte/`, `output/`, `VOICEBUILDER_AUDIO_DIR`, modèle CosyVoice3.
-  - [ ] `docker-compose.yml` (services : serveur GUI `app.server`, CLI).
+  - [x] Accès GPU via `--gpus all` / `nvidia-container-toolkit` (device `cuda`).
+  - [x] Montages : `voix/`, `texte/`, `output/`, modèle CosyVoice3 **hors image**
+        (volume inscriptible `cov3-models`, rempli au premier lancement depuis
+        l'interface ou pré-rempli via `MODEL_DIR`).
+  - [x] `docker-compose.yml` (services : serveur GUI `app.server`, CLI).
   - [ ] Vérifier une génération complète dans le conteneur.
 
 ---
@@ -221,5 +223,10 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       **sauvegarde automatique** ou / et un accès "google drive / nextcloud / etc." pour sauvegarder en archives.
 
 ### Important 
-- [ ] Supprimer les modèles de l'image : il doivent être recharger par l'utilisateur directement depuis l'interface au premier lancement.
-      Sauf si l'utilisateur utilise un volume qui comprends déjà les modèles.
+- [x] **Modèles hors image** : les modèles ne sont plus embarqués dans l'image
+      Docker — ils sont **téléchargés par l'utilisateur depuis l'interface** au
+      premier lancement (panneau « 🧠 Modèles », source ModelScope/Hugging Face,
+      progression SSE) dans le volume `cov3-models` (inscriptible) ou un dossier
+      pré-rempli (`MODEL_DIR`). Si le volume contient déjà le modèle, il est
+      détecté (`engine/modeles.py`, `GET /api/modeles`) et rien n'est
+      re-téléchargé. `COSYVOICE_MODEL_DIR` reste réglable par env/Dockerfile.

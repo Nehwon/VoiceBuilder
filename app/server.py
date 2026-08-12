@@ -33,7 +33,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from engine import config, cosyvoice_engine, multi, voix
+from engine import config, cosyvoice_engine, modeles, multi, voix
 from engine.voix import load_voix
 
 # ---------------------------------------------------------------------------
@@ -114,6 +114,10 @@ class ConfigIn(BaseModel):
     audio_dir: str | None = None
 
 
+class ModeleIn(BaseModel):
+    source: str | None = None  # "modelscope" | "huggingface"
+
+
 class NommageIn(BaseModel):
     entries: list[list[str]]
 
@@ -165,6 +169,80 @@ def api_config(payload: ConfigIn):
     config.ensure_dirs()
     voix.generer_voix_txt()          # (re)génère si voix.txt absent
     return _etat()
+
+
+# ---------------------------------------------------------------------------
+# Modèle CosyVoice3 (hors image — téléchargé au premier lancement, M15)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/modeles")
+def api_modeles():
+    return modeles.infos()
+
+
+_model_jobs: dict[int, dict] = {}
+_model_jobid = itertools.count()
+
+
+@app.post("/api/modeles/telecharger")
+def api_modele_telecharger(payload: ModeleIn):
+    if modeles.modele_present():
+        raise HTTPException(400, "Le modèle CosyVoice3 est déjà présent.")
+    if _model_jobs and any(j["status"] == "running" for j in _model_jobs.values()):
+        raise HTTPException(400, "Un téléchargement est déjà en cours.")
+    source = (payload.source or config.MODEL_SOURCE).lower()
+    if source not in ("modelscope", "huggingface"):
+        raise HTTPException(400, "Source inconnue : modelscope | huggingface")
+
+    jid = next(_model_jobid)
+    q: "queue.Queue[tuple]" = queue.Queue()
+    job = {"status": "running", "source": source, "queue": q,
+           "error": None, "result": None}
+    _model_jobs[jid] = job
+
+    def _run():
+        def progress(pct, octets):
+            q.put(("prog", {"pct": round(pct, 1), "octets": octets}))
+        try:
+            dest = modeles.telecharger(source=source, progress=progress)
+            job["result"] = {"dossier": str(dest)}
+            job["status"] = "done"
+        except Exception as exc:  # noqa: BLE001
+            job["error"] = str(exc)
+            job["status"] = "error"
+        finally:
+            q.put(("fin", None))
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"id": jid}
+
+
+@app.get("/api/modeles/{jid}/stream")
+def api_modele_stream(jid: int):
+    job = _model_jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "Téléchargement inconnu.")
+
+    def gen():
+        yield ": connected\n\n"
+        while job["status"] == "running":
+            try:
+                kind, data = job["queue"].get(timeout=0.5)
+            except queue.Empty:
+                yield ": ping\n\n"
+                continue
+            if kind == "prog":
+                yield f"event: prog\ndata: {json.dumps(data)}\n\n"
+            elif kind == "fin":
+                break
+        if job["error"]:
+            yield f"event: error\ndata: {json.dumps({'error': job['error']})}\n\n"
+        elif job["result"]:
+            r = job["result"]
+            yield f"event: result\ndata: {json.dumps({'dossier': r['dossier']})}\n\n"
+        yield "event: end\ndata: {}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @app.get("/api/voix")

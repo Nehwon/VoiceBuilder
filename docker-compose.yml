@@ -1,6 +1,13 @@
 # Dossier des fichiers .wav/.txt des voix (défaut : dossier frère vb-voice).
-# Surcharger :  AUDIO_SRC_DIR=/chemin/vers/voix docker compose up
+# Surcharger via un fichier .env :  AUDIO_SRC_DIR=/chemin/vers/voix
+#   ou en ligne de commande :        docker compose up  (docker compose lit .env)
 x-audio-volume: &audio-volume "${AUDIO_SRC_DIR:-../vb-voice}:/data/voice:ro"
+
+# Dossier du modèle CosyVoice3 (~11 Go, téléchargé au premier lancement).
+# Par défaut un volume Docker dédié nommé `cov3-models` (inscriptible).
+# Surcharger via .env avec un dossier hôte pré-rempli :
+#   MODEL_DIR=/chemin/vers/le/modele  (détecté → rien n'est re-téléchargé)
+x-model-volume: &model-volume "${MODEL_DIR:-cov3-models}:/models"
 
 services:
   # GUI FastAPI — http://127.0.0.1:8000
@@ -13,12 +20,15 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       - VOICEBUILDER_AUDIO_DIR=/data/voice
+      - COSYVOICE_MODEL_DIR=/models
+      - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
     volumes:
       - ./voix:/app/voix:ro
       - ./texte:/app/texte
       - ./output:/app/output
-      # Modèle CosyVoice3 (9 Go) monté depuis l'hôte
-      - ./vendor/CosyVoice/pretrained_models:/app/vendor/CosyVoice/pretrained_models:ro
+      # Modèle CosyVoice3 (hors image) : volume inscriptible, rempli au premier
+      # lancement depuis l'interface, ou volume/dossier pré-rempli.
+      - *model-volume
       # Dossier des fichiers .wav/.txt des voix (réglé par VOICEBUILDER_AUDIO_DIR)
       - *audio-volume
     deploy:
@@ -39,11 +49,13 @@ services:
     command: ["python", "-m", "tools.gen_multi_voix"]
     environment:
       - VOICEBUILDER_AUDIO_DIR=/data/voice
+      - COSYVOICE_MODEL_DIR=/models
+      - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
     volumes:
       - ./voix:/app/voix:ro
       - ./texte:/app/texte
       - ./output:/app/output
-      - ./vendor/CosyVoice/pretrained_models:/app/vendor/CosyVoice/pretrained_models:ro
+      - *model-volume
       - *audio-volume
     deploy:
       resources:
@@ -52,3 +64,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+volumes:
+  cov3-models: {}

@@ -17,6 +17,7 @@
     </nav>
     <div class="header-btns">
       <button id="btn-aide" title="Aide à la mise en forme">❓</button>
+      <button id="btn-modeles" title="Modèles CosyVoice (téléchargement au premier lancement)">🧠 Modèles</button>
       <button id="btn-theme" title="Basculer le thème clair/sombre">🌙</button>
       <button id="btn-reglages" title="Réglages">⚙️ Réglages</button>
     </div>
@@ -152,6 +153,45 @@
       <div class="modal-actions">
         <button id="btn-modal-fermer">Fermer</button>
         <button id="btn-save" class="primaire">Enregistrer réglages</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : modèles CosyVoice (téléchargement au premier lancement) -->
+  <div id="modal-modeles" class="modal" hidden>
+    <div class="modal-boite">
+      <h2>🧠 Modèle CosyVoice3</h2>
+      <p class="modal-sub">Le modèle (~11 Go) n'est pas fourni avec le programme :
+        il est téléchargé au premier lancement depuis la source choisie. Si un
+        volume contient déjà le modèle, il est détecté et rien n'est re-téléchargé.</p>
+
+      <div id="modele-statut" class="modele-statut">…</div>
+
+      <label>Source de téléchargement
+        <select id="modele-source">
+          <option value="modelscope">ModelScope (défaut)</option>
+          <option value="huggingface">Hugging Face</option>
+        </select>
+      </label>
+
+      <details class="modele-detail">
+        <summary>Fichiers requis</summary>
+        <pre id="modele-manquants"></pre>
+      </details>
+
+      <div id="modele-progress" class="progression" hidden>
+        <div class="progression-info">
+          <span id="modele-progress-label">Téléchargement…</span>
+          <span id="modele-progress-compteur"></span>
+        </div>
+        <div class="progression-barre">
+          <div id="modele-progress-remplie"></div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="btn-modele-fermer">Fermer</button>
+        <button id="btn-modele-telecharger" class="primaire">Télécharger le modèle</button>
       </div>
     </div>
   </div>

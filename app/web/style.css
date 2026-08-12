@@ -271,3 +271,16 @@ button.secondaire { border-color: var(--bor); }
 .bloc-actions button { margin: 0; }
 .bloc-detail { color: var(--dim); font-size: 12px; margin-top: 8px; }
 .montage .log { margin-top: 6px; max-height: 200px; overflow: auto; }
+
+/* ---------------------------------------------------------------- modèle CosyVoice3 */
+.modele-statut { color: var(--txt); font-size: 13px; margin: 8px 0; }
+.modele-statut.ok { border-left: 4px solid #3fa24f; padding: 6px 10px; background: var(--panel2); }
+.modele-statut.missing { border-left: 4px solid #d33; padding: 6px 10px; background: var(--panel2); }
+.modele-statut code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
+.modele-detail { margin-top: 8px; }
+.modele-detail summary { cursor: pointer; color: var(--dim); font-size: 12px; }
+.modele-detail pre {
+  background: var(--panel2); border: 1px solid var(--bor); border-radius: 6px;
+  padding: 8px; font-family: ui-monospace, monospace; font-size: 12px; color: var(--txt);
+  max-height: 26vh; overflow: auto; white-space: pre-wrap;
+}
