@@ -579,70 +579,66 @@ async function chargerBlocs() {
     const d = await r.json();
     montageBlocs = d.blocs || [];
     $("montage-info").textContent = `Durée totale : ${d.duree} s · ${montageBlocs.length} bloc(s)`;
-    remplirSelBlocs();
-    majPanelBloc();
+    remplirListeBlocs();
   } catch { notifier("Erreur au chargement des blocs.", "err"); }
 }
 
-function remplirSelBlocs() {
-  const sel = $("sel-bloc");
-  const courant = sel.value;
-  sel.innerHTML = "";
-  montageBlocs.forEach((b, i) => {
-    const o = document.createElement("option");
-    o.value = b.id;
-    o.textContent = `${i + 1}. ${b.personnage} — ${b.duree} s (${b.chars} chars)`;
-    sel.appendChild(o);
-  });
-  if ([...sel.options].find((o) => o.value === courant)) sel.value = courant;
-  else sel.selectedIndex = 0;
-}
-
-function blocCourant() {
-  const id = parseInt($("sel-bloc").value, 10);
-  return montageBlocs.find((b) => b.id === id) || null;
-}
-
-function majPanelBloc() {
-  const b = blocCourant();
-  if (!b) {
-    $("bloc-panel").hidden = true;
+// Une carte par bloc : audio + texte + infos + boutons.
+function remplirListeBlocs() {
+  const box = $("liste-blocs");
+  box.innerHTML = "";
+  if (!montageBlocs.length) {
+    box.innerHTML = '<p class="liste-vide">Aucun bloc (génère d\u2019abord un montage).</p>';
     return;
   }
-  $("bloc-panel").hidden = false;
-  $("bloc-audio").src = `/api/generer/${montageId}/bloc/${b.id}/wav`;
-  const extra = b.texte ? `\n« ${b.texte.slice(0, 90)}${b.texte.length > 90 ? "…" : ""} »` : "";
-  $("bloc-detail").textContent =
-    `Personnage : ${b.personnage} · voix : ${b.voix} · ${b.duree} s${extra}`;
+  montageBlocs.forEach((b, i) => {
+    const carte = document.createElement("article");
+    carte.className = "bloc-carte";
+    carte.dataset.id = b.id;
+
+    const tete = document.createElement("div");
+    tete.className = "bloc-carte-tete";
+    const titre = document.createElement("strong");
+    titre.textContent = `${i + 1}. ${b.personnage}`;
+    const dur = document.createElement("span");
+    dur.className = "bloc-carte-duree";
+    dur.textContent = `${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
+    tete.append(titre, dur);
+
+    const audio = document.createElement("audio");
+    audio.controls = true;
+    audio.preload = "none";
+    audio.src = `/api/generer/${montageId}/bloc/${b.id}/wav`;
+
+    const texte = document.createElement("p");
+    texte.className = "bloc-carte-texte";
+    texte.textContent = b.texte || "—";
+
+    const actions = document.createElement("div");
+    actions.className = "bloc-carte-actions";
+    const btnRegen = document.createElement("button");
+    btnRegen.textContent = "Regénérer ce bloc";
+    btnRegen.onclick = () => actionBloc(b.id, "regenerer", btnRegen);
+    const btnDiv = document.createElement("button");
+    btnDiv.textContent = "Diviser ce bloc";
+    btnDiv.onclick = () => actionBloc(b.id, "diviser", btnDiv);
+    actions.append(btnRegen, btnDiv);
+
+    carte.append(tete, audio, texte, actions);
+    box.appendChild(carte);
+  });
 }
 
-$("sel-bloc").addEventListener("change", majPanelBloc);
-
-async function actionBloc(url, msg) {
-  const b = blocCourant();
-  if (!b) return;
-  $("btn-bloc-regenerer").disabled = true;
-  $("btn-bloc-diviser").disabled = true;
+async function actionBloc(bid, action, btn) {
+  if (btn) btn.disabled = true;
+  const msg = action === "regenerer" ? "Bloc régénéré." : "Bloc divisé en deux.";
   try {
-    const r = await fetch(url, { method: "POST" });
+    const r = await fetch(`/api/generer/${montageId}/bloc/${bid}/${action}`, { method: "POST" });
     if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
     await chargerBlocs();
-    if (msg) notifier(msg, "ok");
+    notifier(msg, "ok");
   } catch { notifier("Action bloc échouée.", "err"); }
-  finally {
-    $("btn-bloc-regenerer").disabled = false;
-    $("btn-bloc-diviser").disabled = false;
-  }
-}
-
-$("btn-bloc-regenerer").addEventListener("click", () =>
-  actionBloc(`/api/generer/${montageId}/bloc/${blockId()}/regenerer`, "Bloc régénéré."));
-$("btn-bloc-diviser").addEventListener("click", () =>
-  actionBloc(`/api/generer/${montageId}/bloc/${blockId()}/diviser`, "Bloc divisé en deux."));
-
-function blockId() {
-  const b = blocCourant();
-  return b ? b.id : "";
+  finally { if (btn) btn.disabled = false; }
 }
 
 $("btn-concat").addEventListener("click", async () => {

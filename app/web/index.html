@@ -66,8 +66,9 @@
     </section>
   </main>
 
-  <main id="vue-montage" class="vue" hidden>
-    <section class="montage">
+  <main id="vue-montage" class="vue montage-vue" hidden>
+    <!-- À gauche : montage global + log -->
+    <section class="montage montage-global">
       <h2>Montage généré</h2>
       <audio id="montage" controls></audio>
 
@@ -76,23 +77,16 @@
         <span id="montage-info"></span>
       </div>
 
-      <h3>Blocs (locuteur / durée)</h3>
-      <div class="montage-bloc-select">
-        <label for="sel-bloc">Bloc</label>
-        <select id="sel-bloc"></select>
-      </div>
-
-      <div id="bloc-panel" class="bloc-panel">
-        <div class="bloc-actions">
-          <button id="btn-bloc-regenerer">Regénérer ce bloc</button>
-          <button id="btn-bloc-diviser">Diviser ce bloc</button>
-        </div>
-        <audio id="bloc-audio" controls></audio>
-        <div id="bloc-detail" class="bloc-detail"></div>
-      </div>
-
       <h3>Log de génération</h3>
       <pre id="log" class="log"></pre>
+    </section>
+
+    <!-- À droite : liste à ascenseur des lecteurs de blocs -->
+    <section class="montage montage-blocs">
+      <h2>Blocs générés</h2>
+      <div id="liste-blocs" class="liste-blocs">
+        <!-- Un cartouche par bloc : audio + texte + infos/boutons -->
+      </div>
     </section>
   </main>
 
