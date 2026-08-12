@@ -121,7 +121,8 @@ def generate(
             print(f"[{i}/{total}] {pers} ({len(block)} chars) -> {dur:.2f} s")
         if progress:
             progress({"index": i, "total": total, "personnage": pers,
-                      "chars": len(block), "duree": round(dur, 2)})
+                      "chars": len(block), "duree": round(dur, 2),
+                      "wav": info.get("wav")})
         parts.append(np.zeros(pause_n, dtype=np.float32))
 
     final = np.concatenate(parts)

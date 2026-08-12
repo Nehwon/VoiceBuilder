@@ -128,6 +128,9 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [x] **M10 — Onglet « Montage »** : actif après une génération ; montage
       global (lecteur + log) à gauche et **liste à ascenseur de lecteurs par
       bloc** (une carte audio + texte + actions Régénérer/Diviser) à droite.
+- [x] **M10.1 — Écoute temps réel** : chaque bloc généré est immédiatement
+      jouable dans l'onglet « Montage » via SSE (callback `bloc` avec `wav`),
+      sans attendre la fin de la génération complète.
 
 ---
 

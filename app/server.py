@@ -313,6 +313,11 @@ def api_generer(payload: GenererIn):
     _jobs[jid] = job
 
     def _run():
+        job["blocs"] = []
+        def progress_wrapper(b):
+            if "wav" in b:
+                job["blocs"].append(b)
+            q.put(("bloc", b))
         try:
             res = multi.generate(
                 str(tmp), _voix(), personnages=payload.personnages, out=str(sortie),
@@ -320,7 +325,7 @@ def api_generer(payload: GenererIn):
                 max_block_chars=payload.max_chars,
                 verify=payload.verify, device=payload.device,
                 block_dir=str(bloc_dir), fp16=False, verbose=False,
-                progress=lambda b: q.put(("bloc", b)),
+                progress=progress_wrapper,
             )
             job["result"] = res
             job["blocs"] = res.get("blocs", [])

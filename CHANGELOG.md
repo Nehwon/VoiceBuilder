@@ -37,6 +37,9 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
   log) à gauche et **liste à ascenseur de lecteurs par bloc** à droite (une
   carte audio + texte complet + en-tête personnage/durée/voix + actions
   Régénérer/Diviser), en remplacement du sélecteur unique de bloc.
+- **Écoute temps réel** — chaque bloc généré est immédiatement jouable dans
+  l'onglet « Montage » sans attendre la fin de la génération complète
+  (callback SSE `bloc` avec `wav` + `ajouterBlocTempsReel` côté frontend).
 - Objectifs documentés dans `TODO.md` (§Phase 7, M14/M15, backlog cache/
   volumes/import-export), `ROADMAP.md`, `PROJET.md` et `README.md`.
 

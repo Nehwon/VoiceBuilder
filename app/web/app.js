@@ -547,6 +547,9 @@ $("generer").addEventListener("click", async () => {
     $("log").textContent +=
       `[${b.index}/${b.total}] ${b.personnage} (${b.chars} chars) — ${b.duree} s\n`;
     majProgression(b.index, b.total, b.personnage, b.duree);
+    if (b.wav) {
+      ajouterBlocTempsReel(b);
+    }
   });
   ev.addEventListener("result", (e) => {
     const res = JSON.parse(e.data);
@@ -627,6 +630,56 @@ function remplirListeBlocs() {
     carte.append(tete, audio, texte, actions);
     box.appendChild(carte);
   });
+}
+
+// ---------------------------------------------------------------- écoute temps réel : ajoute un bloc au fur et à mesure
+function ajouterBlocTempsReel(b) {
+  const box = $("liste-blocs");
+  // si c'est le premier bloc, vider le message "Aucun bloc"
+  if (box.querySelector(".liste-vide")) {
+    box.innerHTML = "";
+  }
+  // éviter les doublons si l'événement arrive deux fois
+  if (box.querySelector(`[data-id="${b.id}"]`)) return;
+
+  const i = (montageBlocs.length) + 1;
+  const carte = document.createElement("article");
+  carte.className = "bloc-carte";
+  carte.dataset.id = b.id;
+
+  const tete = document.createElement("div");
+  tete.className = "bloc-carte-tete";
+  const titre = document.createElement("strong");
+  titre.textContent = `${i}. ${b.personnage}`;
+  const dur = document.createElement("span");
+  dur.className = "bloc-carte-duree";
+  dur.textContent = `${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
+  tete.append(titre, dur);
+
+  const audio = document.createElement("audio");
+  audio.controls = true;
+  audio.preload = "none";
+  audio.src = b.wav;
+
+  const texte = document.createElement("p");
+  texte.className = "bloc-carte-texte";
+  texte.textContent = b.texte || "—";
+
+  const actions = document.createElement("div");
+  actions.className = "bloc-carte-actions";
+  const btnRegen = document.createElement("button");
+  btnRegen.textContent = "Regénérer ce bloc";
+  btnRegen.onclick = () => actionBloc(b.id, "regenerer", btnRegen);
+  const btnDiv = document.createElement("button");
+  btnDiv.textContent = "Diviser ce bloc";
+  btnDiv.onclick = () => actionBloc(b.id, "diviser", btnDiv);
+  actions.append(btnRegen, btnDiv);
+
+  carte.append(tete, audio, texte, actions);
+  box.appendChild(carte);
+
+  // mémoriser pour le futur rechargement / concaténation
+  montageBlocs.push(b);
 }
 
 async function actionBloc(bid, action, btn) {
