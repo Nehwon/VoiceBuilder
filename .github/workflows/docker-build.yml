@@ -9,6 +9,7 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/Nehwon/voicebuilder
+  # Version lue depuis le fichier VERSION du workspace au moment du build
   IMAGE_TAG: main
 
 jobs:
@@ -189,11 +190,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Read VERSION file
+        id: read_version
+        run: |
+          VERSION=$(cat ${{ github.workspace }}/VERSION)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ cat ${{ github.workspace }}/VERSION }}
-          name: VoiceBuilder v${{ cat ${{ github.workspace }}/VERSION }} release
+          tag_name: v${{ steps.read_version.outputs.version }}
+          name: VoiceBuilder v${{ steps.read_version.outputs.version }} release
           
           draft: false
           prerelease: false
