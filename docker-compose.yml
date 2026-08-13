@@ -1,13 +1,35 @@
-# Dossier des fichiers .wav/.txt des voix (défaut : dossier frère vb-voice).
-# Surcharger via un fichier .env :  AUDIO_SRC_DIR=/chemin/vers/voix
-#   ou en ligne de commande :        docker compose up  (docker compose lit .env)
-x-audio-volume: &audio-volume "${AUDIO_SRC_DIR:-../vb-voice}:/data/voice:ro"
+# VoiceBuilder — orchestration Docker.
+# Tous les dossiers utilisent des volumes Docker nommés (named volumes),
+# pas de bind mounts hôte. Les volumes sont créés au premier `docker compose up`.
+#
+# Ordres :
+#   docker compose build
+#   docker compose up            # GUI sur http://127.0.0.1:8000
+#   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
 
-# Dossier du modèle CosyVoice3 (~11 Go, téléchargé au premier lancement).
-# Par défaut un volume Docker dédié nommé `cov3-models` (inscriptible).
-# Surcharger via .env avec un dossier hôte pré-rempli :
-#   MODEL_DIR=/chemin/vers/le/modele  (détecté → rien n'est re-téléchargé)
-x-model-volume: &model-volume "${MODEL_DIR:-cov3-models}:/models"
+# --- Définition des volumes Docker nommés ---
+# Chaque service référence ces volumes par leur nom.
+# Ils sont déclarés en bas du fichier et créés automatiquement.
+
+# Volume pour les fichiers .wav/.txt des voix.
+# L'interface web peut y écrire (import, génération de voix.txt,
+# futur outil de création de voix). Début vide, rempli par l'usage.
+volume-audio:
+
+# Volume pour le modèle CosyVoice3 (~11 Go).
+# Téléchargé automatiquement au premier lancement depuis l'interface,
+# ou pré-rempli par un volume externe portant le même nom.
+volume-model:
+
+# Volume pour les fichiers texte du projet (.md, .txt).
+# La solution d'upload de l'interface y écrit directement.
+volume-texte:
+
+# Volume pour la sortie des générations audio (.wav).
+volume-output:
+
+# Volume pour les fichiers temporaires (intermédiaires).
+volume-tmp:
 
 services:
   # GUI FastAPI — http://127.0.0.1:8000
@@ -23,14 +45,16 @@ services:
       - COSYVOICE_MODEL_DIR=/models
       - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
     volumes:
-      - ./voix:/app/voix:ro
-      - ./texte:/app/texte
-      - ./output:/app/output
-      # Modèle CosyVoice3 (hors image) : volume inscriptible, rempli au premier
-      # lancement depuis l'interface, ou volume/dossier pré-rempli.
-      - *model-volume
-      # Dossier des fichiers .wav/.txt des voix (réglé par VOICEBUILDER_AUDIO_DIR)
-      - *audio-volume
+      # Dossier des voix : volume DockerNamed, writable, interface y écrit.
+      - volume-audio:/data/voice
+      # Modèle CosyVoice3 : volume DockerNamed, vide au début, rempli au premier lancement.
+      - volume-model:/models
+      # Dossier texte : volume DockerNamed, écrit par la solution d'upload.
+      - volume-texte:/app/texte
+      # Dossier sortie : volume DockerNamed.
+      - volume-output:/app/output
+      # Dossier temporaire : volume DockerNamed.
+      - volume-tmp:/app/tmp
     deploy:
       resources:
         reservations:
@@ -52,11 +76,16 @@ services:
       - COSYVOICE_MODEL_DIR=/models
       - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
     volumes:
-      - ./voix:/app/voix:ro
-      - ./texte:/app/texte
-      - ./output:/app/output
-      - *model-volume
-      - *audio-volume
+      # Dossier des voix : volume DockerNamed, writable.
+      - volume-audio:/data/voice
+      # Modèle CosyVoice3 : volume DockerNamed.
+      - volume-model:/models
+      # Dossier texte : volume DockerNamed.
+      - volume-texte:/app/texte
+      # Dossier sortie : volume DockerNamed.
+      - volume-output:/app/output
+      # Dossier temporaire : volume DockerNamed.
+      - volume-tmp:/app/tmp
     deploy:
       resources:
         reservations:
@@ -66,4 +95,8 @@ services:
               capabilities: [gpu]
 
 volumes:
-  cov3-models: {}
+  volume-audio: {}
+  volume-model: {}
+  volume-texte: {}
+  volume-output: {}
+  volume-tmp: {}

@@ -1,0 +1,231 @@
+name: Build, Version & push VoiceBuilder Docker image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/Nehwon/voicebuilder
+  GITEA_IMAGE: gitea.lamachere.fr:2222/fabrice/voicebuilder
+  IMAGE_TAG: main
+
+# Helper function to get current version
+current_version: ${{ steps.get_version.outputs.version }}
+
+jobs:
+  # Job to get current version from VERSION file
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read_version.outputs.current_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read current VERSION
+        id: read_version
+        run: |
+          VERSION=$(cat VERSION)
+          echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+
+  # Job to determine version bump based on changed files
+  determine-bump:
+    needs: get-version
+    runs-on: ubuntu-latest
+    outputs:
+      bump_type: ${{ steps.decide_bump.outputs.bump_type }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current version
+        id: current_ver
+        run: echo "current=${{ needs.get-version.outputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Initialize bump type as patch (f)
+        id: init_bump
+        run: echo "bump_type=f" >> $GITHUB_OUTPUT
+
+      - name: Check for minor (m) changes - new features
+        id: check_minor
+        run: |
+          # Check if any new feature files or directories were added
+          # that represent significant new functionality
+          CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
+          
+          # Look for patterns indicating new features
+          if echo "$CHANGED_FILES" | grep -qiE "(web_app|server\.py|Dockerfile|entrypoint| wizard)"; then
+            echo "minor_detected=true" >> $GITHUB_OUTPUT
+          else
+            echo "minor_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for major (M) changes - explicit request
+        id: check_major
+        run: |
+          # Major version only bumped on explicit request
+          # We check for a marker file or commit message
+          if git log --format="%s" -1 | grep -qi "major\|M version\|breaking"; then
+            echo "major_detected=true" >> $GITHUB_OUTPUT
+          else
+            echo "major_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine bump type
+        id: decide_bump
+        run: |
+          MINOR=${{ steps.check_minor.outputs.minor_detected }}
+          MAJOR=${{ steps.check_major.outputs.major_detected }}
+          CURRENT=${{ needs.get-version.outputs.version }}
+          
+          IFS='.' read -ra ADDR <<< "$CURRENT"
+          MAJOR_NUM=${ADDR[0]}
+          MINOR_NUM=${ADDR[1]}
+          PATCH_NUM=${ADDR[2]}
+          
+          # Rule: Major only on explicit request
+          if [ "$MAJOR" = "true" ]; then
+            NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${PATCH_NUM}"
+            echo "bump_type=M" >> $GITHUB_OUTPUT
+          elif [ "$MINOR" = "true" ]; then
+            # Increment minor, reset patch
+            NEW_VERSION="${MAJOR_NUM}.${((MINOR_NUM + 1))}.0"
+            echo "bump_type=m" >> $GITHUB_OUTPUT
+          else
+            # Increment patch only
+            NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${((PATCH_NUM + 1))}"
+            echo "bump_type=f" >> $GITHUB_OUTPUT
+          fi
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+  # Job to bump version and update VERSION file
+  bump-version:
+    needs: determine-bump
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get new version
+        id: new_ver
+        run: echo "new=${{ needs.determine-bump.outputs.new_version }}" >> $GITHUB_OUTPUT
+
+      - name: Update VERSION file
+        run: |
+          echo "${{ steps.new_ver.outputs.new }}" > VERSION
+          cat VERSION
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore: bump version to ${{ needs.determine-bump.outputs.new_version }} [skip ci]"
+          git push origin main
+
+      - name: Print new version
+        run: echo "New version: ${{ needs.determine-bump.outputs.new_version }}"
+
+  # Job to build and push Docker image
+  build:
+    needs: bump-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Gitea Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: gitea.lamachere.fr:2222
+          username: ${{ secrets.GITEA_USER }}
+          password: ${{ secrets.GITEA_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha
+          annotations: |
+            org.opencontainers.image.title=VoiceBuilder
+            org.opencontainers.image.description="Voice cloning and multi-voice generation GUI (CosyVoice3 + Matcha-TTS)"
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ needs.determine-bump.outputs.new_version }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            DEBIAN_FRONTEND=noninteractive
+            LANG=C.UTF-8
+            PYTHONUNBUFFERED=1
+            PIP_NO_CACHE_DIR=1
+
+  # Optional: Create GitHub Release
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.determine-bump.outputs.new_version }}
+          name: VoiceBuilder v${{ needs.determine-bump.outputs.new_version }}
+          body: |
+            ## What's Changed
+            - Docker image rebuilt with updated dependencies
+            - VoiceBuilder v${{ needs.determine-bump.outputs.new_version }} release
+          
+          draft: false
+          prerelease: false

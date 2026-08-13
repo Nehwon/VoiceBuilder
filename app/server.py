@@ -107,6 +107,87 @@ def _bootstrap() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Installation torch & modèles API
+# ---------------------------------------------------------------------------
+import subprocess
+
+_torch_jobs: dict[int, dict] = {}
+_torch_jobid = itertools.count()
+
+
+def _check_torch():
+    """Vérifie si torch est importable et renvoie le statut."""
+    import importlib
+    try:
+        import torch
+        return {"status": "installed", "version": torch.__version__}
+    except ImportError:
+        return {"status": "not_installed"}
+
+
+@app.get("/api/torch/status")
+def api_torch_status():
+    return _check_torch()
+
+
+@app.post("/api/torch/install")
+def api_torch_install():
+    """Installe torch, torchvision, torchaudio si pas déjà installé."""
+    global _torch_jobs, _torch_jobid
+    if _torch_jobs and any(j["status"] == "running" for j in _torch_jobs.values()):
+        raise HTTPException(400, "Une installation torch est déjà en cours.")
+    jid = next(_torch_jobid)
+    q: "queue.Queue[tuple]" = queue.Queue()
+    job = {"status": "running", "queue": q, "error": None, "result": None}
+    _torch_jobs[jid] = job
+
+    def _run():
+        try:
+            import sys
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install",
+                 "--extra-index-url", "https://download.pytorch.org/whl/cu130",
+                 "torch==2.13.0", "torchaudio==2.11.0", "torchvision==0.28.0"]
+            )
+            job["result"] = {"version": torch.__version__}
+            job["status"] = "done"
+        except Exception as exc:  # noqa: BLE001
+            job["error"] = str(exc)
+            job["status"] = "error"
+        finally:
+            q.put("fin")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"id": jid}
+
+
+@app.get("/api/torch/install/{jid}/stream")
+def api_torch_install_stream(jid: int):
+    job = _torch_jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "Téléchargement torch inconnu.")
+
+    def gen():
+        yield ": connected\n\n"
+        while job["status"] == "running":
+            try:
+                kind, data = job["queue"].get(timeout=0.5)
+            except queue.Empty:
+                yield ": ping\n\n"
+                continue
+            if kind == "fin":
+                break
+        if job["error"]:
+            yield f"event: error\ndata: {json.dumps({'error': job['error']})}\n\n"
+        elif job["result"]:
+            r = job["result"]
+            yield f"event: result\ndata: {json.dumps(r)}\n\n"
+        yield "event: end\ndata: {}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
 # Modèles API
 # ---------------------------------------------------------------------------
 

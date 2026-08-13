@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import requests
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import gradio as gr
@@ -297,7 +299,104 @@ def construire():
                       variant="primary").click(
                 creer_voix, [src, nom, start_, stop_], out_txt)
 
+    # --- Onglet Wizard installation ---
+    with gr.Tab("Wizard install"):
+
+        # Étape 1 : Installer torch
+        gr.Markdown("### 1. Installer torch, torchvision, torchaudio")
+        torch_status = gr.Textbox(label="Statut torch", interactive=False)
+        torch_install_btn = gr.Button("Installer torch", variant="primary")
+
+        def install_torch():
+            import requests
+            import json
+            try:
+                r = requests.post("http://127.0.0.1:8000/api/torch/install", timeout=30)
+                if r.status_code == 200:
+                    jobid = r.json().get("id", "")
+                    # Poll for completion
+                    for _ in range(30):  # max 30 seconds wait
+                        r2 = requests.get(f"http://127.0.0.1:8000/api/torch/status", timeout=1)
+                        status = r2.json()
+                        if status.get("status") == "installed":
+                            return f"✔ torch {status.get('version', 'inconnue')} installé"
+                        elif status.get("status") == "error":
+                            return f"❌ Erreur : {status.get('error', 'inconnue')}"
+                        import time
+                        time.sleep(1)
+                    return "⏳ En attente d'installation..."
+                else:
+                    return f"❌ Erreur API: {r.text}"
+            except Exception as e:
+                return f"❌ Erreur connexion: {e}"
+
+        torch_install_btn.click(
+            fn=install_torch,
+            outputs=torch_status,
+        )
+
+        # Étape 2 : Télécharger les modèles
+        gr.Markdown("### 2. Télécharger le modèle CosyVoice3")
+        model_source = gr.Dropdown(choices=["modelscope", "huggingface"],
+                                   value="modelscope", label="Source")
+        model_status = gr.Textbox(label="Statut modèle", interactive=False)
+        model_download_btn = gr.Button("Télécharger le modèle", variant="primary")
+
+        def download_model(source):
+            import requests
+            import json
+            try:
+                r = requests.post(
+                    "http://127.0.0.1:8000/api/modeles/telecharger",
+                    json={"source": source},
+                    timeout=60
+                )
+                if r.status_code == 200:
+                    jid = r.json().get("id", "")
+                    # Poll for completion
+                    for _ in range(60):  # max 60 seconds wait
+                        r2 = requests.get(f"http://127.0.0.1:8000/api/modeles", timeout=1)
+                        modes = r2.json()
+                        if modes.get("dossier"):
+                            return f"✔ Modèle téléchargé : {modes.get('dossier')}"
+                        import time
+                        time.sleep(1)
+                    return "⏳ Téléchargement en cours..."
+                else:
+                    return f"❌ Erreur API: {r.text}"
+            except Exception as e:
+                return f"❌ Erreur connexion: {e}"
+
+        model_download_btn.click(
+            fn=lambda src: download_model(src),
+            outputs=model_status,
+        )
+
     return demo
+
+
+def api_torch_install_call():
+    """Call the torch install API and return status + job id."""
+    import requests
+    try:
+        r = requests.get("http://127.0.0.1:8000/api/torch/install")
+        if r.status_code == 200:
+            return json.dumps(r.json())
+    except Exception as e:
+        return json.dumps({"status": "error", "error": str(e)})
+    return json.dumps({"status": "unknown"})
+
+
+def api_modele_telecharger_call(source):
+    """Call the model download API."""
+    import requests
+    try:
+        r = requests.post("http://127.0.0.1:8000/api/modeles/telecharger", json={"source": source})
+        if r.status_code == 200:
+            return json.dumps(r.json())
+    except Exception as e:
+        return json.dumps({"status": "error", "error": str(e)})
+    return json.dumps({"status": "unknown"})
 
 
 def main(argv=None) -> int:

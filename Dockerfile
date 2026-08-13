@@ -38,9 +38,6 @@ COPY . .
 # --- Environnement Python ---
 RUN python3.10 -m venv /opt/venv \
     && pip install --upgrade pip setuptools wheel \
-    # torch/torchaudio/torchvision depuis l'index CUDA 13 (Blackwell sm_120)
-    && pip install --extra-index-url https://download.pytorch.org/whl/cu130 \
-        torch==2.13.0 torchaudio==2.11.0 torchvision==0.28.0 \
     && pip install -r /app/requirements.txt \
     # Snapshot complet de l'environnement validé : tout est listé explicitement.
     && pip install --no-deps -r /app/requirements-lock.txt \
@@ -63,4 +60,5 @@ VOLUME ["/app/output", "/app/texte", "/app/voix", "/models"]
 EXPOSE 8000
 
 # GUI FastAPI par défaut ; `docker compose run --rm cli …` pour la CLI.
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 CMD ["python", "-m", "app.server", "--host", "0.0.0.0", "--port", "8000"]
