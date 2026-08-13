@@ -9,8 +9,7 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/Nehwon/voicebuilder
-  # Version lue depuis le fichier VERSION du workspace
-  # Sera définie par le workflow de bump ; par défaut 'main'
+  # Version lue depuis le fichier VERSION du workspace au moment du build
   IMAGE_TAG: main
 
 jobs:
@@ -214,7 +213,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ cat ${{ github.workspace }}/VERSION }}
+          tag_name: v${{ cat ${{ github.workspace }}/VERSION }}
           name: VoiceBuilder v${{ cat ${{ github.workspace }}/VERSION }} release
           
           draft: false
