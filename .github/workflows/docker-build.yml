@@ -9,7 +9,8 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/Nehwon/voicebuilder
-  # Version sera définie par le workflow de bump ; par défaut 'main'
+  # Version lue depuis le fichier VERSION du workspace
+  # Sera définie par le workflow de bump ; par défaut 'main'
   IMAGE_TAG: main
 
 jobs:
@@ -41,7 +42,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       bump_type: ${{ steps.decide_bump.outputs.bump_type }}
-      new_version: ${{ steps.decide_bump.outputs.new_version }}
 
     steps:
       - name: Setup Node.js 24
@@ -95,19 +95,16 @@ jobs:
           if [ "$MAJOR" = "true" ]; then
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${PATCH_NUM}"
             echo "bump_type=M" >> $GITHUB_OUTPUT
-            echo "new_version=${MAJOR_NUM}.${MINOR_NUM}.${PATCH_NUM}" >> $GITHUB_OUTPUT
           elif [ "$MINOR" = "true" ]; then
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.0"
             # Minor bump: increment the minor number
             NEW_MINOR=$((MINOR_NUM + 1))
             NEW_VERSION="${MAJOR_NUM}.${NEW_MINOR}.0"
             echo "bump_type=m" >> $GITHUB_OUTPUT
-            echo "new_version=${MAJOR_NUM}.${NEW_MINOR}.0" >> $GITHUB_OUTPUT
           else
             NEW_PATCH=$((PATCH_NUM + 1))
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${NEW_PATCH}"
             echo "bump_type=f" >> $GITHUB_OUTPUT
-            echo "new_version=${MAJOR_NUM}.${MINOR_NUM}.${NEW_PATCH}" >> $GITHUB_OUTPUT
           fi
 
   # Job to bump version and update VERSION file
@@ -180,29 +177,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=sha
-            # Use the new version from the bump job - read from VERSION file
-            type=file,template=${{ github.workspace }}/VERSION,commit=true
-          annotations: |
-            org.opencontainers.image.title=VoiceBuilder
-            org.opencontainers.image.description="Voice cloning and multi-voice generation GUI (CosyVoice3 + Matcha-TTS)"
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ cat ${{ github.workspace }}/VERSION }}
+            ${{ env.IMAGE_NAME }}:main
             ${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
