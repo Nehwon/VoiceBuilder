@@ -23,6 +23,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Normaliser le nom de l'image
+        shell: bash
+        run: |
+          echo "IMAGE_NAME=gitea.lamachere.fr:2222/fabrice/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Login to Gitea Container Registry
         uses: docker/login-action@v4
         with:

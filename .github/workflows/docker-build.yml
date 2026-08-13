@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: ghcr.io/nehwon/voicebuilder
+  IMAGE_NAME: ghcr.io/Nehwon/voicebuilder
   IMAGE_TAG: main
 
 jobs:
@@ -29,6 +29,11 @@ jobs:
         run: |
           VERSION=$(cat VERSION)
           echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Normaliser le nom de l'image
+        shell: bash
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
   # Job to determine version bump based on changed files
   determine-bump:
