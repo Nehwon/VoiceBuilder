@@ -19,10 +19,10 @@ jobs:
       version: ${{ steps.read_version.outputs.current_version }}
 
     steps:
-      - name: Setup Node.js 18
+      - name: Setup Node.js 24
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -42,10 +42,10 @@ jobs:
       bump_type: ${{ steps.decide_bump.outputs.bump_type }}
 
     steps:
-      - name: Setup Node.js 18
+      - name: Setup Node.js 24
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -115,10 +115,10 @@ jobs:
       contents: write
       
     steps:
-      - name: Setup Node.js 18
+      - name: Setup Node.js 24
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -154,10 +154,10 @@ jobs:
       packages: write
       
     steps:
-      - name: Setup Node.js 18
+      - name: Setup Node.js 24
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -185,6 +185,8 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=sha
+            # Always add a tag based on the new version from the bump job
+            type=raw,template=${{ needs.determine-bump.outputs.new_version }}
           annotations: |
             org.opencontainers.image.title=VoiceBuilder
             org.opencontainers.image.description="Voice cloning and multi-voice generation GUI (CosyVoice3 + Matcha-TTS)"
@@ -215,10 +217,10 @@ jobs:
       contents: write
       
     steps:
-      - name: Setup Node.js 18
+      - name: Setup Node.js 24
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
