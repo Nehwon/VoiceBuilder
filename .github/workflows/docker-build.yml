@@ -12,9 +12,6 @@ env:
   GITEA_IMAGE: gitea.lamachere.fr:2222/fabrice/voicebuilder
   IMAGE_TAG: main
 
-# Helper function to get current version
-current_version: ${{ steps.get_version.outputs.version }}
-
 jobs:
   # Job to get current version from VERSION file
   get-version:
@@ -58,12 +55,8 @@ jobs:
       - name: Check for minor (m) changes - new features
         id: check_minor
         run: |
-          # Check if any new feature files or directories were added
-          # that represent significant new functionality
           CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
-          
-          # Look for patterns indicating new features
-          if echo "$CHANGED_FILES" | grep -qiE "(web_app|server\.py|Dockerfile|entrypoint| wizard)"; then
+          if echo "$CHANGED_FILES" | grep -qiE "(web_app|server\.py|Dockerfile|entrypoint|wizard)"; then
             echo "minor_detected=true" >> $GITHUB_OUTPUT
           else
             echo "minor_detected=false" >> $GITHUB_OUTPUT
@@ -72,8 +65,6 @@ jobs:
       - name: Check for major (M) changes - explicit request
         id: check_major
         run: |
-          # Major version only bumped on explicit request
-          # We check for a marker file or commit message
           if git log --format="%s" -1 | grep -qi "major\|M version\|breaking"; then
             echo "major_detected=true" >> $GITHUB_OUTPUT
           else
@@ -92,16 +83,13 @@ jobs:
           MINOR_NUM=${ADDR[1]}
           PATCH_NUM=${ADDR[2]}
           
-          # Rule: Major only on explicit request
           if [ "$MAJOR" = "true" ]; then
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${PATCH_NUM}"
             echo "bump_type=M" >> $GITHUB_OUTPUT
           elif [ "$MINOR" = "true" ]; then
-            # Increment minor, reset patch
             NEW_VERSION="${MAJOR_NUM}.${((MINOR_NUM + 1))}.0"
             echo "bump_type=m" >> $GITHUB_OUTPUT
           else
-            # Increment patch only
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${((PATCH_NUM + 1))}"
             echo "bump_type=f" >> $GITHUB_OUTPUT
           fi
@@ -137,7 +125,8 @@ jobs:
           git push origin main
 
       - name: Print new version
-        run: echo "New version: ${{ needs.determine-bump.outputs.new_version }}"
+        run: |
+          echo "New version: ${{ needs.determine-bump.outputs.new_version }}"
 
   # Job to build and push Docker image
   build:
