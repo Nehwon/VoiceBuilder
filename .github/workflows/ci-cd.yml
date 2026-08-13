@@ -1,0 +1,170 @@
+name: Build and push VoiceBuilder Docker image (GitHub)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  prepare:
+    name: Prepare version
+    runs-on: ubuntu-latest
+    outputs:
+      before: ${{ steps.version.outputs.before }}
+      new: ${{ steps.version.outputs.new }}
+      bump_type: ${{ steps.version.outputs.bump_type }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          before=$(cat VERSION)
+          echo "before=$before" >> "$GITHUB_OUTPUT"
+
+          IFS='.' read -r major minor patch <<< "$before"
+          bump_type=patch
+          new="$before"
+
+          changed_files=$(git diff-tree --no-commit-id --name-only -r HEAD || true)
+          commit_subject=$(git log -1 --pretty=%s)
+
+          if echo "$commit_subject" | grep -Eqi 'major|breaking'; then
+            bump_type=major
+            new="$before"
+          elif echo "$changed_files" | grep -Eqi '(web_app|server\.py|Dockerfile|entrypoint|wizard)'; then
+            bump_type=minor
+            minor=$((minor + 1))
+            patch=0
+            new="${major}.${minor}.${patch}"
+          else
+            patch=$((patch + 1))
+            new="${major}.${minor}.${patch}"
+          fi
+
+          echo "bump_type=$bump_type" >> "$GITHUB_OUTPUT"
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+
+  version:
+    name: Bump version
+    needs: prepare
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Update VERSION
+        if: needs.prepare.outputs.before != needs.prepare.outputs.new
+        run: |
+          echo "${{ needs.prepare.outputs.new }}" > VERSION
+          cat VERSION
+
+      - name: Commit and tag
+        if: needs.prepare.outputs.before != needs.prepare.outputs.new
+        shell: bash
+        run: |
+          set -e
+          if git rev-parse -q --verify "refs/tags/v${{ needs.prepare.outputs.new }}" >/dev/null 2>&1; then
+            echo "Tag v${{ needs.prepare.outputs.new }} existe déjà, skip."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore(release): bump version to ${{ needs.prepare.outputs.new }} [skip ci]"
+          git tag "v${{ needs.prepare.outputs.new }}"
+          git push origin "HEAD:main"
+          git push origin "v${{ needs.prepare.outputs.new }}"
+
+  build:
+    name: Build and push Docker image
+    needs: [prepare, version]
+    if: always() && needs.prepare.result == 'success' && (needs.version.result == 'success' || needs.version.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Normalize image name
+        shell: bash
+        run: |
+          echo "IMAGE_SLUG=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_SLUG }}
+          tags: |
+            type=raw,value=main,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=v${{ needs.prepare.outputs.new }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.prepare.outputs.new }},enable={{is_default_branch}}
+            type=sha,prefix=
+            type=ref,event=pr
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            DEBIAN_FRONTEND=noninteractive
+            LANG=C.UTF-8
+            PYTHONUNBUFFERED=1
+            PIP_NO_CACHE_DIR=1
+
+  release:
+    name: Create GitHub Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.prepare.outputs.new }}
+          name: VoiceBuilder v${{ needs.prepare.outputs.new }}
+          draft: false
+          prerelease: false
