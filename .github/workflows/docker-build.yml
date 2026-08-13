@@ -9,6 +9,7 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/Nehwon/voicebuilder
+  # Version sera définie par le workflow de bump ; par défaut 'main'
   IMAGE_TAG: main
 
 jobs:
@@ -40,6 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       bump_type: ${{ steps.decide_bump.outputs.bump_type }}
+      new_version: ${{ steps.decide_bump.outputs.new_version }}
 
     steps:
       - name: Setup Node.js 24
@@ -93,18 +95,20 @@ jobs:
           if [ "$MAJOR" = "true" ]; then
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${PATCH_NUM}"
             echo "bump_type=M" >> $GITHUB_OUTPUT
+            echo "new_version=${MAJOR_NUM}.${MINOR_NUM}.${PATCH_NUM}" >> $GITHUB_OUTPUT
           elif [ "$MINOR" = "true" ]; then
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.0"
             # Minor bump: increment the minor number
             NEW_MINOR=$((MINOR_NUM + 1))
             NEW_VERSION="${MAJOR_NUM}.${NEW_MINOR}.0"
             echo "bump_type=m" >> $GITHUB_OUTPUT
+            echo "new_version=${MAJOR_NUM}.${NEW_MINOR}.0" >> $GITHUB_OUTPUT
           else
             NEW_PATCH=$((PATCH_NUM + 1))
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${NEW_PATCH}"
             echo "bump_type=f" >> $GITHUB_OUTPUT
+            echo "new_version=${MAJOR_NUM}.${MINOR_NUM}.${NEW_PATCH}" >> $GITHUB_OUTPUT
           fi
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
   # Job to bump version and update VERSION file
   bump-version:
@@ -124,13 +128,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get new version
+      - name: Get new version from determine-bump
         id: new_ver
-        run: echo "new=${{ needs.determine-bump.outputs.new_version }}" >> $GITHUB_OUTPUT
+        run: |
+          NEW_VER="${{ needs.determine-bump.outputs.new_version }}"
+          echo "new=${NEW_VER}" >> $GITHUB_OUTPUT
+          # Also set the env var for the build job
+          echo "VERSION_NEW=${NEW_VER}" >> $GITHUB_ENV
 
       - name: Update VERSION file
         run: |
-          echo "${{ steps.new_ver.outputs.new }}" > VERSION
+          echo "${{ env.VERSION_NEW }}" > VERSION
           cat VERSION
 
       - name: Commit version bump
@@ -138,12 +146,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add VERSION
-          git commit -m "chore: bump version to ${{ needs.determine-bump.outputs.new_version }} [skip ci]"
+          git commit -m "chore: bump version to ${{ env.VERSION_NEW }} [skip ci]"
           git push origin main
 
       - name: Print new version
         run: |
-          echo "New version: ${{ needs.determine-bump.outputs.new_version }}"
+          echo "New version: ${{ env.VERSION_NEW }}"
 
   # Job to build and push Docker image
   build:
@@ -185,8 +193,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=sha
-            # Always add a tag based on the new version from the bump job
-            type=raw,template=${{ needs.determine-bump.outputs.new_version }}
+            type=raw,template=${{ env.VERSION_NEW }}
           annotations: |
             org.opencontainers.image.title=VoiceBuilder
             org.opencontainers.image.description="Voice cloning and multi-voice generation GUI (CosyVoice3 + Matcha-TTS)"
@@ -198,7 +205,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ needs.determine-bump.outputs.new_version }}
+            ${{ env.IMAGE_NAME }}:${{ env.VERSION_NEW }}
             ${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -229,12 +236,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.determine-bump.outputs.new_version }}
-          name: VoiceBuilder v${{ needs.determine-bump.outputs.new_version }}
+          tag_name: ${{ env.VERSION_NEW }}
+          name: VoiceBuilder v${{ env.VERSION_NEW }}
           body: |
             ## What's Changed
             - Docker image rebuilt with updated dependencies
-            - VoiceBuilder v${{ needs.determine-bump.outputs.new_version }} release
+            - VoiceBuilder v${{ env.VERSION_NEW }} release
           
           draft: false
           prerelease: false
