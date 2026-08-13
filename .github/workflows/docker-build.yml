@@ -9,7 +9,6 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/Nehwon/voicebuilder
-  # Version lue depuis le fichier VERSION du workspace au moment du build
   IMAGE_TAG: main
 
 jobs:
@@ -20,10 +19,6 @@ jobs:
       version: ${{ steps.read_version.outputs.current_version }}
 
     steps:
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v3
-        with:
-          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -43,10 +38,6 @@ jobs:
       bump_type: ${{ steps.decide_bump.outputs.bump_type }}
 
     steps:
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v3
-        with:
-          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -115,10 +106,6 @@ jobs:
       contents: write
       
     steps:
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v3
-        with:
-          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -154,10 +141,6 @@ jobs:
       packages: write
       
     steps:
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v3
-        with:
-          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -201,10 +184,6 @@ jobs:
       contents: write
       
     steps:
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v3
-        with:
-          node-version: '24'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
