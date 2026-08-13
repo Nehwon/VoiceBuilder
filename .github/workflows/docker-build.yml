@@ -87,10 +87,14 @@ jobs:
             NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${PATCH_NUM}"
             echo "bump_type=M" >> $GITHUB_OUTPUT
           elif [ "$MINOR" = "true" ]; then
-            NEW_VERSION="${MAJOR_NUM}.${((MINOR_NUM + 1))}.0"
+            NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.0"
+            # Minor bump: increment the minor number
+            NEW_MINOR=$((MINOR_NUM + 1))
+            NEW_VERSION="${MAJOR_NUM}.${NEW_MINOR}.0"
             echo "bump_type=m" >> $GITHUB_OUTPUT
           else
-            NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${((PATCH_NUM + 1))}"
+            NEW_PATCH=$((PATCH_NUM + 1))
+            NEW_VERSION="${MAJOR_NUM}.${MINOR_NUM}.${NEW_PATCH}"
             echo "bump_type=f" >> $GITHUB_OUTPUT
           fi
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
