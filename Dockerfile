@@ -43,7 +43,7 @@ RUN python3.10 -m venv /opt/venv \
     && pip install --no-deps -r /app/requirements-lock.txt \
     # Moteur CosyVoice : chargé via sys.path (setup_cosyvoice_paths), pas un
     # paquet pip. Matcha-TTS est un paquet pip (editable).
-    && pip install --no-deps -e /app/vendor/CosyVoice/third_party/Matcha-TTS
+    && pip install --no-deps Matcha-TTS
 
 # --- Patches locaux du moteur ---
 RUN bash /app/scripts/apply_cosyvoice_patches.sh
