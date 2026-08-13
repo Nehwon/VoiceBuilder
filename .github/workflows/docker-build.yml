@@ -130,11 +130,7 @@ jobs:
 
       - name: Get new version from determine-bump
         id: new_ver
-        run: |
-          NEW_VER="${{ needs.determine-bump.outputs.new_version }}"
-          echo "new=${NEW_VER}" >> $GITHUB_OUTPUT
-          # Also set the env var for the build job
-          echo "VERSION_NEW=${NEW_VER}" >> $GITHUB_ENV
+        run: echo "new=${{ needs.determine-bump.outputs.new_version }}" >> $GITHUB_OUTPUT
 
       - name: Update VERSION file
         run: |
@@ -146,12 +142,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add VERSION
-          git commit -m "chore: bump version to ${{ env.VERSION_NEW }} [skip ci]"
+          git commit -m "chore: bump version to ${{ needs.determine-bump.outputs.new_version }} [skip ci]"
           git push origin main
 
       - name: Print new version
         run: |
-          echo "New version: ${{ env.VERSION_NEW }}"
+          echo "New version: ${{ needs.determine-bump.outputs.new_version }}"
 
   # Job to build and push Docker image
   build:
@@ -193,7 +189,8 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=sha
-            type=raw,template=${{ env.VERSION_NEW }}
+            # Use the new version from the bump job - read from VERSION file
+            type=file,template=${{ github.workspace }}/VERSION,commit=true
           annotations: |
             org.opencontainers.image.title=VoiceBuilder
             org.opencontainers.image.description="Voice cloning and multi-voice generation GUI (CosyVoice3 + Matcha-TTS)"
@@ -205,7 +202,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.VERSION_NEW }}
+            ${{ env.IMAGE_NAME }}:${{ cat ${{ github.workspace }}/VERSION }}
             ${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -236,12 +233,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.VERSION_NEW }}
-          name: VoiceBuilder v${{ env.VERSION_NEW }}
-          body: |
-            ## What's Changed
-            - Docker image rebuilt with updated dependencies
-            - VoiceBuilder v${{ env.VERSION_NEW }} release
+          tag_name: ${{ cat ${{ github.workspace }}/VERSION }}
+          name: VoiceBuilder v${{ cat ${{ github.workspace }}/VERSION }} release
           
           draft: false
           prerelease: false
