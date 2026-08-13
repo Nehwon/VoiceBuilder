@@ -13,6 +13,21 @@ env:
   IMAGE_TAG: main
 
 jobs:
+  name: Build, Version & push VoiceBuilder Docker image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/Nehwon/voicebuilder
+  GITEA_IMAGE: gitea.lamachere.fr:2222/fabrice/voicebuilder
+  IMAGE_TAG: main
+
+jobs:
   # Job to get current version from VERSION file
   get-version:
     runs-on: ubuntu-latest
@@ -20,6 +35,10 @@ jobs:
       version: ${{ steps.read_version.outputs.current_version }}
 
     steps:
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -39,6 +58,10 @@ jobs:
       bump_type: ${{ steps.decide_bump.outputs.bump_type }}
 
     steps:
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -108,6 +131,10 @@ jobs:
       contents: write
     
     steps:
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -143,6 +170,10 @@ jobs:
       packages: write
       
     steps:
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -207,6 +238,10 @@ jobs:
       contents: write
       
     steps:
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
