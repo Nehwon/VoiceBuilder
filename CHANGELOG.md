@@ -8,26 +8,67 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
-### Ajout — Packaging & infra
-- **CosyVoice en sous-module git** : le moteur est désormais intégré au projet
-  (`vendor/CosyVoice`) au lieu d'un clone voisin (`~/Projets/CosyVoice`) ;
-  `engine/config.py` pointe vers le sous-module. Récupération :
-  `git submodule update --init --recursive` + `scripts/apply_cosyvoice_patches.sh`.
-- **Conteneur Docker avec GPU** (M15) : `Dockerfile` (base `ubuntu:22.04` +
-  torch `cu130`, sans `nvidia-nccl-cu12` pour éviter un conflit NCCL) +
-  `docker-compose.yml` (services GUI/CLI, GPU via `nvidia-container-toolkit`,
-  dossier des voix réglable via `AUDIO_SRC_DIR`). Image **buildée et pipeline
-  validé** dans le conteneur (import torch OK, CLI charge le modèle) — la
-  génération de bout en bout reste à confirmer sur un hôte avec le toolkit.
-- **CI/CD retiré** : un workflow GitHub Actions a été testé puis **supprimé** —
-  l'image Docker (~21 Go) dépasse l'espace disque des runners GitHub
-  (« no space left on device »). Le build reste local via `docker compose build`.
+### Ajout — Version 0.5.0 (mineur) : nouvelles fonctionnalités
+- **Wizard install** (interface web) : étape 1 installer torch/torchvision/torchaudio
+  au runtime, étape 2 télécharger modèle CosyVoice3 (ModelScope/Hugging Face,
+  progression SSE). Ces composants ne sont plus dans l'image Docker au build.
+- **Versionning automatique** : chaque push `main` incrémente M.m.f automatiquement
+  (Major sur demande explicite, mineur pour nouvelles fonctions, patch pour corrections).
+  Workflow `.github/workflows/docker-build.yml` lit `VERSION`, analyse les fichiers
+  modifiés, commit et build l'image Docker avec le bon tag.
+- **Volumes Docker nommés** (pas de bind mounts) : `volume-audio`, `volume-model`,
+  `volume-texte`, `volume-output`, `volume-tmp` — définis dans `docker-compose.yml`,
+  créés automatiquement.
+- **Entrée entrypoint** (`scripts/entrypoint.sh`) : installe torch au premier lancement
+  si non présent, puis exécute la commande d'origine.
+- **GUI** : nouvel onglet "Wizard install" pour guider l'utilisateur première fois.
+- **API endpoints** : `GET /api/torch/status`, `POST /api/torch/install`,
+  `GET /api/torch/install/{jid}/stream` pour suivre l'installation.
+- **Dockerfile** : retrait de torch/torchaudio/torchvision du `RUN pip install` ;
+  `ENTRYPOINT ["/app/scripts/entrypoint.sh"]` + `CMD ["python", "-m", "app.server", ...]`.
+
+### Modification — Packaging & infra
+- **CosyVoice en sous-module git** : intégré au projet (`vendor/CosyVoice`) au lieu
+  d'un clone voisin ; `engine/config.py` pointe vers le sous-module.
+- **Conteneur Docker avec GPU allégé** (M15) : `Dockerfile` (base `ubuntu:22.04`
+  + Python 3.10, deps `requirements.txt`, moteur CosyVoice, Matcha-TTS) — torch
+  CUDA retiré du build, installé au runtime. `docker-compose.yml` (services GUI/CLI,
+  5 volumes nommés, GPU via `nvidia-container-toolkit`).
+- **Modèles hors image** (Important) : modèle CosyVoice3 n'est pas embarqué —
+  téléchargé par l'utilisateur depuis l'interface (panneau "Modèles" ou "Wizard
+  install", source ModelScope/Hugging Face, progression SSE) dans le volume
+  `volume-model` (inscriptible) ou dossier pré-rempli (`MODEL_DIR`).
+- **CI/CD** : workflow GitHub Actions déplacé vers `.github/workflows/docker-build.yml`
+  avec versionning automatique ; workflow Gitea vers `.gitea/workflows/docker-build.yml`.
 - **GUI** — détection des balises `[Personnage]` du texte (ajoutées au modal
-  « Personnages »), **validation avant génération** : aucun personnage ou
-  personnage sans voix → `afficherErreur` + ouverture du modal.
-- **Sauvegarde git** : `origin` pousse vers **deux dépôts** (gitea +
-  GitHub `Nehwon/VoiceBuilder`, remote `backup`), conformément à `AGENTS.md`.
-- **Modèles hors image** (backlog « Important ») : le modèle CosyVoice3 n'est
+  "Personnages"), validation avant génération : aucun personnage ou personnage
+  sans voix → erreur + ouverture modal.
+- **Sauvegarde git** : `origin` pousse vers deux dépôts (gitea + GitHub
+  `Nehwon/VoiceBuilder`, remote `backup`), conformément à `AGENTS.md`.
+- **Modèles hors image** (Important) : le modèle CosyVoice3 n'est plus embarqué
+  dans l'image Docker — téléchargé par l'utilisateur depuis l'interface (panneau
+  "🧠 Modèles" ou "Wizard install", source ModelScope/Hugging Face, progression SSE)
+  dans le volume inscriptible `volume-model` (ou dossier pré-rempli `MODEL_DIR`).
+  Si le volume contient déjà le modèle, il est détecté et rien n'est re-téléchargé.
+- **GUI** — nouvelle interface wizard install pour le premier lancement.
+
+---
+
+## [0.5.0] - 2026-08-14
+
+### Ajourné — Packaging & infra
+- **Versionning** : chaque push `main` incrémente M.m.f automatiquement.
+- **Wizard install** : guide utilisateur première utilisation (torch + modèle).
+- **Volumes Docker nommés** : remplacement des bind mounts par volumes nommés.
+- **Entrée entrypoint** : installation torch au runtime.
+
+---
+
+## [0.4.0] - 2026-08-11
+
+- Initial commit avec GUI FastAPI, CLI, format taggé, GUI Gradio.
+- CosyVoice en sous-module, Docker GPU de base.
+- Premier déploiement fonctionnel.
   plus attendu dans l'image Docker — téléchargeable au **premier lancement**
   depuis l'interface (« 🧠 Modèles », `engine/modeles.py`, source
   ModelScope/Hugging Face, progression SSE) dans le volume inscriptible

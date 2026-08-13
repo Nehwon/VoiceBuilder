@@ -199,33 +199,39 @@ et ajoute l'entrée dans `voix.txt`.
 
 Le moteur (sous-module `vendor/CosyVoice`) et le GUI FastAPI sont
 **conteneurisables avec prise en charge GPU** (NVIDIA `nvidia-container-toolkit`) :
+Tous les dossiers utilisent des **volumes Docker nommés** (pas de bind mounts hôte) :
 
 ```bash
-# Prérequis hôte : NVIDIA driver + nvidia-container-toolkit
 docker compose up --build        # serveur sur http://127.0.0.1:8000
 ```
 
-Les volumes et la source du modèle se configurent via un fichier `.env`
-(copier `.env.example`, voir les variables `AUDIO_SRC_DIR`, `MODEL_DIR`,
-`COSYVOICE_MODEL_SOURCE`) ou en ligne de commande :
+Configuration via le fichier `.env` (copier `.env.example`) :
+- Les 5 volumes sont créés automatiquement : `volume-audio`, `volume-model`,
+  `volume-texte`, `volume-output`, `volume-tmp`.
+- `AUDIO_SRC_DIR` n'est plus utilisé ; les voix sont écrites directement dans
+  `volume-audio` (writable).
+- `MODEL_DIR` indique le volume modèle (défaut `cov3-models`) ; vide au début,
+  téléchargé automatiquement au 1er lancement depuis le panneau "Wizard install"
+  ou "Modèles".
+- `COSYVOICE_MODEL_SOURCE` : "modelscope" (défaut) ou "huggingface".
 
-- **GPU** : CUDA 13 (torch `cu130`) depuis les wheels pip ; pas de base
-  `nvidia/cuda` (un NCCL système entrerait en conflit avec torch cu130).
-- **Dossier des voix** : `../vb-voice` par défaut (dossier frère du projet) ;
-  surcharger avec `AUDIO_SRC_DIR=/chemin/vers/voix` (cf. `.env`).
-- **Modèle CosyVoice3 (~11 Go)** : volontairement **hors image** — téléchargé
-  au **premier lancement** depuis l'interface (panneau « 🧠 Modèles », source
-  ModelScope ou Hugging Face, progression) dans le volume inscriptible
-  `cov3-models`. Pour le ranger sur l'hôte, pré-remplir par
-  `MODEL_DIR=/chemin/vers/le/modele` (détection automatique : rien n'est
-  re-téléchargé si le volume contient déjà le modèle).
-- Sans `nvidia-container-toolkit` sur l'hôte, `torch.cuda.is_available()` est
-  `False` et la génération échoue (`Attempting to deserialize object on a CUDA
-  device`) — le toolkit est requis.
+>- **GPU** : CUDA 13 (torch `cu130`) depuis les wheels pip ; pas de base
+>   `nvidia/cuda` (NCCL système incompatible avec torch cu130).
+>- **Dossier des voix** : désormais writable dans le conteneur via `volume-audio` ;
+>   pas besoin de `AUDIO_SRC_DIR` ni de dossier hôte pré-rempli.
+>- **Modèle CosyVoice3 (~11 Go)** : hors image — téléchargé automatiquement
+>   la première fois sedan le panneau "Wizard install" / "Modèles" (source
+>   ModelScope ou Hugging Face, progression affichée). Pour le pré-remplir sur
+>   l'hôte, définir `MODEL_DIR=/chemin/vers/le/modele` (détection : rien n'est
+>   re-téléchargé si le volume contient déjà le modèle).
+>- **Versionning** : chaque push sur `main` incrémente automatiquement le numéro
+>   de version (M.m.f — Major uniquement sur demande explicite, mineur pour nouvelles
+>   fonctionnalités, patch pour corrections). Voir `TODO.md` et le workflow
+>   CI/CD `.github/workflows/docker-build.yml`.
 
-Voir `Dockerfile` et `docker-compose.yml` ; les montages couvrent `voix/`,
-`texte/`, `output/` et le modèle CosyVoice3 hors image (détails `TODO.md`
-§Phase 7, M15).
+Voir `Dockerfile` et `docker-compose.yml` ; les montages couvrent
+`volume-audio`, `volume-texte`, `volume-output` et `volume-model` (modèle hors image,
+détails `TODO.md` §Phase 7, M15).
 
 ---
 

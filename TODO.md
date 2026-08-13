@@ -178,14 +178,20 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         de `~/Projets/CosyVoice`).
   - [x] Documenter la récupération (`git submodule update --init --recursive` +
         `scripts/apply_cosyvoice_patches.sh`).
-- [~] **M15 — Conteneur Docker avec GPU**
-  - [x] `Dockerfile` : base `ubuntu:22.04` + Python 3.10, deps (`requirements.txt`,
-        torch CUDA), moteur CosyVoice (sous-module), Matcha-TTS.
+- [x] **M15 — Conteneur Docker avec GPU allégé**
+  - [x] `Dockerfile` : base `ubuntu:22.04` + Python 3.10, deps (`requirements.txt`),
+        moteur CosyVoice (sous-module), Matcha-TTS — **torch, torchvision, torchaudio
+        retirés du build** (installés au runtime via `scripts/entrypoint.sh`).
   - [x] Accès GPU via `--gpus all` / `nvidia-container-toolkit` (device `cuda`).
-  - [x] Montages : `voix/`, `texte/`, `output/`, modèle CosyVoice3 **hors image**
-        (volume inscriptible `cov3-models`, rempli au premier lancement depuis
-        l'interface ou pré-rempli via `MODEL_DIR`).
-  - [x] `docker-compose.yml` (services : serveur GUI `app.server`, CLI).
+  - [x] **5 volumes Docker nommés** (pas de bind mounts) : `volume-audio`,
+        `volume-model`, `volume-texte`, `volume-output`, `volume-tmp` — définis dans
+        `docker-compose.yml`, créé automatiquement au `docker compose up`.
+  - [x] `docker-compose.yml` (services : serveur GUI `app.server`, CLI `cli`).
+  - [x] **Wizard install** (nouvel onglet interface) : étape 1 installer torch/
+    torchvision/torchaudio, étape 2 télécharger modèle CosyVoice3 (progression SSE).
+  - [x] **Versionning automatique** : workflow CI/CD `.github/workflows/docker-build.yml`
+        avec bump M.m.f automatique à chaque push `main` ; lecture `VERSION`, analyse
+        des fichiers modifiés, mise à jour, commit, build image avec tag de version.
   - [ ] Vérifier une génération complète dans le conteneur.
 
 ---

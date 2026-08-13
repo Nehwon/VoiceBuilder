@@ -6,8 +6,16 @@ Usage complet : CLI, GUI, format de texte taggé, et en particulier le jeu de
 Prérequis techniques : moteur **CosyVoice3** (`Fun-CosyVoice3-0.5B`) et son venv
 (`vendor/CosyVoice/venv`, sous-module git) ; chemins dans `engine/config.py`.
 Un **conteneur Docker GPU** est disponible pour un déploiement portable
-(cf. `TODO.md` §Phase 7) ; nécessite `nvidia-container-toolkit` sur l'hôte et
-le dossier des voix monté via `AUDIO_SRC_DIR` (défaut `../vb-voice`).
+(cf. `TODO.md` §Phase 7) ; nécessite `nvidia-container-toolkit` sur l'hôte.
+Tous les dossiers utilisent désormais des **volumes Docker nommés** (pas de bind mounts hôte) :
+- `volume-audio` : fichiers `.wav`/`.txt` des voix (monté en écriture, interface y écrit)
+- `volume-model` : modèle CosyVoice3 (~11 Go, téléchargé automatiquement au 1er lancement)
+- `volume-texte` : fichiers `.md`/`.txt` du projet (solution d'upload interface)
+- `volume-output` : générations audio `.wav`
+- `volume-tmp` : fichiers temporaires
+
+La variable `AUDIO_SRC_DIR` n'est plus utilisée ; les voix sont remplies directement
+puisque les volumes sont writables dans le conteneur.
 
 ---
 
@@ -18,6 +26,15 @@ le dossier des voix monté via `AUDIO_SRC_DIR` (défaut `../vb-voice`).
    non-verbaux** CosyVoice3 (§4) directement dans le texte.
 3. Lancez la **génération** (CLI §5 ou GUI §6).
 4. Récupérez le **montage `.wav`** dans `output/`.
+5. **Première utilisation** : au premier lancement, le wizard install (onglet
+   "Wizard install" de l'interface web) propose d'installer torch, torchvision,
+   torchaudio puis de télécharger le modèle CosyVoice3 depuis ModelScope ou
+   Hugging Face (progression affichée). Ces composants ne sont pas dans l'image
+   Docker au build ; ils sont installés au premier runtime.
+6. **Versionning** : chaque push sur `main` incrémente automatiquement le numéro
+   de version (M.m.f — Major uniquement sur demande explicite, mineur pour nouvelles
+   fonctionnalités, patch pour corrections). Le workflow CI/CD met à jour `VERSION`,
+   commit et build l'image Docker avec le bon tag.
 
 ---
 
@@ -199,9 +216,13 @@ python -m app.server --host 0.0.0.0 --port 8000   # puis ouvrir http://127.0.0.1
 Éditeur **plein écran** : barre d'outils avec un bouton par personnage, documents
 du projet ou **fichier local**, boutons **＋ Nouveau** / **💾 Enregistrer dans le
 projet**, réglages / aide / personnages en modales, thème clair/sombre via `🌙`.
-Au premier lancement, le **modèle CosyVoice3** est téléchargé depuis le panneau
-« 🧠 Modèles » (source ModelScope ou Hugging Face) si le volume ne le contient pas
-déjà (cf. `TODO.md` Phase 7).
+Au premier lancement, le panneau **Wizard install** (onglet dédié) propose :
+- Installation de torch, torchvision, torchaudio (nécessite GPU CUDA 13)
+- Téléchargement du modèle CosyVoice3 (ModelScope ou Hugging Face)
+- Suivi de progression dans l'interface.
+
+L'onglet **Montage** se débloque après une génération et est organisé en deux
+colonnes :
 
 L'onglet **Montage** se débloque après une génération et est organisé en deux
 colonnes :
