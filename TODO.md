@@ -129,8 +129,10 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       global (lecteur + log) à gauche et **liste à ascenseur de lecteurs par
       bloc** (une carte audio + texte + actions Régénérer/Diviser) à droite.
 - [x] **M10.1 — Écoute temps réel** : chaque bloc généré est immédiatement
-      jouable dans l'onglet « Montage » via SSE (callback `bloc` avec `wav`),
-      sans attendre la fin de la génération complète.
+      jouable dans l'onglet « Montage » via SSE (callback `bloc`). Le payload
+      porte `id`/`voix`/`texte` et l'audio est servi par l'API
+      (`/api/generer/{id}/bloc/{bid}/wav`) — lecture possible dès la fin de
+      chaque bloc, boutons Régénérer/Diviser opérationnels en direct.
 
 ---
 
@@ -138,7 +140,14 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 - [ ] M4.x — Benchmark fidélité : loi variation de `max_chars`, seuil de vérif.
 - [ ] M5 — (optionnel) accélération vLLM (~0.9–0.11) ou TensorRT pour la génération.
-- [ ] M5.x — Frontend de normalisation (`wetext`/`ttsfrd`) pour améliorer la prosodie FR (sinon `text_frontend=False`).
+- [~] **M5.x — Normalisation du texte FR** :
+  - [x] **Nombres en français** (`engine/text_fr.py` + `num2words` `lang="fr"`,
+        appliqué dans `cosyvoice_engine.synthesize` ; patch CosyVoice `0003`
+        désactivant `spell_out_number` anglais) — les chiffres sont lus
+        correctement en français à la génération.
+  - [ ] Reste (optionnel) : frontend complet `wetext`/`ttsfrd` pour la prosodie
+        FR (dates, abréviations, ponctuation fine) — sinon le texte est passé
+        brut (sans `text_frontend=False`, la normalisation nombres est interne).
 
 ---
 
@@ -181,18 +190,21 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [x] **M15 — Conteneur Docker avec GPU allégé**
   - [x] `Dockerfile` : base `ubuntu:22.04` + Python 3.10, deps (`requirements.txt`),
         moteur CosyVoice (sous-module), Matcha-TTS — **torch, torchvision, torchaudio
-        retirés du build** (installés au runtime via `scripts/entrypoint.sh`).
+        réintégrés au build** (`requirements.txt`) ; `scripts/entrypoint.sh` reste un
+        filet de sécurité (réinstallé si l'un des trois manquait).
   - [x] Accès GPU via `--gpus all` / `nvidia-container-toolkit` (device `cuda`).
   - [x] **5 volumes Docker nommés** (pas de bind mounts) : `volume-audio`,
         `volume-model`, `volume-texte`, `volume-output`, `volume-tmp` — définis dans
         `docker-compose.yml`, créé automatiquement au `docker compose up`.
   - [x] `docker-compose.yml` (services : serveur GUI `app.server`, CLI `cli`).
-  - [x] **Wizard install** (nouvel onglet interface) : étape 1 installer torch/
-    torchvision/torchaudio, étape 2 télécharger modèle CosyVoice3 (progression SSE).
+  - [x] **Téléchargement du modèle** : panneau « 🧠 Modèles » (source ModelScope/
+        Hugging Face, progression SSE) dans le volume `volume-model` ; un ancien
+        « Wizard install » (torch au runtime) a été simplifié car torch est au build.
   - [x] **Versionning automatique** : workflow CI/CD `.github/workflows/docker-build.yml`
         avec bump M.m.f automatique à chaque push `main` ; lecture `VERSION`, analyse
         des fichiers modifiés, mise à jour, commit, build image avec tag de version.
-  - [ ] Vérifier une génération complète dans le conteneur.
+  - [x] Vérifier une génération complète dans le conteneur (génération multi-voix
+        bout en bout validée sur GPU via `nvidia-container-toolkit`).
 
 ---
 
@@ -236,7 +248,7 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [x] **Modèles hors image** : les modèles ne sont plus embarqués dans l'image
       Docker — ils sont **téléchargés par l'utilisateur depuis l'interface** au
       premier lancement (panneau « 🧠 Modèles », source ModelScope/Hugging Face,
-      progression SSE) dans le volume `cov3-models` (inscriptible) ou un dossier
-      pré-rempli (`MODEL_DIR`). Si le volume contient déjà le modèle, il est
+      progression SSE) dans le volume `volume-model` (`/models`, inscriptible) ou un
+      dossier pré-rempli. Si le volume contient déjà le modèle, il est
       détecté (`engine/modeles.py`, `GET /api/modeles`) et rien n'est
       re-téléchargé. `COSYVOICE_MODEL_DIR` reste réglable par env/Dockerfile.

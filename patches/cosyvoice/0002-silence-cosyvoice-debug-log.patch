@@ -1,0 +1,13 @@
+diff --git a/cosyvoice/utils/file_utils.py b/cosyvoice/utils/file_utils.py
+index 53cfa50..cc556c2 100644
+--- a/cosyvoice/utils/file_utils.py
++++ b/cosyvoice/utils/file_utils.py
+@@ -20,7 +20,7 @@ import torch
+ import torchaudio
+ import logging
+ logging.getLogger('matplotlib').setLevel(logging.WARNING)
+-logging.basicConfig(level=logging.DEBUG,
++logging.basicConfig(level=logging.INFO,
+                     format='%(asctime)s %(levelname)s %(message)s')
+ 
+ 

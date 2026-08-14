@@ -23,15 +23,20 @@ VoiceBuilder/
 ├── CHANGELOG.md     # historique des livrables
 ├── engine/          # backend — moteur CosyVoice + logique
 │   ├── cosyvoice_engine.py  # wrapper AutoModel + zero_shot
+│   ├── text_fr.py           # normalisation des nombres en français
 │   ├── adaptive.py          # blocs adaptatifs vérifiés
 │   ├── verifier.py          # vérification Whisper
 │   ├── multi.py             # pipeline multi-voix
+│   ├── modeles.py           # téléchargement/détection du modèle
 │   ├── voix.py              # voix.txt
 │   ├── tagging.py           # parse du format taggé
 │   └── config.py            # chemins + valeurs par défaut
 ├── app/
 │   ├── server.py     # GUI : serveur HTTP local (FastAPI) + API REST/SSE
-│   └── web/          # frontend statique (HTML/CSS/JS + éditeur CodeMirror)
+│   ├── web/          # frontend statique (HTML/CSS/JS + éditeur CodeMirror)
+│   └── web_app.py    # GUI web Gradio (alternative)
+├── scripts/         # entrypoint (Docker), setup, application des patches
+├── patches/cosyvoice/  # patches locaux appliqués au moteur (sous-module)
 ├── voix/            # voix.txt + paires .wav/.txt
 ├── texte/           # documents taggés + <nom>.map (personnages→voix, CSV)
 ├── output/          # montages produits
@@ -51,7 +56,9 @@ le frontend Gradio (`app/web_app.py`) restant disponible en alternative.
 
 - Python 3.10+
 - Les dépendances dans `requirements.txt` :
-  `numpy`, `soundfile`, `librosa`, `openai-whisper`, `torch`.
+  `numpy`, `soundfile`, `num2words`, `librosa`, `openai-whisper`, `torch` (+
+  `torchaudio`, `torchvision`) pour le moteur ; `fastapi`/`uvicorn` pour la GUI
+  serveur (référence) et `gradio` pour la GUI web alternative.
 - Le moteur **CosyVoice** en **sous-module git** (`vendor/CosyVoice`, voir
   `TODO.md` §Phase 7) avec son venv et le modèle `Fun-CosyVoice3-0.5B`. Les
   chemins sont dans `engine/config.py`.
@@ -66,12 +73,13 @@ git submodule update --init --recursive   # clone CosyVoice dans vendor/
 
 ### Le modèle CosyVoice3
 
-Le modèle (~11 Go) n'est **pas** fourni avec le projet : il est téléchargé au
+Le modèle (~9,7 Go) n'est **pas** fourni avec le projet : il est téléchargé au
 **premier lancement** depuis l'interface (panneau « 🧠 Modèles », source
-ModelScope ou Hugging Face, avec progression). Localement il est rangé dans
+ModelScope ou Hugging Face, avec progression) ou **pré-rempli** dans un volume /
+dossier. Localement il est rangé dans
 `vendor/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B` (réglable via
-`COSYVOICE_MODEL_DIR`) ; s'il est déjà présent, il est détecté et rien n'est
-re-téléchargé.
+`COSYVOICE_MODEL_DIR`) ; en Docker il est monté dans le volume `volume-model`
+(`/models`). S'il est déjà présent, il est détecté et rien n'est re-téléchargé.
 
 ---
 
@@ -140,6 +148,15 @@ silencieusement par le moteur).
 - `[stop]` — arrête la génération (le reste est ignoré).
 - Lignes vides et `#` — commentaires, hors montage.
 
+### Lecture des nombres
+
+Les nombres sont automatiquement lus en **français** (`engine/text_fr.py`,
+`num2words` `lang="fr"`) avant la synthèse : `600` → « six cents », `7,7` →
+« sept virgule sept », `H100` → « H cent », `1er`/`4e` → « premier »/« quatrième »,
+`85 %` → « quatre-vingt-cinq pour cent ». Sans cette normalisation, CosyVoice
+lisait les chiffres en anglais (`spell_out_number`, désactivé par le patch
+CosyVoice `0003`).
+
 ---
 
 ## Usage
@@ -199,32 +216,34 @@ et ajoute l'entrée dans `voix.txt`.
 
 Le moteur (sous-module `vendor/CosyVoice`) et le GUI FastAPI sont
 **conteneurisables avec prise en charge GPU** (NVIDIA `nvidia-container-toolkit`) :
-Tous les dossiers utilisent des **volumes Docker nommés** (pas de bind mounts hôte) :
+tous les dossiers de données utilisent des **volumes Docker nommés** (pas de bind
+mounts hôte).
 
 ```bash
 docker compose up --build        # serveur sur http://127.0.0.1:8000
 ```
 
-Configuration via le fichier `.env` (copier `.env.example`) :
 - Les 5 volumes sont créés automatiquement : `volume-audio`, `volume-model`,
   `volume-texte`, `volume-output`, `volume-tmp`.
-- `AUDIO_SRC_DIR` n'est plus utilisé ; les voix sont écrites directement dans
-  `volume-audio` (writable).
-- `MODEL_DIR` indique le volume modèle (défaut `cov3-models`) ; vide au début,
-  téléchargé automatiquement au 1er lancement depuis le panneau "Wizard install"
-  ou "Modèles".
-- `COSYVOICE_MODEL_SOURCE` : "modelscope" (défaut) ou "huggingface".
+- `VOICEBUILDER_AUDIO_DIR=/data/voice` : les voix sont écrites directement dans
+  `volume-audio` (writable depuis l'interface).
+- `COSYVOICE_MODEL_DIR=/models` (volume `volume-model`) : vide au début,
+  rempli par le panneau « 🧠 Modèles » au premier lancement, ou **pré-rempli**
+  (si le volume contient déjà le modèle, il est détecté et rien n'est
+  re-téléchargé).
+- `COSYVOICE_MODEL_SOURCE` : `modelscope` (défaut) ou `huggingface`.
 
->- **GPU** : CUDA 13 (torch `cu130`) depuis les wheels pip ; pas de base
->   `nvidia/cuda` (NCCL système incompatible avec torch cu130).
->- **Dossier des voix** : désormais writable dans le conteneur via `volume-audio` ;
->   pas besoin de `AUDIO_SRC_DIR` ni de dossier hôte pré-rempli.
->- **Modèle CosyVoice3 (~11 Go)** : hors image — téléchargé automatiquement
->   la première fois sedan le panneau "Wizard install" / "Modèles" (source
->   ModelScope ou Hugging Face, progression affichée). Pour le pré-remplir sur
->   l'hôte, définir `MODEL_DIR=/chemin/vers/le/modele` (détection : rien n'est
->   re-téléchargé si le volume contient déjà le modèle).
->- **Versionning** : chaque push sur `main` incrémente automatiquement le numéro
+> - **GPU** : image CUDA 13 (torch `cu130`, wheels pip) construite dès le build ;
+>   pas de base `nvidia/cuda` (NCCL système incompatible avec torch cu130).
+>   `scripts/entrypoint.sh` ne sert plus que de **filet de sécurité** (réinstalle
+>   torch/torchaudio/torchvision si l'un des trois manquait).
+> - **Dossier des voix** : writable dans le conteneur via `volume-audio` ;
+>   plus besoin de dossier hôte pré-rempli.
+> - **Modèle CosyVoice3 (~9,7 Go)** : hors image — téléchargé automatiquement
+>   la première fois depuis le panneau « 🧠 Modèles » (source ModelScope ou
+>   Hugging Face, progression affichée), ou **pré-rempli** dans le volume
+>   `volume-model` (détection : rien n'est re-téléchargé).
+> - **Versionning** : chaque push sur `main` incrémente automatiquement le numéro
 >   de version (M.m.f — Major uniquement sur demande explicite, mineur pour nouvelles
 >   fonctionnalités, patch pour corrections). Voir `TODO.md` et le workflow
 >   CI/CD `.github/workflows/docker-build.yml`.

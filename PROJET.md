@@ -174,7 +174,12 @@ indifféremment — dans la lignée de l'existant `voicebuilder/`.
 - **Français** : CosyVoice3 (multilingue) est requis ; CosyVoice2 reste trop faible et
   produirait un mauvais français.
 - **Frontend de normalisation** : dépend de `wetext`/`ttsfrd` (réseau/token) ; en
-  absence, `text_frontend=False` + token `"<|endofprompt|>"` inséré manuellement.
+  absence, CosyVoice lisait les chiffres en anglais (`spell_out_number`,
+  lib `inflect`). Corrigé par une **normalisation française des nombres**
+  interne (`engine/text_fr.py` + `num2words` `lang="fr"`, appliquée avant la
+  synthèse ; patch CosyVoice `0003` désactivant `spell_out_number`). Un frontend
+  complet `wetext`/`ttsfrd` (dates, abréviations, ponctuation fine) reste un
+  perfectionnement optionnel (`TODO.md` M5.x).
 - **Fidélité** : le clonage dépend du `.wav` de référence (max ~30 s), du timbre et de
   la prosodie du locuteur modèle.
 - **Intégration du moteur** : CosyVoice est un **sous-module git** du projet
@@ -201,7 +206,7 @@ indifféremment — dans la lignée de l'existant `voicebuilder/`.
       vitesse, max chars, Whisper, `device`), génération non bloquante + export.
 - [ ] **M5** — (optionnel) accélération vLLM / TensorRT pour la génération
 - [x] **M14** — CosyVoice intégré en **sous-module git** (`vendor/CosyVoice`), `engine/config.py` ajusté.
-- [~] **M15** — **Conteneur Docker avec GPU** (NVIDIA Container Toolkit) : `Dockerfile` + `docker-compose.yml`, moteur + GUI FastAPI (image buildée, pipeline validé ; génération bout-en-bout à confirmer sur hôte avec toolkit).
+- [x] **M15** — **Conteneur Docker avec GPU** (NVIDIA Container Toolkit) : `Dockerfile` + `docker-compose.yml`, moteur + GUI FastAPI (5 volumes nommés, modèle hors image téléchargé au premier lancement ou pré-rempli ; génération multi-voix bout en bout validée dans le conteneur).
 
 ## 9. Critères de succès
 

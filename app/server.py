@@ -376,6 +376,8 @@ def api_generer(payload: GenererIn):
     texte = (payload.texte or "").strip()
     if not texte:
         raise HTTPException(400, "Éditeur vide.")
+    if any(j["status"] == "running" for j in _jobs.values()):
+        raise HTTPException(409, "Une génération est déjà en cours.")
     try:
         _voix()
     except Exception as exc:  # noqa: BLE001
@@ -467,6 +469,14 @@ def api_result(jid: int):
                         filename=Path(job["out"]).name)
 
 
+def _job_live(jid: int) -> dict:
+    """Retourne le job qu'il soit terminé ou encore en cours (écoute temps réel)."""
+    job = _jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "Travail inconnu.")
+    return job
+
+
 def _job_done(jid: int) -> dict:
     job = _jobs.get(jid)
     if not job or job["status"] != "done":
@@ -476,14 +486,16 @@ def _job_done(jid: int) -> dict:
 
 @app.get("/api/generer/{jid}/blocs")
 def api_blocs(jid: int):
-    job = _job_done(jid)
-    return {"blocs": job.get("blocs", []), "out": job["out"],
-            "duree": job["result"]["duration"]}
+    job = _job_live(jid)
+    blocs = job.get("blocs", [])
+    res = job.get("result") or {}
+    return {"blocs": blocs, "out": job["out"],
+            "duree": res.get("duration") if res else None}
 
 
 @app.get("/api/generer/{jid}/bloc/{bid}/wav")
 def api_bloc_wav(jid: int, bid: int):
-    job = _job_done(jid)
+    job = _job_live(jid)
     bloc = next((b for b in job.get("blocs", []) if b["id"] == bid), None)
     if not bloc or not Path(bloc["wav"]).exists():
         raise HTTPException(404, "Bloc indisponible.")

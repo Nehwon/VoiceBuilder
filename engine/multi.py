@@ -96,21 +96,35 @@ def generate(
     block_dir = Path(block_dir) if block_dir else None
     if block_dir:
         block_dir.mkdir(parents=True, exist_ok=True)
-    total = len(blocs)
-    for i, (pers, block) in enumerate(blocs, 1):
+
+    # Chaque groupe de personnage est fendu en sous-blocs de <= ``max_chars``
+    # caractères (adaptive.build_blocks) : un bloc = une unité audio de taille
+    # raisonnable, écoutable individuellement dans l'onglet « Montage ».
+    sous_blocs: List[tuple] = []
+    for pers, block in blocs:
         voix_nom = personnages[pers]
         if voix_nom not in voices:
             raise ValueError(f"Voix introuvable pour le personnage « {pers} » : {voix_nom}")
         voice = voices.get(voix_nom)
         block_chars = voice.max_block_chars or max_chars
         block_speed = voice.speed if voice.speed is not None else (speed or config.DEFAULT_SPEED)
+        for t in adaptive.build_blocks(block, block_chars):
+            sous_blocs.append((pers, voix_nom, voice, t, block_chars, block_speed))
 
-        audio = _synthesize_for(block, model, sr, voice, block_chars, block_speed, verify)
+    total = len(sous_blocs)
+    pers_precedent = None
+    for i, (pers, voix_nom, voice, t, block_chars, block_speed) in enumerate(sous_blocs, 1):
+        audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed, verify)
+        # Pause uniquement au changement de personnage : les sous-blocs d'un même
+        # locuteur s'enchaînent sans coupure dans le montage final.
+        if pers_precedent is not None and pers != pers_precedent:
+            parts.append(np.zeros(pause_n, dtype=np.float32))
         parts.append(audio)
+        pers_precedent = pers
         dur = len(audio) / sr
         info = {
-            "id": i, "personnage": pers, "voix": voix_nom, "texte": block,
-            "chars": len(block), "duree": round(dur, 2),
+            "id": i, "personnage": pers, "voix": voix_nom, "texte": t,
+            "chars": len(t), "duree": round(dur, 2),
         }
         if block_dir:
             wav = block_dir / f"bloc_{i}.wav"
@@ -118,12 +132,12 @@ def generate(
             info["wav"] = str(wav)
         blocs_report.append(info)
         if verbose:
-            print(f"[{i}/{total}] {pers} ({len(block)} chars) -> {dur:.2f} s")
+            print(f"[{i}/{total}] {pers} ({len(t)} chars) -> {dur:.2f} s")
         if progress:
-            progress({"index": i, "total": total, "personnage": pers,
-                      "chars": len(block), "duree": round(dur, 2),
+            progress({"id": i, "index": i, "total": total, "personnage": pers,
+                      "voix": voix_nom, "texte": t,
+                      "chars": len(t), "duree": round(dur, 2),
                       "wav": info.get("wav")})
-        parts.append(np.zeros(pause_n, dtype=np.float32))
 
     final = np.concatenate(parts)
     res = {

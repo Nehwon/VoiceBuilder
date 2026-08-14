@@ -9,7 +9,7 @@ Un **conteneur Docker GPU** est disponible pour un déploiement portable
 (cf. `TODO.md` §Phase 7) ; nécessite `nvidia-container-toolkit` sur l'hôte.
 Tous les dossiers utilisent désormais des **volumes Docker nommés** (pas de bind mounts hôte) :
 - `volume-audio` : fichiers `.wav`/`.txt` des voix (monté en écriture, interface y écrit)
-- `volume-model` : modèle CosyVoice3 (~11 Go, téléchargé automatiquement au 1er lancement)
+- `volume-model` : modèle CosyVoice3 (~9,7 Go, téléchargé automatiquement au 1er lancement)
 - `volume-texte` : fichiers `.md`/`.txt` du projet (solution d'upload interface)
 - `volume-output` : générations audio `.wav`
 - `volume-tmp` : fichiers temporaires
@@ -26,11 +26,11 @@ puisque les volumes sont writables dans le conteneur.
    non-verbaux** CosyVoice3 (§4) directement dans le texte.
 3. Lancez la **génération** (CLI §5 ou GUI §6).
 4. Récupérez le **montage `.wav`** dans `output/`.
-5. **Première utilisation** : au premier lancement, le wizard install (onglet
-   "Wizard install" de l'interface web) propose d'installer torch, torchvision,
-   torchaudio puis de télécharger le modèle CosyVoice3 depuis ModelScope ou
-   Hugging Face (progression affichée). Ces composants ne sont pas dans l'image
-   Docker au build ; ils sont installés au premier runtime.
+5. **Première utilisation** : torch/torchvision/torchaudio (CUDA 13) sont déjà
+   dans l'image Docker ; seul le **modèle CosyVoice3** reste à télécharger depuis
+   le panneau **« 🧠 Modèles »** (source ModelScope ou Hugging Face, progression
+   affichée). Si le volume `volume-model` est pré-rempli, il est détecté et rien
+   n'est re-téléchargé.
 6. **Versionning** : chaque push sur `main` incrémente automatiquement le numéro
    de version (M.m.f — Major uniquement sur demande explicite, mineur pour nouvelles
    fonctionnalités, patch pour corrections). Le workflow CI/CD met à jour `VERSION`,
@@ -69,10 +69,10 @@ Au clonage, le prompt TTS =
 
 Les fichiers audio et leurs transcriptions peuvent être stockés **en dehors** du
 projet. Leur dossier est réglé par la variable d'environnement
-`VOICEBUILDER_AUDIO_DIR` (défaut : `~/Partages/voice`) :
+`VOICEBUILDER_AUDIO_DIR` (défaut : `~/Projets/Personnel (Fabrice)/vb-voice`) :
 
 ```bash
-export VOICEBUILDER_AUDIO_DIR=~/Partages/voice
+export VOICEBUILDER_AUDIO_DIR=~/Projets/Personnel\ \(Fabrice\)/vb-voice
 ```
 
 Les chemins de `voix.txt` sont résolus dans l'ordre : dossier du projet, `voix/`,
@@ -82,7 +82,7 @@ puis ce dossier audio (`config.VOIX_SEARCH_DIRS`). Ex. une ligne simple :
 [Michel], unirreductibleathee_phrase_01.wav
 ```
 
-…est retrouvée dans `~/Partages/voice/` si elle s'y trouve.
+…est retrouvée dans `~/Projets/Personnel (Fabrice)/vb-voice/` si elle s'y trouve.
 
 ---
 
@@ -186,6 +186,15 @@ Les anciens tags de commande (`[confirmation-en]`, `[question-en]`, …) ne sont
 
 ## 5. Génération
 
+> **Lecture des nombres** — avant la synthèse, les nombres sont automatiquement
+> écrits en **français** (`engine/text_fr.py`, `num2words` `lang="fr"` ; patch
+> CosyVoice `0003` désactivant le `spell_out_number` anglais). Exemples :
+> `600` → « six cents », `7,7` → « sept virgule sept », `2 290` →
+> « deux mille deux cent quatre-vingt-dix », `H100` → « H cent », `CO2` →
+> « CO deux », `1er`/`4e` → « premier »/« quatrième », `85 %` →
+> « quatre-vingt-cinq pour cent ». Vous pouvez donc écrire vos chiffres en
+> chiffres : ils seront lus correctement en français à l'écoute.
+
 ### CLI (`tools/gen_multi_voix.py`)
 
 ```bash
@@ -216,21 +225,18 @@ python -m app.server --host 0.0.0.0 --port 8000   # puis ouvrir http://127.0.0.1
 Éditeur **plein écran** : barre d'outils avec un bouton par personnage, documents
 du projet ou **fichier local**, boutons **＋ Nouveau** / **💾 Enregistrer dans le
 projet**, réglages / aide / personnages en modales, thème clair/sombre via `🌙`.
-Au premier lancement, le panneau **Wizard install** (onglet dédié) propose :
-- Installation de torch, torchvision, torchaudio (nécessite GPU CUDA 13)
-- Téléchargement du modèle CosyVoice3 (ModelScope ou Hugging Face)
-- Suivi de progression dans l'interface.
+Le bouton **« 🧠 Modèles »** gère le téléchargement du modèle CosyVoice3 au
+premier lancement (source ModelScope ou Hugging Face, progression affichée) ;
+le volume `volume-model` pré-rempli est détecté automatiquement.
 
 L'onglet **Montage** se débloque après une génération et est organisé en deux
-colonnes :
-
-L'onglet **Montage** se débloque après une génération et est organisé en deux
-colonnes :
+colonnes. Chaque bloc y est **écoutable dès la fin de sa génération** (sans
+attendre la fin du montage complet) :
 - **À gauche** — le **montage global** (lecteur de l'ensemble + bouton
   « 🔄 Re-créer le montage » + durée totale) et le **log de génération**.
 - **À droite** — une **liste à ascenseur des blocs générés**. Chaque bloc est une
   carte contenant :
-  - le **lecteur audio** du bloc ;
+  - le **lecteur audio** du bloc (ajouté en direct, écoutable immédiatement) ;
   - le **texte** complet de la réplique sous le lecteur ;
   - un en-tête `N. Personnage · durée · nb de chars · voix` ;
   - les boutons **Regénérer ce bloc** et **Diviser ce bloc** (re-synthèse d'une

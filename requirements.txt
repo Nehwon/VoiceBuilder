@@ -1,5 +1,6 @@
 numpy>=1.24
 soundfile>=0.12
+num2words>=0.5.12
 librosa>=0.10
 openai-whisper
 torch

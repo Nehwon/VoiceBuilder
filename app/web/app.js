@@ -530,6 +530,7 @@ $("generer").addEventListener("click", async () => {
     return;
   }
   const { id } = await r.json();
+  montageId = id;
 
   const ev = new EventSource(`/api/generer/${id}/stream`);
   let fini = false;
@@ -581,7 +582,8 @@ async function chargerBlocs() {
     if (!r.ok) { notifier("Impossible de charger les blocs.", "err"); return; }
     const d = await r.json();
     montageBlocs = d.blocs || [];
-    $("montage-info").textContent = `Durée totale : ${d.duree} s · ${montageBlocs.length} bloc(s)`;
+    const duree = d.duree != null ? `${d.duree} s` : "…";
+    $("montage-info").textContent = `Durée totale : ${duree} · ${montageBlocs.length} bloc(s)`;
     remplirListeBlocs();
   } catch { notifier("Erreur au chargement des blocs.", "err"); }
 }
@@ -659,7 +661,9 @@ function ajouterBlocTempsReel(b) {
   const audio = document.createElement("audio");
   audio.controls = true;
   audio.preload = "none";
-  audio.src = b.wav;
+  audio.src = b.wav
+    ? `/api/generer/${montageId}/bloc/${b.id}/wav`
+    : "";
 
   const texte = document.createElement("p");
   texte.className = "bloc-carte-texte";

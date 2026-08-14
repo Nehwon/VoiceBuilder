@@ -86,7 +86,10 @@ onglet « Montage » (montage global + **liste à ascenseur de lecteurs par bloc
 ### M5 — Performance (optionnel)
 **Objectif** : réduire le temps de génération via vLLM ou TensorRT ; frontend de
 normalisation (`wetext`/`ttsfrd`) pour la prosodie FR.
-**Statut** : exploration.
+**Statut** : exploration — **normalisation des nombres en français déjà en
+place** (`engine/text_fr.py` + `num2words` `lang="fr"`, patch CosyVoice `0003`
+désactivant `spell_out_number` anglais) ; un frontend complet `wetext`/`ttsfrd`
+(dates, abréviations, ponctuation fine) reste optionnel.
 
 ### M14/M15 — Packaging & infra (sous-module CosyVoice + Docker GPU)
 **Objectif** : intégrer **CosyVoice comme sous-module git du projet** (`vendor/CosyVoice`,
@@ -94,14 +97,16 @@ fini le clone voisin dans `~/Projets/CosyVoice`) et fournir un **conteneur Docke
 prise en charge GPU** (nvidia-container-toolkit) pour le moteur et le GUI
 FastAPI, portable sur toute machine équipée d'un GPU NVIDIA.
 **Livrables** : sous-module `vendor/CosyVoice` + `engine/config.py` ajusté ;
-`Dockerfile` + `docker-compose.yml` (montages `voix/`, `texte/`, `output/`,
-modèle CosyVoice3) ; génération complète validée dans le conteneur.
-**Statut** : M14 ✔ terminé · M15 ✔ image buildée + pipeline validé dans le
-conteneur (import torch `cu130` OK, CLI charge le modèle) — **modèle hors image** :
-téléchargé au premier lancement depuis l'interface (`engine/modeles.py`, volume
-`cov3-models`) ou monté depuis un volume pré-rempli. La génération de
-bout en bout reste à confirmer sur un hôte équipé de `nvidia-container-toolkit`
-(`TODO.md` §Phase 7).
+`Dockerfile` + `docker-compose.yml` (5 **volumes nommés** : `volume-audio`,
+`volume-model`, `volume-texte`, `volume-output`, `volume-tmp`) ; génération
+complète validée dans le conteneur.
+**Statut** : M14 ✔ terminé · M15 ✔ terminé — image buildée, **génération multi-voix
+bout en bout validée dans le conteneur** sur GPU (NVIDIA `nvidia-container-toolkit`,
+torch `cu130` au build). **Modèle hors image** : téléchargé au premier lancement
+depuis l'interface (panneau « 🧠 Modèles », `engine/modeles.py`, volume `volume-model`
+→ `/models`) ou **pré-rempli** dans le volume (détection : rien n'est re-téléchargé).
+Tous les dossiers de données utilisent des **volumes Docker nommés** (`volume-audio`,
+`volume-model`, `volume-texte`, `volume-output`, `volume-tmp`).
 
 ---
 

@@ -8,55 +8,60 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
-### Ajout — Version 0.5.0 (mineur) : nouvelles fonctionnalités
-- **Wizard install** (interface web) : étape 1 installer torch/torchvision/torchaudio
-  au runtime, étape 2 télécharger modèle CosyVoice3 (ModelScope/Hugging Face,
-  progression SSE). Ces composants ne sont plus dans l'image Docker au build.
-- **Versionning automatique** : chaque push `main` incrémente M.m.f automatiquement
-  (Major sur demande explicite, mineur pour nouvelles fonctions, patch pour corrections).
-  Workflow `.github/workflows/docker-build.yml` lit `VERSION`, analyse les fichiers
-  modifiés, commit et build l'image Docker avec le bon tag.
-- **Volumes Docker nommés** (pas de bind mounts) : `volume-audio`, `volume-model`,
-  `volume-texte`, `volume-output`, `volume-tmp` — définis dans `docker-compose.yml`,
-  créés automatiquement.
-- **Entrée entrypoint** (`scripts/entrypoint.sh`) : installe torch au premier lancement
-  si non présent, puis exécute la commande d'origine.
-- **GUI** : nouvel onglet "Wizard install" pour guider l'utilisateur première fois.
-- **API endpoints** : `GET /api/torch/status`, `POST /api/torch/install`,
-  `GET /api/torch/install/{jid}/stream` pour suivre l'installation.
-- **Dockerfile** : retrait de torch/torchaudio/torchvision du `RUN pip install` ;
-  `ENTRYPOINT ["/app/scripts/entrypoint.sh"]` + `CMD ["python", "-m", "app.server", ...]`.
+### Correction — Docker (modèle, voix, dépendances)
+- **torch/torchaudio/torchvision réintégrés au build** : de retour dans
+  `requirements.txt` (image CUDA 13 complète au build) ; `scripts/entrypoint.sh`
+  ne sert plus que de **filet de sécurité** (vérifie les 3 imports, sinon réinstalle
+  torch `cu130`).
+- **Téléchargement du modèle corrigé** (`engine/modeles.py`) : gestion de la
+  progression via des barres tqdm sous-classées (fini `progress_callback` et
+  `get_lock`), staging dans le volume cible + `shutil.move` (fini
+  `Invalid cross-device link`), barre de progression dans le panneau « 🧠 Modèles ».
+- **Dossier des voix invalide → repli** : `app/server.py` et `app/web_app.py`
+  replient sur le dossier par défaut si le chemin persisté n'existe plus ;
+  `voicebuilder_settings.json` est exclu de l'image (`.dockerignore`) et désindexé
+  de git (`.gitignore`).
 
-### Modification — Packaging & infra
-- **CosyVoice en sous-module git** : intégré au projet (`vendor/CosyVoice`) au lieu
-  d'un clone voisin ; `engine/config.py` pointe vers le sous-module.
-- **Conteneur Docker avec GPU allégé** (M15) : `Dockerfile` (base `ubuntu:22.04`
-  + Python 3.10, deps `requirements.txt`, moteur CosyVoice, Matcha-TTS) — torch
-  CUDA retiré du build, installé au runtime. `docker-compose.yml` (services GUI/CLI,
-  5 volumes nommés, GPU via `nvidia-container-toolkit`).
-- **Modèles hors image** (Important) : modèle CosyVoice3 n'est pas embarqué —
-  téléchargé par l'utilisateur depuis l'interface (panneau "Modèles" ou "Wizard
-  install", source ModelScope/Hugging Face, progression SSE) dans le volume
-  `volume-model` (inscriptible) ou dossier pré-rempli (`MODEL_DIR`).
-- **CI/CD** : workflow GitHub Actions déplacé vers `.github/workflows/docker-build.yml`
-  avec versionning automatique ; workflow Gitea vers `.gitea/workflows/docker-build.yml`.
-- **GUI** — détection des balises `[Personnage]` du texte (ajoutées au modal
-  "Personnages"), validation avant génération : aucun personnage ou personnage
-  sans voix → erreur + ouverture modal.
-- **Sauvegarde git** : `origin` pousse vers deux dépôts (gitea + GitHub
-  `Nehwon/VoiceBuilder`, remote `backup`), conformément à `AGENTS.md`.
-- **Modèles hors image** (Important) : le modèle CosyVoice3 n'est plus embarqué
-  dans l'image Docker — téléchargé par l'utilisateur depuis l'interface (panneau
-  "🧠 Modèles" ou "Wizard install", source ModelScope/Hugging Face, progression SSE)
-  dans le volume inscriptible `volume-model` (ou dossier pré-rempli `MODEL_DIR`).
-  Si le volume contient déjà le modèle, il est détecté et rien n'est re-téléchargé.
-- **GUI** — nouvelle interface wizard install pour le premier lancement.
+### Correction — Moteur & logs
+- **Patch CosyVoice `0002`** : `logging.DEBUG` → `INFO` dans
+  `cosyvoice/utils/file_utils.py` — fin du spam de logs numba/SSA dans
+  `docker compose logs` (appliqué au build via `apply_cosyvoice_patches.sh`).
+
+### Correction — GUI : blocs écoutables en direct
+- **Payload SSE `bloc` complet** (`engine/multi.py`) : chaque bloc porte désormais
+  `id`, `voix`, `texte` — les cartes « Blocs générés » s'affichent toutes (plus de
+  doublon `data-id="undefined"`) avec le bon en-tête.
+- **Audio servi via l'API** (`app/web/app.js`) : le lecteur d'un bloc utilise
+  `/api/generer/{id}/bloc/{bid}/wav` au lieu du chemin conteneur — chaque bloc est
+  écoutable immédiatement après sa génération, boutons Regénérer/Diviser actifs.
+- **Blocs « trop grands » corrigés** (`engine/multi.py`) : un groupe de
+  personnage entier (ex. un chapitre d'un seul narrateur) devenait un bloc géant
+  (118 s / 5,7 Mo). Chaque **sous-bloc adaptatif** (`adaptive.build_blocks`,
+  ≤ `max_chars`, défaut 600) est désormais un bloc à part entière (wav + texte +
+  id + progression), avec pause uniquement au changement de personnage.
+
+### Correction — Moteur : robustesse & nombres en français
+- **Normalisation française des nombres** (`engine/text_fr.py`, nouveau) : avant
+  la synthèse, les nombres du texte et du prompt sont convertis en **mots
+  français** (`num2words`, `lang="fr"`) — `600` → « six cents », `7,7` →
+  « sept virgule sept », `2 290` → « deux mille deux cent quatre-vingt-dix »,
+  `H100` → « H cent », `CO2` → « CO deux », `1er`/`4e` → « premier »/« quatrième »,
+  `85 %` → « quatre-vingt-cinq pour cent ». Jusqu'alors `frontend.py` lisait les
+  chiffres en **anglais** via la lib `inflect` (`spell_out_number`).
+- **Patch CosyVoice `0003`** (`patches/cosyvoice/0003-disable-english-spell-out-number.patch`) :
+  désactive `spell_out_number` dans `cosyvoice/cli/frontend.py` — plus aucune
+  re-conversion anglaise des chiffres après notre normalisation.
+- **`requirements.txt`** : ajout de `num2words>=0.5.12`.
+- **Génération concurrente protégée** (`engine/cosyvoice_engine.py`,
+  `app/server.py`) : verrou (`threading.Lock`) autour de la construction
+  d'`AutoModel` (fini l'erreur « Cannot copy out of meta tensor ») + réponse
+  `409` si une génération est déjà en cours.
 
 ---
 
 ## [0.5.0] - 2026-08-14
 
-### Ajourné — Packaging & infra
+### Ajout — Packaging & infra
 - **Versionning** : chaque push `main` incrémente M.m.f automatiquement.
 - **Wizard install** : guide utilisateur première utilisation (torch + modèle).
 - **Volumes Docker nommés** : remplacement des bind mounts par volumes nommés.
@@ -69,11 +74,6 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 - Initial commit avec GUI FastAPI, CLI, format taggé, GUI Gradio.
 - CosyVoice en sous-module, Docker GPU de base.
 - Premier déploiement fonctionnel.
-  plus attendu dans l'image Docker — téléchargeable au **premier lancement**
-  depuis l'interface (« 🧠 Modèles », `engine/modeles.py`, source
-  ModelScope/Hugging Face, progression SSE) dans le volume inscriptible
-  `cov3-models` ou un dossier pré-rempli (`MODEL_DIR`). Détection automatique
-  de présence (`GET /api/modeles`), `COSYVOICE_MODEL_DIR` réglable par env.
 - **GUI Montage** — refonte de l'onglet « Montage » : montage global (lecteur +
   log) à gauche et **liste à ascenseur de lecteurs par bloc** à droite (une
   carte audio + texte complet + en-tête personnage/durée/voix + actions

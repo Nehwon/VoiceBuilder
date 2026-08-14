@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -9,6 +10,7 @@ import numpy as np
 import soundfile as sf
 
 from . import config
+from . import text_fr
 
 
 def setup_cosyvoice_paths() -> None:
@@ -22,6 +24,7 @@ def setup_cosyvoice_paths() -> None:
 # Module cache
 _model = None
 _sr = None
+_load_lock = threading.Lock()
 
 
 def load(model_dir=None, device: str = None, fp16: bool = None) -> "tuple":
@@ -30,15 +33,21 @@ def load(model_dir=None, device: str = None, fp16: bool = None) -> "tuple":
     if _model is not None:
         return _model, _sr
 
-    setup_cosyvoice_paths()
-    device = device or config.DEFAULT_DEVICE
-    fp16 = config.DEFAULT_FP16 if fp16 is None else fp16
-    model_dir = Path(model_dir) if model_dir else config.COSYVOICE_MODEL_DIR
+    # Verrou : deux générations simultanées pourraient déclencher deux
+    # constructions d'AutoModel en même temps (course sur _model -> erreurs
+    # type "Cannot copy out of meta tensor").
+    with _load_lock:
+        if _model is not None:
+            return _model, _sr
+        setup_cosyvoice_paths()
+        device = device or config.DEFAULT_DEVICE
+        fp16 = config.DEFAULT_FP16 if fp16 is None else fp16
+        model_dir = Path(model_dir) if model_dir else config.COSYVOICE_MODEL_DIR
 
-    from cosyvoice.cli.cosyvoice import AutoModel
+        from cosyvoice.cli.cosyvoice import AutoModel
 
-    _model = AutoModel(model_dir=str(model_dir), fp16=fp16)
-    _sr = _model.sample_rate
+        _model = AutoModel(model_dir=str(model_dir), fp16=fp16)
+        _sr = _model.sample_rate
     return _model, _sr
 
 
@@ -57,6 +66,11 @@ def synthesize(
     """
     if model is None or sample_rate is None:
         model, sample_rate = load()
+
+    # CosyVoice lit les chiffres en anglais (inflect) : on normalise les
+    # nombres en français avant la synthèse (cf. engine/text_fr.py).
+    text = text_fr.normalize(text)
+    prompt_text = text_fr.normalize(prompt_text)
 
     chunks = []
     for out in model.inference_zero_shot(

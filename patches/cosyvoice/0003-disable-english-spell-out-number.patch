@@ -1,0 +1,16 @@
+diff --git a/cosyvoice/cli/frontend.py b/cosyvoice/cli/frontend.py
+index 6d397cc..3fb0fed 100644
+--- a/cosyvoice/cli/frontend.py
++++ b/cosyvoice/cli/frontend.py
+@@ -153,7 +153,10 @@ class CosyVoiceFrontEnd:
+             else:
+                 if self.text_frontend == 'wetext':
+                     text = self.en_tn_model.normalize(text)
+-                text = spell_out_number(text, self.inflect_parser)
++                # VoiceBuilder : les nombres sont déjà écrits en français par
++                # engine/text_fr.py avant la synthèse ; on désactive le
++                # "spell_out_number" anglais (inflect) qui les lirait en anglais.
++                # text = spell_out_number(text, self.inflect_parser)
+                 texts = list(split_paragraph(text, partial(self.tokenizer.encode, allowed_special=self.allowed_special), "en", token_max_n=80,
+                                              token_min_n=60, merge_len=20, comma_split=False))
+         texts = [i for i in texts if not is_only_punctuation(i)]
