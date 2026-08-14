@@ -87,7 +87,7 @@ def _blocs() -> list:
 def bootstrap() -> str:
     """Applique le dossier sauvegardé et génère ``voix.txt`` si absent."""
     data = _charger_persistance()
-    if data.get("audio_dir"):
+    if data.get("audio_dir") and Path(data["audio_dir"]).is_dir():
         config.set_audio_dir(data["audio_dir"])
     config.ensure_dirs()
     voix.generer_voix_txt()          # crée voix.txt s'il n'existe pas

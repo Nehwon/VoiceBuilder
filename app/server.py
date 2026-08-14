@@ -76,6 +76,10 @@ def _voix():
 def _etat() -> dict:
     """État général : dossier des voix, présence de voix.txt, liste des voix."""
     d = _charger_persistance().get("audio_dir") or str(config.VOIX_AUDIO_DIR)
+    if not Path(d).is_dir():
+        # dossier persisté invalide (ex. chemin hôte repris dans l'image) :
+        # on revient au défaut (VOICEBUILDER_AUDIO_DIR) au lieu de casser la résolution
+        d = str(config.VOIX_AUDIO_DIR)
     config.set_audio_dir(d)
     config.ensure_dirs()
     _BROUILLONS.mkdir(parents=True, exist_ok=True)

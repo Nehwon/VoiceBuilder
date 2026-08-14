@@ -72,51 +72,76 @@ def infos() -> dict:
 
 def _telech_modelscope(dest: Path, progress) -> None:
     import modelscope
+
     if progress:
-        def cb(a, b, c):
-            progress(float(c) / max(1.0, float(_MODEL_TOTAL)) * 100, int(c))
+        from modelscope.hub import file_download
+
+        class _MsBar(file_download.tqdm):
+            _octets = 0
+
+            def __init__(self, *a, **k):
+                k.setdefault("disable", True)
+                super().__init__(*a, **k)
+
+            def update(self, n=1):
+                super().update(n)
+                type(self)._octets += int(n)
+                t = type(self)._octets
+                progress(
+                    float(t) / max(1.0, float(_MODEL_TOTAL)) * 100, int(t))
+
+        original = file_download.tqdm
+        file_download.tqdm = _MsBar
+        try:
+            modelscope.snapshot_download(
+                config.MODEL_ID_COSYVOICE3,
+                local_dir=str(dest),
+            )
+        finally:
+            file_download.tqdm = original
     else:
-        cb = None
-    modelscope.snapshot_download(
-        config.MODEL_ID_COSYVOICE3,
-        local_dir=str(dest),
-        progress_callback=cb,
-    )
+        modelscope.snapshot_download(
+            config.MODEL_ID_COSYVOICE3,
+            local_dir=str(dest),
+        )
 
 
 def _telech_huggingface(dest: Path, progress) -> None:
+    import importlib
     import huggingface_hub
+    import huggingface_hub._snapshot_download as _sd
+    hf_tqdm_module = importlib.import_module("huggingface_hub.utils.tqdm")
 
     if progress:
-        class _Bar:
-            """tqdm minimal qui reporte la progression à ``progress``."""
-            total = _MODEL_TOTAL
+        class _HfBar(hf_tqdm_module.tqdm):
+            _octets = 0
 
             def __init__(self, *a, **k):
-                self._n = 0
-                self.n = 0
+                self._compte_octets = k.get("unit") == "B"
+                k.setdefault("disable", True)
+                super().__init__(*a, **k)
 
             def update(self, n=1):
-                self._n += int(n)
-                self.n = self._n
-                progress(float(self._n) / max(1.0, float(_MODEL_TOTAL)) * 100,
-                         int(self._n))
+                super().update(n)
+                if self._compte_octets:
+                    type(self)._octets += int(n)
+                    t = type(self)._octets
+                    progress(
+                        float(t) / max(1.0, float(_MODEL_TOTAL)) * 100,
+                        int(t))
 
-            def close(self):
-                pass
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *exc):
-                return False
-
-        bar = _Bar()
-        huggingface_hub.snapshot_download(
-            config.MODEL_ID_COSYVOICE3,
-            local_dir=str(dest),
-            tqdm_class=bar,
-        )
+        orig_utils = hf_tqdm_module.tqdm
+        orig_sd = _sd.hf_tqdm
+        hf_tqdm_module.tqdm = _HfBar
+        _sd.hf_tqdm = _HfBar
+        try:
+            huggingface_hub.snapshot_download(
+                config.MODEL_ID_COSYVOICE3,
+                local_dir=str(dest),
+            )
+        finally:
+            hf_tqdm_module.tqdm = orig_utils
+            _sd.hf_tqdm = orig_sd
     else:
         huggingface_hub.snapshot_download(
             config.MODEL_ID_COSYVOICE3,
@@ -138,24 +163,27 @@ def telecharger(source: Optional[str] = None,
     source = (source or config.MODEL_SOURCE).lower()
     dest = config.COSYVOICE_MODEL_DIR
     dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.mkdir(parents=True, exist_ok=True)
 
-    staged = Path(tempfile.mkdtemp(prefix=".cv3-", dir=str(dest.parent)))
+    # Staging *dans* le volume de destination : `dest` peut être un point de
+    # montage Docker distinct de `/`, un simple `rename` échouerait sinon
+    # (Errno 18 Invalid cross-device link).
+    staged = Path(tempfile.mkdtemp(prefix=".cv3-", dir=str(dest)))
     try:
         if source == "huggingface":
             _telech_huggingface(staged, progress)
         else:
             _telech_modelscope(staged, progress)
         # glisser d'un seul tenant vers la destination (peut déjà exister)
+        import shutil
         for sub in staged.iterdir():
             target = dest / sub.name
             if target.exists():
-                import shutil
                 if target.is_dir():
                     shutil.rmtree(target)
                 else:
                     target.unlink()
-            sub.rename(target)
-        import shutil
+            shutil.move(str(sub), str(target))
         shutil.rmtree(staged, ignore_errors=True)
         return dest
     except BaseException:

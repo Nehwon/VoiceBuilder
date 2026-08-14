@@ -5,3 +5,4 @@ historique/
 .venv/
 texte/brouillons/
 .env
+voicebuilder_settings.json

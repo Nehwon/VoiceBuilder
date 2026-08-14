@@ -260,12 +260,12 @@ button.secondaire { border-color: var(--bor); }
   display: flex; justify-content: space-between; align-items: center;
   font-size: 12px; color: var(--dim); margin-bottom: 6px;
 }
-.progression-compteur, #progression-compteur { font-weight: 600; color: var(--txt); }
+.progression-compteur, #progression-compteur, #modele-progress-compteur { font-weight: 600; color: var(--txt); }
 .progression-barre {
   height: 8px; border-radius: 4px; overflow: hidden;
   background: var(--panel2); border: 1px solid var(--bor);
 }
-#progression-remplie {
+#progression-remplie, #modele-progress-remplie {
   height: 100%; width: 0%;
   background: var(--acc); transition: width 0.25s ease;
 }

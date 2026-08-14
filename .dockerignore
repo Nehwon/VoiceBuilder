@@ -18,6 +18,9 @@ historique/
 *.wav
 *.mp3
 
+# --- Config runtime (chemin hôte, ne doit pas entrer dans l'image) ---
+voicebuilder_settings.json
+
 # --- Env / IDE ---
 .venv/
 .env

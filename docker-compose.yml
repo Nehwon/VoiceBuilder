@@ -7,30 +7,6 @@
 #   docker compose up            # GUI sur http://127.0.0.1:8000
 #   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
 
-# --- Définition des volumes Docker nommés ---
-# Chaque service référence ces volumes par leur nom.
-# Ils sont déclarés en bas du fichier et créés automatiquement.
-
-# Volume pour les fichiers .wav/.txt des voix.
-# L'interface web peut y écrire (import, génération de voix.txt,
-# futur outil de création de voix). Début vide, rempli par l'usage.
-volume-audio:
-
-# Volume pour le modèle CosyVoice3 (~11 Go).
-# Téléchargé automatiquement au premier lancement depuis l'interface,
-# ou pré-rempli par un volume externe portant le même nom.
-volume-model:
-
-# Volume pour les fichiers texte du projet (.md, .txt).
-# La solution d'upload de l'interface y écrit directement.
-volume-texte:
-
-# Volume pour la sortie des générations audio (.wav).
-volume-output:
-
-# Volume pour les fichiers temporaires (intermédiaires).
-volume-tmp:
-
 services:
   # GUI FastAPI — http://127.0.0.1:8000
   gui:
