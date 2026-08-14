@@ -3,6 +3,8 @@ soundfile>=0.12
 librosa>=0.10
 openai-whisper
 torch
+torchaudio
+torchvision
 gradio>=4.0
 fastapi>=0.110
 uvicorn[standard]>=0.27
