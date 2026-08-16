@@ -11,7 +11,8 @@ on:
 
 env:
   OWNER: fabrice
-  BASE_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-base
+  REGISTRY: 192.168.0.5:3000
+  BASE_IMAGE: 192.168.0.5:3000/fabrice/voicebuilder-base
 
 jobs:
   build-base:
@@ -42,14 +43,14 @@ jobs:
             echo "build=no" >> "$GITHUB_OUTPUT"
           fi
         env:
-          GITEA_URL: https://gitea.lamachere.fr
+          GITEA_URL: http://192.168.0.5:3000
           GITEA_TOKEN: ${{ secrets.TOKEN }}
 
       - name: Login to Gitea Container Registry
         if: steps.skip.outputs.build == 'yes'
         uses: docker/login-action@v4
         with:
-          registry: gitea.lamachere.fr
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.USER }}
           password: ${{ secrets.TOKEN }}
 

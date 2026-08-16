@@ -11,7 +11,8 @@ on:
 
 env:
   OWNER: fabrice
-  VB_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-vb
+  REGISTRY: 192.168.0.5:3000
+  VB_IMAGE: 192.168.0.5:3000/fabrice/voicebuilder-vb
 
 jobs:
   build-vb:
@@ -43,14 +44,14 @@ jobs:
             echo "build=no" >> "$GITHUB_OUTPUT"
           fi
         env:
-          GITEA_URL: https://gitea.lamachere.fr
+          GITEA_URL: http://192.168.0.5:3000
           GITEA_TOKEN: ${{ secrets.TOKEN }}
 
       - name: Login to Gitea Container Registry
         if: steps.skip.outputs.build == 'yes'
         uses: docker/login-action@v4
         with:
-          registry: gitea.lamachere.fr
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.USER }}
           password: ${{ secrets.TOKEN }}
 
@@ -65,12 +66,12 @@ jobs:
             ${{ env.VB_IMAGE }}:cu130
             ${{ env.VB_IMAGE }}:${{ steps.hash.outputs.tag }}
           build-args: |
-            BASE_IMAGE=gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+            BASE_IMAGE=${{ env.REGISTRY }}/fabrice/voicebuilder-base:cu130
             DEBIAN_FRONTEND=noninteractive
             LANG=C.UTF-8
             PYTHONUNBUFFERED=1
             PIP_NO_CACHE_DIR=1
           cache-from: |
             type=registry,ref=${{ env.VB_IMAGE }}:cache
-            type=registry,ref=gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+            type=registry,ref=${{ env.REGISTRY }}/fabrice/voicebuilder-base:cu130
           cache-to: type=registry,ref=${{ env.VB_IMAGE }}:cache,mode=max
