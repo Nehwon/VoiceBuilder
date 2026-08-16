@@ -1,20 +1,20 @@
-# VoiceBuilder — image de base stable (GPU/NVIDIA).
+# VoiceBuilder — image de base système générique (GPU/NVIDIA).
 #
-# Contient TOUT ce qui ne bouge pratiquement jamais pendant le développement :
-#   - Ubuntu système à jour + dépendances système
-#   - venv Python
-#   - torch / torchaudio / torchvision / torchcodec + packages nvidia-* (cu130)
-#   - le snapshot complet requirements-lock.txt (--no-deps)
-#   - Matcha-TTS (paquet pip des `third_party` du sous-module)
+# Contient UNIQUEMENT le socle réutilisable par n'importe quel projet torch/CUDA :
+#   - Ubuntu 22.04 à jour + dépendances système
+#   - Python 3.10
+#   - torch / torchaudio / torchvision / torchcodec (cu130)
+#   - packages nvidia-* (cu130) fournis par les wheels pip
 #
-# Cette base est construite RAREMENT (uniquement quand requirements.txt ou
-# requirements-lock.txt changent) et poussée vers le registre Gitea. L'image
-# finale `voicebuilder` la référence via FROM, ce qui évite de re-télécharger
-# torch (plusieurs Go) à chaque build du code applicatif.
+# C'est une image "réutilisable ailleurs" : PAS de requirements spécifiques au
+# projet, PAS de venv dédié. Le venv et les requirements sont le rôle de l'image
+# `voicebuilder-vb` (docker/vb/Dockerfile).
 #
-# Construction (la première fois, puis à chaque changement de requirements) :
-#   docker build -f docker/base/Dockerfile -t voicebuilder-base:cu130 \
-#     --build-arg MATCHA_TTS_DIR=third_party/Matcha-TTS .
+# Fréquence de compilation : ~1 fois par semaine (les versions torch/cu130
+# bougent peu). Poussée sur le registre Gitea.
+#
+# Construction :
+#   docker build -f docker/base/Dockerfile -t voicebuilder-base:cu130 .
 #   docker push gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
 
 # Base épurée : les libs CUDA/GPU viennent des wheels pip (torch cu130 +
@@ -25,8 +25,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PIP_NO_CACHE_DIR=1
 
 # --- Dépendances système ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -37,21 +36,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         sox \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Environnement Python : tout le lourd (torch, nvidia, lock) ---
+# --- Socle torch + CUDA (générique, réutilisable) ---
 # L'index cu130 fournit les wheels CUDA (torch, torchaudio, torchvision,
 # torchcodec + paquets nvidia-*), indisponibles sur PyPI standard.
-# NB : Matcha-TTS N'EST PAS installé ici — il est chargé par source depuis
-# vendor/CosyVoice/third_party/Matcha-TTS dans l'image finale (voir
-# engine/config.py MATCHA_TTS_DIR + engine/cosyvoice_engine.py setup_cosyvoice_paths).
-COPY requirements.txt requirements-lock.txt /tmp/requirements/
-RUN python3.10 -m venv /opt/venv \
-    && pip install --upgrade pip setuptools wheel \
-    && pip install --extra-index-url https://download.pytorch.org/whl/cu130 -r /tmp/requirements/requirements.txt \
-    # Snapshot complet de l'environnement validé : tout est listé explicitement.
-    && pip install --no-deps --extra-index-url https://download.pytorch.org/whl/cu130 -r /tmp/requirements/requirements-lock.txt \
-    && rm -rf /tmp/requirements
+# torchcodec est requis par torchaudio 2.11 pour load()/save() (load_with_torchcodec).
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install --extra-index-url https://download.pytorch.org/whl/cu130 \
+        torch==2.13.0 torchaudio==2.11.0 torchvision==0.28.0 torchcodec==0.16.0
 
-# La couche du venv est figée ici : l'image finale n'installera plus jamais
-# torch ni les packages nvidia, seulement les dépendances du code applicatif
-# (généralement déjà présentes via le lock).
 CMD ["bash"]

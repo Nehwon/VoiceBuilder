@@ -1,0 +1,42 @@
+name: Purge obsolescent registry images
+
+# Nettoyage périodique du registre container Gitea : supprime les versions
+# obsolètes (tags <hash> non réutilisés, anciennes versions) tout en gardant
+# les tags stables (latest, main, cu130) et les N versions récentes.
+# Évite d'exploser le stockage de Gitea.
+
+on:
+  schedule:
+    - cron: '0 5 * * 0'   # dimanche 05:00
+  workflow_dispatch:
+
+env:
+  OWNER: fabrice
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Purge voicebuilder-base
+        run: bash scripts/ci/purge_registry.sh "${{ env.OWNER }}" voicebuilder-base 3
+        env:
+          GITEA_URL: https://gitea.lamachere.fr
+          GITEA_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Purge voicebuilder-vb
+        run: bash scripts/ci/purge_registry.sh "${{ env.OWNER }}" voicebuilder-vb 5
+        env:
+          GITEA_URL: https://gitea.lamachere.fr
+          GITEA_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Purge voicebuilder (final)
+        run: bash scripts/ci/purge_registry.sh "${{ env.OWNER }}" voicebuilder 10
+        env:
+          GITEA_URL: https://gitea.lamachere.fr
+          GITEA_TOKEN: ${{ secrets.TOKEN }}

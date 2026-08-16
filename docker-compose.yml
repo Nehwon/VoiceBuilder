@@ -2,9 +2,15 @@
 # Tous les dossiers utilisent des volumes Docker nommés (named volumes),
 # pas de bind mounts hôte. Les volumes sont créés au premier `docker compose up`.
 #
+# 3 niveaux d'image (cf. docker/base, docker/vb et Dockerfile racine) :
+#   base : Ubuntu + Python + torch/CUDA générique (compilée ~1×/semaine)
+#   vb   : base + requirements + lock + venv (compilée ~1×/jour)
+#   final: vb + code applicatif + patches (à la demande)
+#
 # Ordres :
-#   docker compose build base       # construit la base torch/nvidia (rare)
-#   docker compose build            # construit l'image finale (rapide, tire la base)
+#   docker compose build base       # socle torch/CUDA générique (rare)
+#   docker compose build vb         # venv + requirements (journalier)
+#   docker compose build            # image finale (à la demande)
 #   docker compose up               # GUI sur http://127.0.0.1:8000
 #   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
 
@@ -14,12 +20,22 @@ x-image-base: &image-base
     context: .
     dockerfile: docker/base/Dockerfile
 
+x-image-vb: &image-vb
+  image: gitea.lamachere.fr/fabrice/voicebuilder-vb:cu130
+  build:
+    context: .
+    dockerfile: docker/vb/Dockerfile
+    args:
+      BASE_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+
 services:
-  # Image de base stable : Ubuntu à jour + venv + torch + nvidia + lock.
-  # Construite rarement (uniquement quand requirements changent) et poussée
-  # vers le registre Gitea pour être réutilisée par le CI.
+  # Image de base générique : Ubuntu + Python + torch/CUDA (réutilisable ailleurs).
   base:
     <<: *image-base
+
+  # Image "vb" : pré-requis du projet (venv + requirements + lock).
+  vb:
+    <<: *image-vb
 
   # GUI FastAPI — http://127.0.0.1:8000
   gui:
@@ -27,7 +43,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BASE_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+        VB_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-vb:cu130
     image: voicebuilder:latest
     container_name: voicebuilder-gui
     command: python -m app.server --host 0.0.0.0 --port 8000
@@ -64,7 +80,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BASE_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+        VB_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-vb:cu130
     image: voicebuilder:latest
     profiles: ["cli"]
     command: ["python", "-m", "tools.gen_multi_voix"]

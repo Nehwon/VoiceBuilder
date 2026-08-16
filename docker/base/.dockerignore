@@ -1,8 +1,4 @@
 # .dockerignore dédié au Dockerfile de base (docker/base/Dockerfile).
-# Le contexte est la racine du projet ; on n'y embarque que requirements.txt
-# et requirements-lock.txt. Tout le reste est exclu pour un COPY rapide.
-
-# Tout ce qui n'est pas requis pour la base
+# La base n'embarque AUCUN fichier du projet : uniquement Ubuntu + torch/CUDA.
+# On exclut tout le contexte pour un build vide et rapide.
 *
-!requirements.txt
-!requirements-lock.txt

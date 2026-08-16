@@ -207,16 +207,24 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         des dépendances torch) ; GitHub ne sert plus que de backup du dépôt.
   - [x] Vérifier une génération complète dans le conteneur (génération multi-voix
         bout en bout validée sur GPU via `nvidia-container-toolkit`).
-- [x] **Optimisation du build (image de base stable)**
-  - [x] Découpage en deux images : `docker/base/Dockerfile` (Ubuntu à jour + venv +
-        torch/torchaudio/torchvision/torchcodec + packages nvidia + lock) construite
-        rarement et poussée sur le registre Gitea ; le `Dockerfile` final la référence
-        via `FROM ${BASE_IMAGE}` et ne fait que copier le code + appliquer les patches.
-  - [x] Les builds quotidiens ne re-téléchargent plus torch (plusieurs Go) : de
-        ~21 min à quelques minutes quand la base est en cache.
-  - [x] `docker compose build base` construit la base ; `docker compose build`
-        construit l'image finale. Le workflow CI a un job `base` (avec cache de
-        registre, quasi instantané si rien ne change) puis un job `build`.
+- [x] **Optimisation du build (images à 3 niveaux + CI fréquentiel)**
+  - [x] **base** (`docker/base/Dockerfile`) : Ubuntu à jour + Python + torch/
+        torchaudio/torchvision/torchcodec + packages nvidia-* (cu130). Générique,
+        réutilisable pour d'autres projets torch/GPU. Compilée ~1×/semaine
+        (`.gitea/workflows/base.yml`).
+  - [x] **vb** (`docker/vb/Dockerfile`) : FROM base + venv + requirements.txt +
+        requirements-lock.txt. Pré-requis spécifiques au projet. Compilée ~1×/jour
+        (`.gitea/workflows/vb.yml`).
+  - [x] **final** (`Dockerfile`) : FROM vb + code applicatif + patches CosyVoice.
+        Compilée à la demande, au push (`.gitea/workflows/docker-build.yml`).
+  - [x] **Skip si inchangé** : chaque job calcule un hash du contenu pertinent et
+        vérifie via l'API Gitea si le tag `<niveau>-<hash>` existe déjà (scripts
+        `scripts/ci/needs_rebuild.sh`) → skip du build si présent.
+  - [x] **Purge du registre** : workflow cron hebdomadaire (`.gitea/workflows/purge.yml`)
+        qui supprime les versions obsolètes tout en gardant les tags stables
+        (latest, main, cu130) et les N récentes (`scripts/ci/purge_registry.sh`).
+  - [x] `docker compose build base|vb` construit les niveaux ; `docker compose build`
+        construit le final. Les builds quotidiens ne re-téléchargent plus torch.
 
 ---
 

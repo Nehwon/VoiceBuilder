@@ -1,0 +1,7 @@
+# .dockerignore dédié au Dockerfile "vb" (docker/vb/Dockerfile).
+# Le contexte est la racine du projet ; on n'y embarque que requirements.txt
+# et requirements-lock.txt. Tout le reste est exclu pour un COPY rapide.
+
+*
+!requirements.txt
+!requirements-lock.txt

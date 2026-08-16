@@ -3,29 +3,29 @@
 # Construit l'environnement : moteur CosyVoice3 (sous-module vendor/CosyVoice)
 # + pipeline engine/ + GUI FastAPI.
 #
-# La base (torch + nvidia + deps système + venv) est fournie par l'image
-# `voicebuilder-base` (voir docker/base/Dockerfile), construite rarement et
-# poussée vers le registre Gitea. Cette image-ci ne réinstalle jamais torch :
-# elle ne fait que copier le code applicatif et appliquer les patches, d'où
-# des builds quotidiens en quelques minutes au lieu de ~21 min.
+# FROM l'image `voicebuilder-vb` (docker/vb/Dockerfile) qui apporte déjà le
+# venv + requirements + lock. Cette image-ci ne fait que copier le code
+# applicatif et appliquer les patches CosyVoice : elle ne réinstalle JAMAIS
+# ni torch, ni les dépendances Python. D'où des builds "à la demande" en
+# quelques minutes.
 #
 # Build :
-#   docker compose build          # tire voicebuilder-base du registre ou cache local
+#   docker compose build          # tire voicebuilder-vb du registre ou cache local
 # Usage :
 #   docker compose up             # GUI sur http://127.0.0.1:8000
 #   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
 
-# Nom de l'image de base (réglable) : registre Gitea par défaut, ou tag local.
-ARG BASE_IMAGE=gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
-FROM ${BASE_IMAGE}
+# Nom de l'image "vb" (réglable) : registre Gitea par défaut, ou tag local.
+ARG VB_IMAGE=gitea.lamachere.fr/fabrice/voicebuilder-vb:cu130
+FROM ${VB_IMAGE}
 
 # --- Copie du projet (sans venv/modèles, voir .dockerignore) ---
 WORKDIR /app
 COPY . .
 
 # --- Patches locaux du moteur ---
-# La base n'a PAS les patches (elle ne contient que les wheels pip). On
-# applique ici les patches CosyVoice (fix load_wav, etc.) au code du
+# L'image vb n'a PAS les patches (elle ne contient que les dépendances pip).
+# On applique ici les patches CosyVoice (fix load_wav, etc.) au code du
 # sous-module copié ci-dessus.
 RUN bash /app/scripts/apply_cosyvoice_patches.sh
 

@@ -2,8 +2,9 @@
 vendor/CosyVoice/venv
 vendor/CosyVoice/pretrained_models
 
-# --- Docker de base (construit séparément, inutile dans l'image finale) ---
+# --- Docker de base / vb (construits séparément, inutiles dans l'image finale) ---
 docker/base/
+docker/vb/
 
 # --- Git ---
 .git

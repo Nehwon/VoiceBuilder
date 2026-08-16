@@ -1,4 +1,9 @@
-name: Build and push VoiceBuilder Docker image (Gitea)
+name: Build VoiceBuilder final image (à la demande)
+
+# Image applicative finale : FROM vb + code + patches. Déclenchée par push main
+# (à la demande). Skip du build si le code n'a pas changé depuis le dernier tag.
+# Le bump de version M.m.f est calculé à chaque push ; le build final référence
+# l'image vb stable (cu130) déjà publiée par le workflow journalier.
 
 on:
   push:
@@ -8,56 +13,17 @@ on:
   workflow_dispatch:
 
 env:
+  OWNER: fabrice
   IMAGE_NAME: gitea.lamachere.fr/fabrice/voicebuilder
-  BASE_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+  VB_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-vb:cu130
 
 jobs:
-  base:
-    name: Build and push base image (torch/nvidia)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Login to Gitea Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: gitea.lamachere.fr
-          username: ${{ secrets.USER }}
-          password: ${{ secrets.TOKEN }}
-
-      # La base (Ubuntu + venv + torch + nvidia + lock) n'est reconstruite que
-      # si requirements changent : le cache de registre (voir cache-from/to)
-      # renvoie les couches existantes sinon, rendant ce job quasi instantané.
-      - name: Build and push base image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: docker/base/Dockerfile
-          push: true
-          tags: |
-            ${{ env.BASE_IMAGE }}
-          cache-from: type=registry,ref=${{ env.BASE_IMAGE }}:cache
-          cache-to: type=registry,ref=${{ env.BASE_IMAGE }}:cache,mode=max
-          build-args: |
-            DEBIAN_FRONTEND=noninteractive
-            LANG=C.UTF-8
-            PYTHONUNBUFFERED=1
-            PIP_NO_CACHE_DIR=1
-
   prepare:
     name: Prepare version
     runs-on: ubuntu-latest
     outputs:
       before: ${{ steps.version.outputs.before }}
       new: ${{ steps.version.outputs.new }}
-      bump_type: ${{ steps.version.outputs.bump_type }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -70,17 +36,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           before=$(cat VERSION)
           echo "before=$before" >> "$GITHUB_OUTPUT"
-
           IFS='.' read -r major minor patch <<< "$before"
           bump_type=patch
           new="$before"
-
           changed_files=$(git diff-tree --no-commit-id --name-only -r HEAD || true)
           commit_subject=$(git log -1 --pretty=%s)
-
           if echo "$commit_subject" | grep -Eqi 'major|breaking'; then
             bump_type=major
             new="$before"
@@ -93,8 +55,6 @@ jobs:
             patch=$((patch + 1))
             new="${major}.${minor}.${patch}"
           fi
-
-          echo "bump_type=$bump_type" >> "$GITHUB_OUTPUT"
           echo "new=$new" >> "$GITHUB_OUTPUT"
 
   version:
@@ -110,13 +70,11 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-
       - name: Update VERSION
         if: needs.prepare.outputs.before != needs.prepare.outputs.new
         run: |
           echo "${{ needs.prepare.outputs.new }}" > VERSION
           cat VERSION
-
       - name: Commit and tag
         if: needs.prepare.outputs.before != needs.prepare.outputs.new
         shell: bash
@@ -135,8 +93,8 @@ jobs:
           git push origin "v${{ needs.prepare.outputs.new }}"
 
   build:
-    name: Build and push Docker image
-    needs: [prepare, version, base]
+    name: Build and push final image
+    needs: [prepare, version]
     if: always() && needs.prepare.result == 'success' && (needs.version.result == 'success' || needs.version.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
@@ -149,14 +107,35 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Compute content hash
+        id: hash
+        run: |
+          hash=$(git ls-files -z | xargs -0 sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1 | cut -c1-12)
+          echo "tag=${{ needs.prepare.outputs.new }}-$hash" >> "$GITHUB_OUTPUT"
+          echo "Hash du contenu : $hash"
+
+      - name: Skip if already built
+        id: skip
+        run: |
+          if bash scripts/ci/needs_rebuild.sh "${{ env.OWNER }}" voicebuilder "${{ steps.hash.outputs.tag }}"; then
+            echo "build=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=no" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GITEA_URL: https://gitea.lamachere.fr
+          GITEA_TOKEN: ${{ secrets.TOKEN }}
+
       - name: Login to Gitea Container Registry
+        if: steps.skip.outputs.build == 'yes'
         uses: docker/login-action@v4
         with:
           registry: gitea.lamachere.fr
           username: ${{ secrets.USER }}
           password: ${{ secrets.TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push final image
+        if: steps.skip.outputs.build == 'yes'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -168,14 +147,14 @@ jobs:
             ${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.new }}
           cache-from: |
             type=registry,ref=${{ env.IMAGE_NAME }}:cache
-            type=registry,ref=${{ env.BASE_IMAGE }}
+            type=registry,ref=${{ env.VB_IMAGE }}
           cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:cache,mode=max
           build-args: |
             DEBIAN_FRONTEND=noninteractive
             LANG=C.UTF-8
             PYTHONUNBUFFERED=1
             PIP_NO_CACHE_DIR=1
-            BASE_IMAGE=${{ env.BASE_IMAGE }}
+            VB_IMAGE=${{ env.VB_IMAGE }}
 
   release:
     name: Create Gitea Release

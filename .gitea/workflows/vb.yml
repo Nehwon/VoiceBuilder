@@ -1,0 +1,76 @@
+name: Build vb image (venv + requirements) — journalier
+
+# Image "vb" : FROM la base torch/CUDA + venv + requirements.txt +
+# requirements-lock.txt. Compilée ~1× par jour (les requirements bougent plus
+# souvent que torch). Skip automatique si rien n'a changé.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # tous les jours à 04:00
+  workflow_dispatch:
+
+env:
+  OWNER: fabrice
+  VB_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-vb
+
+jobs:
+  build-vb:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Compute content hash
+        id: hash
+        run: |
+          hash=$(cat docker/vb/Dockerfile requirements.txt requirements-lock.txt \
+                | sha256sum | cut -d' ' -f1 | cut -c1-12)
+          echo "tag=cu130-$hash" >> "$GITHUB_OUTPUT"
+          echo "Hash du contenu : $hash"
+
+      - name: Skip if already built
+        id: skip
+        run: |
+          if bash scripts/ci/needs_rebuild.sh "${{ env.OWNER }}" voicebuilder-vb "${{ steps.hash.outputs.tag }}"; then
+            echo "build=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=no" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GITEA_URL: https://gitea.lamachere.fr
+          GITEA_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Login to Gitea Container Registry
+        if: steps.skip.outputs.build == 'yes'
+        uses: docker/login-action@v4
+        with:
+          registry: gitea.lamachere.fr
+          username: ${{ secrets.USER }}
+          password: ${{ secrets.TOKEN }}
+
+      - name: Build and push vb image
+        if: steps.skip.outputs.build == 'yes'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/vb/Dockerfile
+          push: true
+          tags: |
+            ${{ env.VB_IMAGE }}:cu130
+            ${{ env.VB_IMAGE }}:${{ steps.hash.outputs.tag }}
+          build-args: |
+            BASE_IMAGE=gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+            DEBIAN_FRONTEND=noninteractive
+            LANG=C.UTF-8
+            PYTHONUNBUFFERED=1
+            PIP_NO_CACHE_DIR=1
+          cache-from: |
+            type=registry,ref=${{ env.VB_IMAGE }}:cache
+            type=registry,ref=gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+          cache-to: type=registry,ref=${{ env.VB_IMAGE }}:cache,mode=max
