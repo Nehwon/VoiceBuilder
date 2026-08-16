@@ -26,7 +26,7 @@ jobs:
       - name: Login to Gitea Container Registry
         uses: docker/login-action@v4
         with:
-          registry: http://gitea.lamachere.fr:2222
+          registry: gitea.lamachere.fr
           username: ${{ secrets.USER }}
           password: ${{ secrets.TOKEN }}
 
