@@ -36,11 +36,13 @@ WORKDIR /app
 COPY . .
 
 # --- Environnement Python ---
+# L'index cu130 fournit les wheels CUDA (torch, torchaudio, torchvision,
+# torchcodec + paquets nvidia-*), indisponibles sur PyPI standard.
 RUN python3.10 -m venv /opt/venv \
     && pip install --upgrade pip setuptools wheel \
-    && pip install -r /app/requirements.txt \
+    && pip install --extra-index-url https://download.pytorch.org/whl/cu130 -r /app/requirements.txt \
     # Snapshot complet de l'environnement validé : tout est listé explicitement.
-    && pip install --no-deps -r /app/requirements-lock.txt \
+    && pip install --no-deps --extra-index-url https://download.pytorch.org/whl/cu130 -r /app/requirements-lock.txt \
     # Moteur CosyVoice : chargé via sys.path (setup_cosyvoice_paths), pas un
     # paquet pip. Matcha-TTS est un paquet pip (editable).
     && pip install --no-deps Matcha-TTS
