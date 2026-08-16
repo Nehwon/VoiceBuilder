@@ -74,4 +74,4 @@ jobs:
           cache-from: |
             type=registry,ref=${{ env.VB_IMAGE }}:cache
             type=registry,ref=${{ env.REGISTRY }}/fabrice/voicebuilder-base:cu130
-          cache-to: type=registry,ref=${{ env.VB_IMAGE }}:cache,mode=max
+          cache-to: type=registry,ref=${{ env.VB_IMAGE }}:cache,mode=min

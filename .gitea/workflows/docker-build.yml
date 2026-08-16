@@ -149,7 +149,7 @@ jobs:
           cache-from: |
             type=registry,ref=${{ env.IMAGE_NAME }}:cache
             type=registry,ref=${{ env.VB_IMAGE }}
-          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:cache,mode=max
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:cache,mode=min
           build-args: |
             DEBIAN_FRONTEND=noninteractive
             LANG=C.UTF-8

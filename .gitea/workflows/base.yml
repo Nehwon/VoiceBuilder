@@ -65,7 +65,7 @@ jobs:
             ${{ env.BASE_IMAGE }}:cu130
             ${{ env.BASE_IMAGE }}:${{ steps.hash.outputs.tag }}
           cache-from: type=registry,ref=${{ env.BASE_IMAGE }}:cache
-          cache-to: type=registry,ref=${{ env.BASE_IMAGE }}:cache,mode=max
+          cache-to: type=registry,ref=${{ env.BASE_IMAGE }}:cache,mode=min
           build-args: |
             DEBIAN_FRONTEND=noninteractive
             LANG=C.UTF-8
