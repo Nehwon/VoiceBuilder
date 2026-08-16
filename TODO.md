@@ -200,9 +200,11 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [x] **Téléchargement du modèle** : panneau « 🧠 Modèles » (source ModelScope/
         Hugging Face, progression SSE) dans le volume `volume-model` ; un ancien
         « Wizard install » (torch au runtime) a été simplifié car torch est au build.
-  - [x] **Versionning automatique** : workflow CI/CD `.github/workflows/docker-build.yml`
+  - [x] **Versionning automatique** : workflow CI/CD `.gitea/workflows/docker-build.yml`
         avec bump M.m.f automatique à chaque push `main` ; lecture `VERSION`, analyse
         des fichiers modifiés, mise à jour, commit, build image avec tag de version.
+        Le CI GitHub (`.github/workflows/`) est désactivé (out of space dû à la taille
+        des dépendances torch) ; GitHub ne sert plus que de backup du dépôt.
   - [x] Vérifier une génération complète dans le conteneur (génération multi-voix
         bout en bout validée sur GPU via `nvidia-container-toolkit`).
 
