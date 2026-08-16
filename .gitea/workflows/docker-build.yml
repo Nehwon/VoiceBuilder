@@ -27,8 +27,8 @@ jobs:
         uses: docker/login-action@v4
         with:
           registry: gitea.lamachere.fr:2222
-          username: ${{ secrets.GITEA_USER }}
-          password: ${{ secrets.GITEA_TOKEN }}
+          username: ${{ secrets.USER }}
+          password: ${{ secrets.TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
