@@ -3,14 +3,31 @@
 # pas de bind mounts hôte. Les volumes sont créés au premier `docker compose up`.
 #
 # Ordres :
-#   docker compose build
-#   docker compose up            # GUI sur http://127.0.0.1:8000
+#   docker compose build base       # construit la base torch/nvidia (rare)
+#   docker compose build            # construit l'image finale (rapide, tire la base)
+#   docker compose up               # GUI sur http://127.0.0.1:8000
 #   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
 
+x-image-base: &image-base
+  image: gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+  build:
+    context: .
+    dockerfile: docker/base/Dockerfile
+
 services:
+  # Image de base stable : Ubuntu à jour + venv + torch + nvidia + lock.
+  # Construite rarement (uniquement quand requirements changent) et poussée
+  # vers le registre Gitea pour être réutilisée par le CI.
+  base:
+    <<: *image-base
+
   # GUI FastAPI — http://127.0.0.1:8000
   gui:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
     image: voicebuilder:latest
     container_name: voicebuilder-gui
     command: python -m app.server --host 0.0.0.0 --port 8000
@@ -43,7 +60,11 @@ services:
   # CLI — génération multi-voix dans le conteneur
   #   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
   cli:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
     image: voicebuilder:latest
     profiles: ["cli"]
     command: ["python", "-m", "tools.gen_multi_voix"]
@@ -69,7 +90,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-
 volumes:
   volume-audio: {}
   volume-model: {}

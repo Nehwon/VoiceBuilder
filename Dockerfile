@@ -1,53 +1,32 @@
-# VoiceBuilder — image avec prise en charge GPU (NVIDIA).
+# VoiceBuilder — image applicative finale (GPU/NVIDIA).
 #
-# Construit l'environnement complet : moteur CosyVoice3 (sous-module
-# vendor/CosyVoice) + Matcha-TTS + pipeline engine/ + GUI FastAPI.
-# Nécessite nvidia-container-toolkit côté hôte et un GPU NVIDIA (CUDA 13).
+# Construit l'environnement : moteur CosyVoice3 (sous-module vendor/CosyVoice)
+# + pipeline engine/ + GUI FastAPI.
+#
+# La base (torch + nvidia + deps système + venv) est fournie par l'image
+# `voicebuilder-base` (voir docker/base/Dockerfile), construite rarement et
+# poussée vers le registre Gitea. Cette image-ci ne réinstalle jamais torch :
+# elle ne fait que copier le code applicatif et appliquer les patches, d'où
+# des builds quotidiens en quelques minutes au lieu de ~21 min.
 #
 # Build :
-#   docker compose build
+#   docker compose build          # tire voicebuilder-base du registre ou cache local
 # Usage :
-#   docker compose up            # GUI sur http://127.0.0.1:8000
+#   docker compose up             # GUI sur http://127.0.0.1:8000
 #   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
 
-# Base épurée : les libs CUDA/GPU viennent des wheels pip (torch cu130 +
-# packages nvidia-*), comme dans l'environnement local validé. Une base
-# nvidia/cuda embarquerait un NCCL système incompatible avec torch cu130.
-FROM ubuntu:22.04
-
-ENV DEBIAN_FRONTEND=noninteractive \
-    LANG=C.UTF-8 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
-
-# --- Dépendances système ---
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3.10 python3.10-venv python3.10-dev \
-        python3-pip \
-        git ffmpeg libsndfile1 \
-        build-essential g++ \
-        sox \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV PATH="/opt/venv/bin:$PATH"
+# Nom de l'image de base (réglable) : registre Gitea par défaut, ou tag local.
+ARG BASE_IMAGE=gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+FROM ${BASE_IMAGE}
 
 # --- Copie du projet (sans venv/modèles, voir .dockerignore) ---
 WORKDIR /app
 COPY . .
 
-# --- Environnement Python ---
-# L'index cu130 fournit les wheels CUDA (torch, torchaudio, torchvision,
-# torchcodec + paquets nvidia-*), indisponibles sur PyPI standard.
-RUN python3.10 -m venv /opt/venv \
-    && pip install --upgrade pip setuptools wheel \
-    && pip install --extra-index-url https://download.pytorch.org/whl/cu130 -r /app/requirements.txt \
-    # Snapshot complet de l'environnement validé : tout est listé explicitement.
-    && pip install --no-deps --extra-index-url https://download.pytorch.org/whl/cu130 -r /app/requirements-lock.txt \
-    # Moteur CosyVoice : chargé via sys.path (setup_cosyvoice_paths), pas un
-    # paquet pip. Matcha-TTS est un paquet pip (editable).
-    && pip install --no-deps Matcha-TTS
-
 # --- Patches locaux du moteur ---
+# La base n'a PAS les patches (elle ne contient que les wheels pip). On
+# applique ici les patches CosyVoice (fix load_wav, etc.) au code du
+# sous-module copié ci-dessus.
 RUN bash /app/scripts/apply_cosyvoice_patches.sh
 
 # --- Volumes (dossier des voix réglable) ---

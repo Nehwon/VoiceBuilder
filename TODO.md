@@ -207,6 +207,16 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         des dépendances torch) ; GitHub ne sert plus que de backup du dépôt.
   - [x] Vérifier une génération complète dans le conteneur (génération multi-voix
         bout en bout validée sur GPU via `nvidia-container-toolkit`).
+- [x] **Optimisation du build (image de base stable)**
+  - [x] Découpage en deux images : `docker/base/Dockerfile` (Ubuntu à jour + venv +
+        torch/torchaudio/torchvision/torchcodec + packages nvidia + lock) construite
+        rarement et poussée sur le registre Gitea ; le `Dockerfile` final la référence
+        via `FROM ${BASE_IMAGE}` et ne fait que copier le code + appliquer les patches.
+  - [x] Les builds quotidiens ne re-téléchargent plus torch (plusieurs Go) : de
+        ~21 min à quelques minutes quand la base est en cache.
+  - [x] `docker compose build base` construit la base ; `docker compose build`
+        construit l'image finale. Le workflow CI a un job `base` (avec cache de
+        registre, quasi instantané si rien ne change) puis un job `build`.
 
 ---
 

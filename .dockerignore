@@ -2,6 +2,9 @@
 vendor/CosyVoice/venv
 vendor/CosyVoice/pretrained_models
 
+# --- Docker de base (construit séparément, inutile dans l'image finale) ---
+docker/base/
+
 # --- Git ---
 .git
 vendor/CosyVoice/.git

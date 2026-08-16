@@ -9,8 +9,48 @@ on:
 
 env:
   IMAGE_NAME: gitea.lamachere.fr/fabrice/voicebuilder
+  BASE_IMAGE: gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
 
 jobs:
+  base:
+    name: Build and push base image (torch/nvidia)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Login to Gitea Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: gitea.lamachere.fr
+          username: ${{ secrets.USER }}
+          password: ${{ secrets.TOKEN }}
+
+      # La base (Ubuntu + venv + torch + nvidia + lock) n'est reconstruite que
+      # si requirements changent : le cache de registre (voir cache-from/to)
+      # renvoie les couches existantes sinon, rendant ce job quasi instantané.
+      - name: Build and push base image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/base/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BASE_IMAGE }}
+          cache-from: type=registry,ref=${{ env.BASE_IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.BASE_IMAGE }}:cache,mode=max
+          build-args: |
+            DEBIAN_FRONTEND=noninteractive
+            LANG=C.UTF-8
+            PYTHONUNBUFFERED=1
+            PIP_NO_CACHE_DIR=1
+
   prepare:
     name: Prepare version
     runs-on: ubuntu-latest
@@ -96,7 +136,7 @@ jobs:
 
   build:
     name: Build and push Docker image
-    needs: [prepare, version]
+    needs: [prepare, version, base]
     if: always() && needs.prepare.result == 'success' && (needs.version.result == 'success' || needs.version.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
@@ -126,13 +166,16 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:v${{ needs.prepare.outputs.new }}
             ${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.new }}
-          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:cache
+          cache-from: |
+            type=registry,ref=${{ env.IMAGE_NAME }}:cache
+            type=registry,ref=${{ env.BASE_IMAGE }}
           cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:cache,mode=max
           build-args: |
             DEBIAN_FRONTEND=noninteractive
             LANG=C.UTF-8
             PYTHONUNBUFFERED=1
             PIP_NO_CACHE_DIR=1
+            BASE_IMAGE=${{ env.BASE_IMAGE }}
 
   release:
     name: Create Gitea Release
