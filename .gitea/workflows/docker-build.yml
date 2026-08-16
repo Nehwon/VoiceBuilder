@@ -111,7 +111,7 @@ jobs:
       - name: Compute content hash
         id: hash
         run: |
-          hash=$(git ls-files -z | xargs -0 sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1 | cut -c1-12)
+          hash=$(git ls-files -z ':(exclude)vendor/CosyVoice' | xargs -0 sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1 | cut -c1-12)
           echo "tag=${{ needs.prepare.outputs.new }}-$hash" >> "$GITHUB_OUTPUT"
           echo "Hash du contenu : $hash"
 
