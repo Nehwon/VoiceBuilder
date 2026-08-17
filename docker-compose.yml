@@ -30,12 +30,16 @@ x-image-vb: &image-vb
 
 services:
   # Image de base générique : Ubuntu + Python + torch/CUDA (réutilisable ailleurs).
+  # Construite via `docker compose build base` ; jamais lancée par `up`.
   base:
     <<: *image-base
+    profiles: ["build"]
 
   # Image "vb" : pré-requis du projet (venv + requirements + lock).
+  # Construite via `docker compose build vb` ; jamais lancée par `up`.
   vb:
     <<: *image-vb
+    profiles: ["build"]
 
   # GUI FastAPI — http://127.0.0.1:8000
   gui:
