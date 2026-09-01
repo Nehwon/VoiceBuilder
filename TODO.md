@@ -110,6 +110,22 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [x] à la configuration du dossier, **générer `voix.txt` dans le dossier du
         projet** ; si **plusieurs fichiers portent le même nom**, les **numéroter**
         (suffixe `_2`, `_3`, …).
+- [x] **M8.3 — Gestion des projets (prochaine itération pratique, 2026-09-01)**
+  - [x] **Barre de documents réorganisée** : sélecteur + Ouvrir / ＋ Nouveau /
+        📁 Fichier local / 💾 Enregistrer / **📥 Importer** / **🗂️ Gérer** (`app/web/index.html:31`).
+  - [x] **Onglet « Projets »** (`app/web/index.html:69`, `app/web/app.js:837`) :
+        2 colonnes (documents + voix), tableau actifs (taille/date/.map/brouillon,
+        `GET /api/documents/details`), actions **Ouvrir / Renommer / Dupliquer /
+        Archiver / Supprimer**, section **📦 Archives** (Restaurer),
+        voir `app/server.py:788-940`.
+  - [x] **Contenus personnels hors git** : `texte/*.md`/`*.map`/`*.txt` (hors
+        `exemple_demo`), `texte/brouillons/`, `texte/archives/`, `voix/*.wav`/`*.txt`
+        (hors `voix.txt`) ignorés (`.gitignore:1`, `.dockerignore:1`). Import via
+        `POST /api/document/importer` (multipart, `app/server.py:900`, limite 5 Mo).
+  - [x] **Import/suppression des voix** : zone 🎙️ (liste + pré-écoute + suppression
+        + 📥 Importer `wav`+`txt`/`transcription`), `POST /api/voix/importer` +
+        `POST /api/voix/supprimer` (`app/server.py:945-1045`, modal `app/web/index.html:180`,
+        `python-multipart` dans `requirements.txt`). Testé en conteneur.
 
 ---
 

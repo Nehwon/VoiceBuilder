@@ -8,6 +8,31 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Gestion des projets (documents) + import voix
+
+- **Onglet « Projets »** (`app/web/index.html:69`, `app/web/style.css:312`) : nouveau
+  onglet à côté d'Éditeur/Montage, en 2 colonnes (documents + voix). Tableau des
+  documents actifs avec **taille / date / .map / brouillon** (`GET /api/documents/details`,
+  `app/server.py:788`) et actions **Ouvrir / Renommer / Dupliquer / Archiver / Supprimer**
+  (`POST /api/document/{supprimer,archiver,desarchiver,dupliquer,renommer}`, `app/server.py:810-940`).
+  Section **📦 Archives** (`texte/archives/`) avec **Restaurer** (`POST /api/document/desarchiver`).
+  Barre de documents réorganisée (`#barre-doc`) : sélecteur + Ouvrir / ＋ Nouveau /
+  📁 Fichier local / 💾 Enregistrer / **📥 Importer** / **🗂️ Gérer** (vers Projets).
+- **Import de documents** : bouton `📥 Importer` (barre + Projets) via
+  `POST /api/document/importer` (multipart, `app/server.py:900`, limite 5 Mo, évite
+  l'écrasement par suffixe `_2`). Détection auto personnages → modal si voix manquante.
+- **Import/suppression des voix** (`app/server.py:945-1045`) : zone 🎙️ Voix dans Projets,
+  pré-écoute, suppression (`POST /api/voix/supprimer`), import d'un couple
+  `.wav` + `.txt`/transcription (`POST /api/voix/importer`, multipart, `app/web/app.js:930`,
+  modal `app/web/index.html:180`). `voix.txt` mis à jour côté serveur.
+- **Hors git** : `.gitignore:1` exclut désormais les contenus personnels
+  (`texte/*.md`/`*.map`/`*.txt` hors `exemple_demo`, `texte/brouillons/`, `texte/archives/`,
+  `voix/*.wav`/`*.mp3`/`*.txt` hors `voix.txt`) ; `.dockerignore:1` aligné. Seul
+  `exemple_demo.md`/`voix.txt` restent versionnés. `requirements.txt:12` ajoute
+  `python-multipart` pour les uploads.
+- **Docs** : `README.md:16` (architecture + §Voix/§Projets), `PROJET.md:1` (§5/§6/§8),
+  `ROADMAP.md:1`, `TODO.md:1` mis à jour.
+
 ### Correction — Docker (modèle, voix, dépendances)
 - **torch/torchaudio/torchvision réintégrés au build** : de retour dans
   `requirements.txt` (image CUDA 13 complète au build) ; `scripts/entrypoint.sh`

@@ -14,6 +14,7 @@
     <nav class="onglets">
       <button id="tab-edit" class="actif">Éditeur</button>
       <button id="tab-montage">Montage</button>
+      <button id="tab-projets">Projets</button>
     </nav>
     <div class="header-btns">
       <button id="btn-aide" title="Aide à la mise en forme">❓</button>
@@ -36,7 +37,10 @@
     <button id="btn-nouveau" title="Ouvrir un document vierge dans le projet">＋ Nouveau</button>
     <button id="btn-fichier">📁 Fichier local…</button>
     <input type="file" id="file-local" accept=".md,.txt,text/*" hidden />
+    <input type="file" id="file-import-doc" accept=".md,.txt" hidden />
     <button id="btn-sauver" title="Enregistrer le contenu dans le projet">💾 Enregistrer dans le projet</button>
+    <button id="btn-import-doc" title="Importer un document (.md/.txt) dans le projet">📥 Importer…</button>
+    <button id="btn-gerer" title="Gérer les projets (supprimer, archiver, renommer…)">🗂️ Gérer</button>
     <span id="doc-statut" class="doc-statut"></span>
   </div>
 
@@ -87,6 +91,40 @@
       <div id="liste-blocs" class="liste-blocs">
         <!-- Un cartouche par bloc : audio + texte + infos/boutons -->
       </div>
+    </section>
+  </main>
+
+  <main id="vue-projets" class="vue projets-vue" hidden>
+    <section class="projets-col projets-documents">
+      <div class="projets-header">
+        <h2>📄 Projets — documents texte</h2>
+        <div class="projets-actions">
+          <button id="btn-projets-import" title="Importer un .md/.txt">📥 Importer un document</button>
+          <input type="file" id="file-projets-import" accept=".md,.txt" hidden />
+          <button id="btn-projets-nouveau" class="primaire">＋ Nouveau projet</button>
+          <button id="btn-projets-rafraichir" title="Rafraîchir la liste">🔄</button>
+        </div>
+      </div>
+      <p class="modal-sub">Les documents personnels sont <strong>locaux et ignorés par git</strong> (<code>texte/*.md</code> exclu, seul <code>exemple_demo.md</code> est versionné). Archive un projet pour le retirer de la liste active sans le supprimer.</p>
+      <div id="projets-liste" class="projets-liste"></div>
+      <details id="archives-details" class="archives-details">
+        <summary>📦 Archives (<span id="archives-count">0</span>)</summary>
+        <div id="archives-liste" class="projets-liste"></div>
+      </details>
+    </section>
+
+    <section class="projets-col projets-voix">
+      <div class="projets-header">
+        <h2>🎙️ Voix — échantillons</h2>
+        <div class="projets-actions">
+          <button id="btn-voix-import" title="Importer une voix (wav + txt)">📥 Importer une voix</button>
+          <input type="file" id="file-voix-wav" accept=".wav,.mp3,.flac,.ogg,audio/*" hidden />
+          <input type="file" id="file-voix-txt" accept=".txt" hidden />
+          <button id="btn-voix-rafraichir" title="Rafraîchir les voix">🔄</button>
+        </div>
+      </div>
+      <p class="modal-sub">Les voix sont <strong>hors git</strong> (<code>voix/*.wav</code>, <code>voix/*.txt</code> ignorés). Importe un couple <code>.wav</code> + <code>.txt</code> (transcription). Le fichier <code>voix.txt</code> est mis à jour automatiquement.</p>
+      <div id="voix-liste" class="voix-liste"></div>
     </section>
   </main>
 
@@ -232,6 +270,41 @@
       <pre id="erreur-msg" class="erreur-msg"></pre>
       <div class="modal-actions">
         <button id="btn-erreur-fermer" class="primaire">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : confirmation (supprimer / archiver) -->
+  <div id="modal-confirm" class="modal" hidden>
+    <div class="modal-boite modal-erreur">
+      <h2 id="confirm-titre">Confirmer</h2>
+      <p id="confirm-msg" class="modal-sub"></p>
+      <div class="modal-actions">
+        <button id="btn-confirm-annuler">Annuler</button>
+        <button id="btn-confirm-ok" class="primaire">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : importer une voix -->
+  <div id="modal-voix-import" class="modal" hidden>
+    <div class="modal-boite">
+      <h2>Importer une voix</h2>
+      <p class="modal-sub">Fournis un <code>.wav</code> (5–30 s, sans musique) et sa transcription <code>.txt</code> ou saisie manuelle. Le couple sera copié dans le dossier des voix et ajouté à <code>voix.txt</code>.</p>
+      <label>Nom de la voix
+        <input id="voix-import-nom" type="text" placeholder="Ex. Narrateur" />
+      </label>
+      <label>Fichier audio (.wav)
+        <input id="voix-import-wav-name" type="text" readonly placeholder="Aucun fichier" />
+      </label>
+      <button id="btn-voix-choisir-wav">Choisir .wav…</button>
+      <label>Transcription (.txt ou saisie)
+        <textarea id="voix-import-txt" rows="4" placeholder="Transcription exacte du wav…"></textarea>
+      </label>
+      <button id="btn-voix-choisir-txt">Choisir .txt…</button>
+      <div class="modal-actions">
+        <button id="btn-voix-import-annuler">Annuler</button>
+        <button id="btn-voix-import-ok" class="primaire">Importer</button>
       </div>
     </div>
   </div>

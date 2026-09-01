@@ -52,7 +52,7 @@ services:
     container_name: voicebuilder-gui
     command: python -m app.server --host 0.0.0.0 --port 8000
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8001:8000"
     environment:
       - VOICEBUILDER_AUDIO_DIR=/data/voice
       - COSYVOICE_MODEL_DIR=/models

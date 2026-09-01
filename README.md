@@ -37,8 +37,10 @@ VoiceBuilder/
 │   └── web_app.py    # GUI web Gradio (alternative)
 ├── scripts/         # entrypoint (Docker), setup, application des patches
 ├── patches/cosyvoice/  # patches locaux appliqués au moteur (sous-module)
-├── voix/            # voix.txt + paires .wav/.txt
-├── texte/           # documents taggés + <nom>.map (personnages→voix, CSV)
+├── voix/            # voix.txt (+ paires .wav/.txt hors git, voir §Voix)
+├── texte/           # documents taggés + <nom>.map (CSV) + archives/
+│   ├── brouillons/  # copies de travail (hors git)
+│   └── archives/    # projets archivés (hors git)
 ├── output/          # montages produits
 ├── vendor/CosyVoice/  # moteur CosyVoice en sous-module git
 └── tools/
@@ -106,11 +108,18 @@ Si plusieurs fichiers portent le même nom, ils sont automatiquement **numérot�
 Au clonage, le prompt TTS =
 `"You are a helpful assistant.<|endofprompt|>" + texte_du_txt`.
 
+> **Hors git** : les fichiers personnels `.wav`/`.txt` et les `.map` sont ignorés
+> par `.gitignore` (`voix/*.wav`, `voix/*.txt` hors `voix.txt`) — seul
+> `voix.txt` peut rester versionné à titre d'exemple. Les voix s'importent
+> depuis l'interface (onglet **Projets** → 🎙️ Voix → 📥 Importer) ou via
+> `POST /api/voix/importer` (multipart `wav` + `txt`/`transcription`). La suppression
+> se fait depuis le même onglet (`POST /api/voix/supprimer`).
+
 ### Où ranger les fichiers .wav / .txt
 
 Le dossier contenant les **fichiers `wav`/`txt`** des voix se configure via la
 variable d'environnement `VOICEBUILDER_AUDIO_DIR` (défaut :
-`~/Projets/Personnel (Fabrice)/vb-voice`).
+`~/Projets/Personnel (Fabrice)/vb-voice` ; en Docker : `/data/voice` via `volume-audio`).
 
 ```bash
 export VOICEBUILDER_AUDIO_DIR=~/Projets/Personnel\ \(Fabrice\)/vb-voice
@@ -168,12 +177,26 @@ python -m app.server --host 0.0.0.0 --port 8000
 # puis ouvrir http://127.0.0.1:8000
 ```
 
-L'éditeur est **plein écran** : barre d'outils avec un bouton par personnage,
-ouverte de documents (projet ou **fichier local**), boutons **＋ Nouveau** et
-**💾 Enregistrer dans le projet**, réglages / aide / personnages en modales.
-L'onglet **Montage** se débloque après une génération : montage global (lecteur
-+ log) à gauche, et à droite une **liste à ascenseur** avec un **lecteur par
-bloc** (texte + actions Régénérer/Diviser). Thème clair/sombre via `🌙`.
+L'éditeur est **plein écran** : 3 onglets **Éditeur** / **Montage** / **Projets**,
+barre de documents réorganisée (sélecteur + Ouvrir / ＋ Nouveau / 📁 Fichier local /
+💾 Enregistrer / 📥 Importer / 🗂️ Gérer), boutons personnage en toolbar,
+réglages / aide / personnages en modales.
+
+- **Onglet Éditeur** : CodeMirror avec surlignage `[Nom]:`, autocomplétion `Tab`,
+  numéros de ligne, brouillon auto-sauvegardé dans `texte/brouillons/`.
+- **Onglet Montage** : montage global (lecteur + log) à gauche, **liste à ascenseur**
+  de lecteurs par bloc à droite (texte + actions Régénérer/Diviser), écoute temps réel.
+- **Onglet Projets** : tableau de gestion des documents (taille, date, .map) avec
+  actions **Ouvrir / Renommer / Dupliquer / Archiver / Supprimer**, section **📦 Archives**
+  (Restaurer), zone **🎙️ Voix** (pré-écoute, suppression, 📥 Importer un couple
+  `wav`+`txt`/transcription). Thème clair/sombre via `🌙`.
+
+> **Projets personnels hors git** : `texte/*.md`/`*.map`/`*.txt` (hors `exemple_demo`)
+> et `texte/brouillons/` / `texte/archives/` sont ignorés par `.gitignore` — seul
+> `texte/exemple_demo.md` est versionné à titre d'exemple. L'import se fait via
+> `📥 Importer` (barre ou onglet Projets, `POST /api/document/importer` multipart) ;
+> la gestion complète passe par `GET /api/documents/details` et
+> `POST /api/document/{supprimer,archiver,desarchiver,dupliquer,renommer}`.
 
 ### GUI web (Gradio — alternative)
 
@@ -250,7 +273,9 @@ docker compose up --build        # serveur sur http://127.0.0.1:8000
 
 Voir `Dockerfile` et `docker-compose.yml` ; les montages couvrent
 `volume-audio`, `volume-texte`, `volume-output` et `volume-model` (modèle hors image,
-détails `TODO.md` §Phase 7, M15).
+détails `TODO.md` §Phase 7, M15). Les documents/voix personnels restent dans les
+volumes et hors git ; un `docker compose down -v` supprime les volumes — prévoir
+un export avant.
 
 ---
 

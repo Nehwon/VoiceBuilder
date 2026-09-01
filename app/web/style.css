@@ -298,6 +298,45 @@ button.secondaire { border-color: var(--bor); }
 .montage-toolbar button { margin-top: 0; }
 .montage-global .log { max-height: 35vh; }
 
+/* ---------------------------------------------------------------- projets (gestion documents + voix) */
+.projets-vue {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px; align-items: start;
+  height: 100%; overflow: auto;
+}
+@media (max-width: 900px) { .projets-vue { grid-template-columns: 1fr; } }
+.projets-col { background: var(--panel); border: 1px solid var(--bor); border-radius: 8px; padding: 16px 20px; }
+.projets-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.projets-header h2 { margin: 0; }
+.projets-actions { display: flex; gap: 6px; align-items: center; }
+.projets-actions button { margin: 0; padding: 6px 10px; }
+.projets-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.projet-carte {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 8px; align-items: center;
+  background: var(--panel2); border: 1px solid var(--bor); border-radius: 8px;
+  padding: 10px 12px;
+}
+.projet-carte-info { min-width: 0; }
+.projet-carte-nom { font-weight: 700; color: var(--acc); word-break: break-all; }
+.projet-carte-meta { font-size: 12px; color: var(--dim); }
+.projet-carte-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.projet-carte-actions button { margin: 0; padding: 5px 8px; font-size: 12px; }
+.projet-carte-actions button.danger { border-color: #d33; color: #d33; }
+.projet-carte-actions button.danger:hover { background: #d33; color: #fff; }
+.archives-details { margin-top: 16px; }
+.archives-details summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+.voix-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.voix-carte {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: var(--panel2); border: 1px solid var(--bor); border-radius: 8px;
+  padding: 10px 12px;
+}
+.voix-carte-nom { font-weight: 600; }
+.voix-carte-meta { font-size: 12px; color: var(--dim); }
+#voix-import-txt { width: 100%; background: var(--panel2); border: 1px solid var(--bor); color: var(--txt); border-radius: 5px; padding: 6px; margin-top: 2px; font-family: ui-monospace, monospace; font-size: 12px; }
+
 /* ---------------------------------------------------------------- modèle CosyVoice3 */
 .modele-statut { color: var(--txt); font-size: 13px; margin: 8px 0; }
 .modele-statut.ok { border-left: 4px solid #3fa24f; padding: 6px 10px; background: var(--panel2); }

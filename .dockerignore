@@ -18,6 +18,7 @@ __pycache__/
 # --- Données / sorties ---
 output/
 texte/brouillons/
+texte/archives/
 historique/
 *.wav
 *.mp3

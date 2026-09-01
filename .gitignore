@@ -3,6 +3,29 @@ __pycache__/
 output/
 historique/
 .venv/
-texte/brouillons/
 .env
 voicebuilder_settings.json
+
+# --- Brouillons et archives (générés, personnels) ---
+texte/brouillons/
+texte/archives/
+
+# --- Projets personnels : ignorés du git (garder uniquement l'exemple) ---
+texte/*.md
+!texte/exemple_demo.md
+texte/*.map
+!texte/exemple_demo.map
+texte/*.txt
+!texte/exemple_demo.txt
+
+# --- Voix personnelles : wav/txt/map ignorés, seul le listage exemple reste ---
+voix/*.wav
+voix/*.mp3
+voix/*.txt
+!voix/voix.txt
+voix/*.map
+
+# --- Fichiers de travail locaux non versionnés ---
+BUILDER.md
+RAPPORT.md
+docker/sd-webui-forge/

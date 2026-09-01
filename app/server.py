@@ -25,8 +25,11 @@ import threading
 import csv
 from pathlib import Path
 
+import shutil
+import time
+
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -42,6 +45,7 @@ from engine.voix import load_voix
 
 _PERSISTANCE = config.PROJECT_ROOT / "voicebuilder_settings.json"
 _BROUILLONS = config.TEXTE_DIR / "brouillons"
+_ARCHIVES = config.TEXTE_DIR / "archives"
 
 app = FastAPI(title="VoiceBuilder", version="0.1.0")
 
@@ -107,6 +111,7 @@ def _bootstrap() -> None:
             config.set_audio_dir(chemin)
     config.ensure_dirs()
     _BROUILLONS.mkdir(parents=True, exist_ok=True)
+    _ARCHIVES.mkdir(parents=True, exist_ok=True)
     voix.generer_voix_txt()      # génère depuis le dossier s'il n'existe pas
 
 
@@ -232,6 +237,24 @@ class DocumentSaveIn(BaseModel):
 class DocumentSauverIn(BaseModel):
     fichier: str
     contenu: str
+
+
+class DocumentActionIn(BaseModel):
+    fichier: str
+
+
+class DocumentRenommerIn(BaseModel):
+    fichier: str
+    nouveau: str
+
+
+class DocumentDupliquerIn(BaseModel):
+    fichier: str
+    nouveau: str | None = None
+
+
+class VoixSupprimerIn(BaseModel):
+    nom: str
 
 
 # ---------------------------------------------------------------------------
@@ -736,6 +759,388 @@ def api_personnages_save(payload: PersonnagesSaveIn):
     propre = {k: v for k, v in payload.personnages.items() if k.strip() and v}
     _ecrire_csv_mapping(p, propre)
     return {"fichier": payload.fichier, "personnages": propre}
+
+
+# ---------------------------------------------------------------------------
+# Gestion des documents : suppr., archiver, dupliquer, renommer, importer
+# ---------------------------------------------------------------------------
+
+def _valider_nom_document(nom: str) -> str:
+    """Nettoie et valide un nom de document (sécurité anti-traversal)."""
+    nom = (nom or "").strip().replace("\\", "/").split("/")[-1]
+    if not nom or nom.startswith("."):
+        raise HTTPException(400, "Nom de document invalide.")
+    if ".." in nom or "/" in nom or "\\" in nom:
+        raise HTTPException(400, "Nom de document invalide.")
+    # normalise l'extension
+    if not nom.lower().endswith((".md", ".txt")):
+        nom += ".md"
+    # caractères autorisés : évite les caractères spéciaux filesystem
+    if len(nom) > 120:
+        raise HTTPException(400, "Nom trop long (max 120).")
+    return nom
+
+
+def _details_document(p: Path) -> dict:
+    """Métadonnées d'un document pour le tableau de gestion."""
+    try:
+        st = p.stat()
+        map_p = config.TEXTE_DIR / (p.stem + ".map")
+        brouillon = _BROUILLONS / p.name
+        return {
+            "fichier": p.name,
+            "taille": st.st_size,
+            "modifie": int(st.st_mtime),
+            "modifie_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime)),
+            "map": map_p.exists(),
+            "brouillon": brouillon.exists(),
+            "archived": False,
+        }
+    except OSError:
+        return {"fichier": p.name, "taille": 0, "modifie": 0, "modifie_iso": "", "map": False, "brouillon": False, "archived": False}
+
+
+def _details_archive(p: Path) -> dict:
+    d = _details_document(p)
+    d["archived"] = True
+    return d
+
+
+@app.get("/api/documents/details")
+def api_documents_details():
+    config.ensure_dirs()
+    _ARCHIVES.mkdir(parents=True, exist_ok=True)
+    actifs = []
+    for p in sorted(config.TEXTE_DIR.glob("*")):
+        if p.is_file() and p.suffix in (".md", ".txt"):
+            actifs.append(_details_document(p))
+    archives = []
+    if _ARCHIVES.is_dir():
+        for p in sorted(_ARCHIVES.glob("*")):
+            if p.is_file() and p.suffix in (".md", ".txt"):
+                archives.append(_details_archive(p))
+    return {"documents": actifs, "archives": archives}
+
+
+@app.post("/api/document/supprimer")
+def api_document_supprimer(payload: DocumentActionIn):
+    p = _chemin_projet(payload.fichier)
+    # supprime : fichier + .map + brouillon
+    try:
+        map_p = config.TEXTE_DIR / (p.stem + ".map")
+        brouillon = _BROUILLONS / p.name
+        arch_map = _ARCHIVES / map_p.name if _ARCHIVES.is_dir() else None
+        p.unlink()
+        if map_p.exists():
+            map_p.unlink()
+        if brouillon.exists():
+            brouillon.unlink()
+        # aussi en archives si doublon
+        if arch_map and arch_map.exists():
+            pass  # on garde l'archive
+    except OSError as exc:
+        raise HTTPException(500, f"Suppression échouée : {exc}")
+    return {"supprime": payload.fichier}
+
+
+@app.post("/api/document/archiver")
+def api_document_archiver(payload: DocumentActionIn):
+    p = _chemin_projet(payload.fichier)
+    _ARCHIVES.mkdir(parents=True, exist_ok=True)
+    dest = _ARCHIVES / p.name
+    if dest.exists():
+        raise HTTPException(409, f"Archive déjà existante : {dest.name}")
+    try:
+        shutil.move(str(p), str(dest))
+        # déplace aussi le .map et le brouillon si présents
+        map_src = config.TEXTE_DIR / (p.stem + ".map")
+        if map_src.exists():
+            shutil.move(str(map_src), str(_ARCHIVES / map_src.name))
+        brouillon = _BROUILLONS / p.name
+        if brouillon.exists():
+            shutil.move(str(brouillon), str(_ARCHIVES / brouillon.name))
+    except OSError as exc:
+        raise HTTPException(500, f"Archivage échoué : {exc}")
+    return {"archive": dest.name}
+
+
+@app.post("/api/document/desarchiver")
+def api_document_desarchiver(payload: DocumentActionIn):
+    # le fichier est dans archives/
+    arch = (_ARCHIVES / payload.fichier).resolve()
+    if not arch.is_relative_to(_ARCHIVES.resolve()):
+        raise HTTPException(400, "Chemin d'archive invalide.")
+    if not arch.exists():
+        raise HTTPException(404, f"Archive introuvable : {payload.fichier}")
+    dest = (config.TEXTE_DIR / payload.fichier).resolve()
+    if not dest.is_relative_to(config.TEXTE_DIR.resolve()):
+        raise HTTPException(400, "Destination invalide.")
+    if dest.exists():
+        raise HTTPException(409, f"Un document du même nom existe déjà : {dest.name}")
+    try:
+        shutil.move(str(arch), str(dest))
+        map_arch = _ARCHIVES / (arch.stem + ".map")
+        if map_arch.exists():
+            shutil.move(str(map_arch), str(config.TEXTE_DIR / map_arch.name))
+        brouillon_arch = _ARCHIVES / arch.name
+        # le brouillon a le même nom que le doc ; déjà déplacé si présent en archive
+        # si pas, rien à faire
+        if brouillon_arch.exists() and brouillon_arch != arch:
+            shutil.move(str(brouillon_arch), str(_BROUILLONS / brouillon_arch.name))
+    except OSError as exc:
+        raise HTTPException(500, f"Désarchivage échoué : {exc}")
+    return {"restaure": dest.name}
+
+
+@app.post("/api/document/dupliquer")
+def api_document_dupliquer(payload: DocumentDupliquerIn):
+    p = _chemin_projet(payload.fichier)
+    nouveau = payload.nouveau.strip() if payload.nouveau else ""
+    if not nouveau:
+        # génère un nom : stem_copie.md
+        base = p.stem + "_copie"
+        ext = p.suffix
+        nouveau = f"{base}{ext}"
+        i = 2
+        while (config.TEXTE_DIR / nouveau).exists():
+            nouveau = f"{base}_{i}{ext}"
+            i += 1
+    else:
+        nouveau = _valider_nom_document(nouveau)
+    dest = (config.TEXTE_DIR / nouveau).resolve()
+    if not dest.is_relative_to(config.TEXTE_DIR.resolve()):
+        raise HTTPException(400, "Destination invalide.")
+    if dest.exists():
+        raise HTTPException(409, f"Fichier déjà existant : {dest.name}")
+    try:
+        shutil.copy(str(p), str(dest))
+        map_src = config.TEXTE_DIR / (p.stem + ".map")
+        if map_src.exists():
+            shutil.copy(str(map_src), str(config.TEXTE_DIR / (dest.stem + ".map")))
+    except OSError as exc:
+        raise HTTPException(500, f"Duplication échouée : {exc}")
+    return {"original": p.name, "copie": dest.name}
+
+
+@app.post("/api/document/renommer")
+def api_document_renommer(payload: DocumentRenommerIn):
+    p = _chemin_projet(payload.fichier)
+    nouveau = _valider_nom_document(payload.nouveau)
+    dest = (config.TEXTE_DIR / nouveau).resolve()
+    if not dest.is_relative_to(config.TEXTE_DIR.resolve()):
+        raise HTTPException(400, "Destination invalide.")
+    if dest.exists():
+        raise HTTPException(409, f"Fichier déjà existant : {dest.name}")
+    try:
+        p.rename(dest)
+        map_src = config.TEXTE_DIR / (p.stem + ".map")
+        if map_src.exists():
+            map_src.rename(config.TEXTE_DIR / (dest.stem + ".map"))
+        brouillon = _BROUILLONS / p.name
+        if brouillon.exists():
+            brouillon.rename(_BROUILLONS / dest.name)
+    except OSError as exc:
+        raise HTTPException(500, f"Renommage échoué : {exc}")
+    return {"ancien": p.name, "nouveau": dest.name}
+
+
+@app.post("/api/document/importer")
+async def api_document_importer(file: UploadFile = File(...)):
+    # valide extension et taille
+    fname = _valider_nom_document(file.filename or "import.md")
+    # évite l'écrasement silencieux : génère un suffixe si existe
+    dest = config.TEXTE_DIR / fname
+    if dest.exists():
+        base = dest.stem
+        ext = dest.suffix
+        i = 2
+        while (config.TEXTE_DIR / f"{base}_{i}{ext}").exists():
+            i += 1
+        fname = f"{base}_{i}{ext}"
+        dest = config.TEXTE_DIR / fname
+    try:
+        contenu = await file.read()
+        # limite 5 Mo de texte
+        if len(contenu) > 5 * 1024 * 1024:
+            raise HTTPException(400, "Fichier trop volumineux (max 5 Mo).")
+        # tente décodage utf-8
+        try:
+            text = contenu.decode("utf-8")
+        except UnicodeDecodeError:
+            text = contenu.decode("latin-1")
+        dest.write_text(text, encoding="utf-8")
+        _BROUILLONS.mkdir(parents=True, exist_ok=True)
+        (_BROUILLONS / dest.name).write_text(text, encoding="utf-8")
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"Import échoué : {exc}")
+    return {"fichier": dest.name, "taille": len(contenu)}
+
+
+# ---------------------------------------------------------------------------
+# Gestion des voix : import (wav+txt) et suppression
+# ---------------------------------------------------------------------------
+
+@app.post("/api/voix/importer")
+async def api_voix_importer(
+    wav: UploadFile = File(...),
+    txt: UploadFile | None = File(default=None),
+    nom: str | None = Form(default=None),
+    transcription: str | None = Form(default=None),
+):
+    """Importe une voix : couple wav (+ txt ou transcription brute).
+
+    - ``wav`` : fichier audio (wav/mp3/flac)
+    - ``txt`` : fichier de transcription (optionnel si ``transcription`` fournie)
+    - ``nom`` : nom de la voix (défaut = nom du wav)
+    - ``transcription`` : texte brut alternatif au fichier txt
+    """
+    audio_dir = Path(config.VOIX_AUDIO_DIR)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+
+    # valide le wav
+    wav_name = Path(wav.filename or "voix.wav").name
+    if not wav_name.lower().endswith((".wav", ".mp3", ".flac", ".ogg")):
+        # on force .wav si extension inconnue
+        wav_name = Path(wav_name).stem + ".wav"
+    # sécurise le nom fichier (pas de slash)
+    wav_name = wav_name.replace("/", "_").replace("\\", "_")
+    if not wav_name or wav_name.startswith("."):
+        raise HTTPException(400, "Nom de fichier wav invalide.")
+
+    # nom de la voix
+    voix_nom = (nom or Path(wav_name).stem).strip()
+    # retire caractères interdits pour le nom de voix
+    voix_nom = "".join(c for c in voix_nom if c not in "/\\").strip() or Path(wav_name).stem
+    if len(voix_nom) > 80:
+        raise HTTPException(400, "Nom de voix trop long (max 80).")
+
+    # vérifie doublon dans voix.txt
+    try:
+        existants = set()
+        if config.VOIX_FILE.exists():
+            # lecture tolérante
+            for raw in config.VOIX_FILE.read_text(encoding="utf-8").splitlines():
+                raw = raw.strip()
+                if raw.startswith("[") and "]" in raw:
+                    existants.add(raw.split("]")[0].lstrip("["))
+        if voix_nom in existants:
+            raise HTTPException(409, f"Voix déjà existante : {voix_nom}")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    wav_dest = audio_dir / wav_name
+    # évite écrasement : suffixe
+    if wav_dest.exists():
+        stem = wav_dest.stem
+        ext = wav_dest.suffix
+        i = 2
+        while (audio_dir / f"{stem}_{i}{ext}").exists():
+            i += 1
+        wav_name = f"{stem}_{i}{ext}"
+        wav_dest = audio_dir / wav_name
+
+    try:
+        data = await wav.read()
+        if len(data) > 100 * 1024 * 1024:
+            raise HTTPException(400, "Fichier wav trop volumineux (max 100 Mo).")
+        if len(data) < 1000:
+            raise HTTPException(400, "Fichier wav trop petit ou vide.")
+        wav_dest.write_bytes(data)
+
+        # transcription
+        txt_content = ""
+        if txt is not None and txt.filename:
+            raw = await txt.read()
+            try:
+                txt_content = raw.decode("utf-8").strip()
+            except UnicodeDecodeError:
+                txt_content = raw.decode("latin-1").strip()
+        elif transcription:
+            txt_content = transcription.strip()
+
+        if not txt_content:
+            raise HTTPException(400, "Transcription manquante : fournis un .txt ou un texte.")
+
+        txt_name = Path(wav_name).stem + ".txt"
+        txt_dest = audio_dir / txt_name
+        txt_dest.write_text(txt_content, encoding="utf-8")
+
+        # met à jour voix.txt
+        config.ensure_dirs()
+        # génère si absent, sinon append
+        if not config.VOIX_FILE.exists():
+            voix.generer_voix_txt(dossier=str(audio_dir))
+        # si voix_nom pas déjà dans voix.txt, on append
+        lignes = []
+        if config.VOIX_FILE.exists():
+            lignes = config.VOIX_FILE.read_text(encoding="utf-8").splitlines()
+        # vérifie si couple déjà listé
+        deja = any(wav_name in l for l in lignes)
+        if not deja:
+            with open(config.VOIX_FILE, "a", encoding="utf-8") as f:
+                f.write(f"[{voix_nom}], {wav_name}, {txt_name}\n")
+
+    except HTTPException:
+        # nettoie en cas d'échec partiel
+        if wav_dest.exists():
+            try:
+                wav_dest.unlink()
+            except OSError:
+                pass
+        raise
+    except Exception as exc:  # noqa: BLE001
+        if wav_dest.exists():
+            try:
+                wav_dest.unlink()
+            except OSError:
+                pass
+        raise HTTPException(500, f"Import voix échoué : {exc}")
+
+    return {"nom": voix_nom, "wav": wav_name, "txt": txt_name}
+
+
+@app.post("/api/voix/supprimer")
+def api_voix_supprimer(payload: VoixSupprimerIn):
+    nom = payload.nom.strip()
+    if not nom:
+        raise HTTPException(400, "Nom de voix invalide.")
+    if not config.VOIX_FILE.exists():
+        raise HTTPException(404, "Aucun fichier voix.txt.")
+    lignes = config.VOIX_FILE.read_text(encoding="utf-8").splitlines()
+    nouvelles = []
+    trouve = False
+    wav_a_suppr = None
+    txt_a_suppr = None
+    for l in lignes:
+        if l.strip().startswith(f"[{nom}]"):
+            trouve = True
+            # extrait wav/txt pour éventuelle suppression fichier
+            parts = [p.strip() for p in l.split(",")]
+            if len(parts) >= 2:
+                wav_a_suppr = parts[1]
+            if len(parts) >= 3:
+                txt_a_suppr = parts[2]
+            continue
+        nouvelles.append(l)
+    if not trouve:
+        raise HTTPException(404, f"Voix introuvable : {nom}")
+    # réécrit voix.txt
+    config.VOIX_FILE.write_text("\n".join(nouvelles) + ("\n" if nouvelles else ""), encoding="utf-8")
+    # supprime les fichiers audio/txt du dossier audio (optionnel, mais demandé)
+    for fname in (wav_a_suppr, txt_a_suppr):
+        if not fname:
+            continue
+        p = Path(config.VOIX_AUDIO_DIR) / Path(fname).name
+        if p.exists():
+            try:
+                p.unlink()
+            except OSError:
+                pass
+    return {"supprime": nom}
 
 
 # ---------------------------------------------------------------------------

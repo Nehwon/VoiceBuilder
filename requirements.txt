@@ -10,3 +10,4 @@ torchvision==0.28.0
 gradio==3.43.2
 fastapi==0.141.1
 uvicorn==0.52.1
+python-multipart==0.0.9

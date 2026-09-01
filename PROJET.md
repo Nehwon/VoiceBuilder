@@ -112,21 +112,28 @@ appelé côté serveur).
 
 Priorités de l'écran principal :
 
-1. **Import** d'un texte brut (`.md`, `.txt`) et création du fichier de voix si absent.
+1. **Import** d'un texte brut (`.md`, `.txt`) — barre et onglet Projets — et création
+   du fichier de voix si absent.
 2. **Éditeur Markdown efficace** :
    - surlignage syntaxique des `[Locuteur]:`, des tags inline, de la prose narrateur ;
    - autocomplétion des noms de voix définis dans `voix.txt` ;
    - insertion d'un bloc `[Nom]:` en un clic ;
    - numéros de ligne, pliage de paragraphes, navigation.
 3. **Panneau des voix** : liste issue de `voix.txt`, pré-écoute du `.wav`, ajout via
-   l'assistant « create-voix ».
+   l'assistant « create-voix » ou **import direct** (onglet Projets → 🎙️ Voix → 📥 Importer).
 4. **Génération multi-voix** : bouton lançant la pipeline du §4, avec :
    - **progression & log** : voyant par bloc (personnage, durée, nb de sous-blocs) ;
    - **vérification visible** : blocs revérifiés / rapprochés ;
    - **onglet « Montage »** : montage global (lecteur + log) à gauche, et à
      droite une **liste à ascenseur de lecteurs par bloc** (une carte audio +
      texte + actions Régénérer/Diviser) ; **export** du montage final.
-5. **Réglages** : vitesse globale, pause, device, fp16 (panneau avancé).
+5. **Gestion des projets** (nouveau) : onglet **« Projets »** en 2 colonnes —
+   documents actifs (taille/date/.map, actions Ouvrir/Renommer/Dupliquer/Archiver/Supprimer,
+   `texte/archives/` pour les archivés) et voix (liste, pré-écoute, suppression, import
+   `wav`+`txt`/`transcription`). Barre de documents réorganisée (sélecteur + Ouvrir /
+   ＋ Nouveau / 📁 Fichier local / 💾 Enregistrer / 📥 Importer / 🗂️ Gérer). Contenus
+   personnels **hors git** (`.gitignore`).
+6. **Réglages** : vitesse globale, pause, device, fp16 (panneau avancé).
 
 ```bash
 python -m app.server --host 0.0.0.0 --port 8000   # GUI serveur FastAPI (référence)
@@ -152,8 +159,10 @@ VoiceBuilder/
 │   ├── multi.py               #   pipeline multi-voix (parse, regrouper, concat)
 │   ├── voix.py                #   chargement/parsing de voix.txt
 │   └── verifier.py            #   vérification par transcription Whisper
-├── voix/                      # voix.txt + paires .wav/.txt
-├── texte/                     # projets d'écriture taggés
+├── voix/                      # voix.txt + paires .wav/.txt (hors git, sauf exemple)
+├── texte/                     # projets d'écriture taggés (+ .map, brouillons/, archives/)
+│   ├── brouillons/            # copies de travail auto-sauvegardées (hors git)
+│   └── archives/              # projets archivés (hors git)
 ├── output/                    # montages audio produits
 ├── vendor/CosyVoice/          # moteur CosyVoice en sous-module git
 └── tools/
@@ -207,6 +216,7 @@ indifféremment — dans la lignée de l'existant `voicebuilder/`.
 - [ ] **M5** — (optionnel) accélération vLLM / TensorRT pour la génération
 - [x] **M14** — CosyVoice intégré en **sous-module git** (`vendor/CosyVoice`), `engine/config.py` ajusté.
 - [x] **M15** — **Conteneur Docker avec GPU** (NVIDIA Container Toolkit) : `Dockerfile` + `docker-compose.yml`, moteur + GUI FastAPI (5 volumes nommés, modèle hors image téléchargé au premier lancement ou pré-rempli ; génération multi-voix bout en bout validée dans le conteneur).
+- [x] **M8.3/M13.0** — **Gestion des projets & import** : onglet « Projets » (documents actifs + archives + voix), barre de documents réorganisée, API de gestion (`/api/documents/details`, `/api/document/{supprimer,archiver,desarchiver,dupliquer,renommer,importer}`), import/suppression des voix (`/api/voix/importer`, `/api/voix/supprimer`), contenus personnels hors git (`.gitignore`/` .dockerignore`).
 
 ## 9. Critères de succès
 

@@ -91,6 +91,24 @@ place** (`engine/text_fr.py` + `num2words` `lang="fr"`, patch CosyVoice `0003`
 désactivant `spell_out_number` anglais) ; un frontend complet `wetext`/`ttsfrd`
 (dates, abréviations, ponctuation fine) reste optionnel.
 
+### M8.3 — Gestion des projets (prochaine itération pratique)
+**Objectif** : réorganiser la barre de documents et fournir un onglet dédié pour
+gérer les projets en cours (supprimer, archiver/désarchiver, dupliquer, renommer,
+importer), hors git (contenus personnels ignorés).
+**Livrables** : onglet **« Projets »** (`app/web/index.html:69`, `app/web/app.js:837`),
+barre `#barre-doc` réorganisée, API `GET /api/documents/details` +
+`POST /api/document/{supprimer,archiver,desarchiver,dupliquer,renommer,importer}`
+(`app/server.py:788-940`), `texte/archives/` + `texte/brouillons/` hors git.
+**Statut** : ✔ Terminé (2026-09-01) — tableau actifs + archives, modales de confirmation.
+
+### M13.0 — Import des voix (pré-requis création de voix)
+**Objectif** : permettre l'import facile des voix (couple `wav` + `txt`/transcription)
+avant l'onglet complet de création de voix (extraction vidéo, éditeur onde).
+**Livrables** : zone 🎙️ dans l'onglet Projets, `POST /api/voix/importer` (multipart)
++ `POST /api/voix/supprimer` (`app/server.py:945-1045`), modal `app/web/index.html:180`,
+`voix/*.wav`/`*.txt` hors git (`.gitignore:22`), `python-multipart` ajouté.
+**Statut** : ✔ Terminé (2026-09-01) — pré-écoute, suppression, import testé en conteneur.
+
 ### M14/M15 — Packaging & infra (sous-module CosyVoice + Docker GPU)
 **Objectif** : intégrer **CosyVoice comme sous-module git du projet** (`vendor/CosyVoice`,
 fini le clone voisin dans `~/Projets/CosyVoice`) et fournir un **conteneur Docker avec

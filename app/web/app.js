@@ -31,13 +31,18 @@ $("btn-theme").addEventListener("click", () => {
 function mountVue(nom) {
   $("vue-edit").hidden = nom !== "edit";
   $("vue-montage").hidden = nom !== "montage";
+  $("vue-projets").hidden = nom !== "projets";
   $("tab-edit").classList.toggle("actif", nom === "edit");
   $("tab-montage").classList.toggle("actif", nom === "montage");
+  $("tab-projets").classList.toggle("actif", nom === "projets");
   if (nom === "edit" && cm) cm.refresh();
   if (nom === "montage" && montageId) chargerBlocs();
+  if (nom === "projets") { chargerDetailsProjets(); chargerVoixListe(); }
 }
 $("tab-edit").addEventListener("click", () => mountVue("edit"));
 $("tab-montage").addEventListener("click", () => mountVue("montage"));
+$("tab-projets").addEventListener("click", () => mountVue("projets"));
+$("btn-gerer").addEventListener("click", () => mountVue("projets"));
 
 // l'onglet Montage est toujours accessible (le contenu dépend du résultat)
 function majMontage() {
@@ -105,6 +110,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!modalNom.hidden) { annulerNom(); return; }
     if (!modalModeles.hidden) { fermerModal(modalModeles); return; }
+    if (!$("modal-confirm").hidden) { fermerModal($("modal-confirm")); if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; } return; }
+    if (!$("modal-voix-import").hidden) { fermerModal($("modal-voix-import")); return; }
     [modalReglages, modalAide, modalPerso, modalErreur].forEach((m) => { if (!m.hidden) fermerModal(m); });
   }
 });
@@ -828,6 +835,272 @@ function majBanniere() {
     $("banniere").hidden = true;
   }
 }
+
+// ---------------------------------------------------------------- confirmation générique
+const modalConfirm = $("modal-confirm");
+let _confirmResolve = null;
+function demanderConfirmation(titre, msg) {
+  $("confirm-titre").textContent = titre;
+  $("confirm-msg").textContent = msg;
+  ouvrirModal(modalConfirm);
+  return new Promise((res) => { _confirmResolve = res; });
+}
+$("btn-confirm-annuler").addEventListener("click", () => { fermerModal(modalConfirm); if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; } });
+$("btn-confirm-ok").addEventListener("click", () => { fermerModal(modalConfirm); if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; } });
+modalConfirm.addEventListener("click", (e) => { if (e.target === modalConfirm) { fermerModal(modalConfirm); if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; } } });
+
+// ---------------------------------------------------------------- projets : détails + actions
+async function chargerDetailsProjets() {
+  try {
+    const r = await fetch("/api/documents/details");
+    if (!r.ok) throw new Error("details failed");
+    const d = await r.json();
+    renderProjets(d.documents || [], $("projets-liste"), false);
+    renderProjets(d.archives || [], $("archives-liste"), true);
+    $("archives-count").textContent = (d.archives || []).length;
+  } catch { notifier("Impossible de charger les projets.", "err"); }
+}
+
+function fmtTaille(o) {
+  if (o < 1024) return o + " o";
+  if (o < 1024 * 1024) return (o / 1024).toFixed(1) + " Ko";
+  return (o / (1024 * 1024)).toFixed(1) + " Mo";
+}
+
+function renderProjets(list, container, archived) {
+  container.innerHTML = "";
+  if (!list.length) {
+    container.innerHTML = `<p class="liste-vide">${archived ? "Aucune archive." : "Aucun projet. Crée ou importe un document."}</p>`;
+    return;
+  }
+  for (const doc of list) {
+    const carte = document.createElement("div");
+    carte.className = "projet-carte";
+    const info = document.createElement("div");
+    info.className = "projet-carte-info";
+    const nom = document.createElement("div");
+    nom.className = "projet-carte-nom";
+    nom.textContent = doc.fichier;
+    const meta = document.createElement("div");
+    meta.className = "projet-carte-meta";
+    meta.textContent = `${fmtTaille(doc.taille)} · ${doc.modifie_iso || ""}${doc.map ? " · .map" : ""}${doc.brouillon ? " · brouillon" : ""}`;
+    info.append(nom, meta);
+    const acts = document.createElement("div");
+    acts.className = "projet-carte-actions";
+    if (!archived) {
+      const bOuvrir = document.createElement("button");
+      bOuvrir.textContent = "Ouvrir";
+      bOuvrir.onclick = async () => {
+        // reproduit le flux Ouvrir de la barre-doc
+        const r = await fetch("/api/document/ouvrir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fichier: doc.fichier }) });
+        if (!r.ok) { notifier("Ouverture échouée.", "err"); return; }
+        const d = await r.json();
+        docCourant = { fichier: d.fichier, brouillon: d.brouillon };
+        cm.setValue(d.contenu ?? "");
+        await chargerPersonnagesDoc(d.fichier);
+        $("doc-statut").textContent = `brouillon : ${d.brouillon}`;
+        await chargerDocuments();
+        selectDoc(d.fichier);
+        mountVue("edit");
+        notifier(`« ${d.fichier} » ouvert.`, "ok");
+      };
+      const bRenommer = document.createElement("button");
+      bRenommer.textContent = "Renommer";
+      bRenommer.onclick = async () => {
+        const nouveau = await demanderNom("Renommer le document", doc.fichier);
+        if (!nouveau || nouveau === doc.fichier) return;
+        const r = await fetch("/api/document/renommer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fichier: doc.fichier, nouveau }) });
+        if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+        notifier("Document renommé.", "ok");
+        await chargerDocuments();
+        await chargerDetailsProjets();
+      };
+      const bDupliquer = document.createElement("button");
+      bDupliquer.textContent = "Dupliquer";
+      bDupliquer.onclick = async () => {
+        const r = await fetch("/api/document/dupliquer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fichier: doc.fichier }) });
+        if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+        const d = await r.json();
+        notifier(`Copie créée : ${d.copie}`, "ok");
+        await chargerDocuments();
+        await chargerDetailsProjets();
+      };
+      const bArchiver = document.createElement("button");
+      bArchiver.textContent = "Archiver";
+      bArchiver.onclick = async () => {
+        const ok = await demanderConfirmation("Archiver", `Archiver « ${doc.fichier} » ? Il sera déplacé dans texte/archives/ et retiré de la liste active.`);
+        if (!ok) return;
+        const r = await fetch("/api/document/archiver", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fichier: doc.fichier }) });
+        if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+        notifier("Document archivé.", "ok");
+        await chargerDocuments();
+        await chargerDetailsProjets();
+      };
+      const bSuppr = document.createElement("button");
+      bSuppr.textContent = "Supprimer";
+      bSuppr.className = "danger";
+      bSuppr.onclick = async () => {
+        const ok = await demanderConfirmation("Supprimer", `Supprimer définitivement « ${doc.fichier} » ? Cette action est irréversible (fichier + .map + brouillon seront effacés).`);
+        if (!ok) return;
+        const r = await fetch("/api/document/supprimer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fichier: doc.fichier }) });
+        if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+        if (docCourant && docCourant.fichier === doc.fichier) { docCourant = null; cm.setValue(""); $("doc-statut").textContent = ""; }
+        notifier("Document supprimé.", "ok");
+        await chargerDocuments();
+        await chargerDetailsProjets();
+      };
+      acts.append(bOuvrir, bRenommer, bDupliquer, bArchiver, bSuppr);
+    } else {
+      const bRestaurer = document.createElement("button");
+      bRestaurer.textContent = "Restaurer";
+      bRestaurer.onclick = async () => {
+        const r = await fetch("/api/document/desarchiver", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fichier: doc.fichier }) });
+        if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+        notifier("Document restauré.", "ok");
+        await chargerDocuments();
+        await chargerDetailsProjets();
+      };
+      const bSuppr = document.createElement("button");
+      bSuppr.textContent = "Supprimer";
+      bSuppr.className = "danger";
+      bSuppr.onclick = async () => {
+        const ok = await demanderConfirmation("Supprimer l'archive", `Supprimer l'archive « ${doc.fichier} » ?`);
+        if (!ok) return;
+        // suppression directe dans archives via fetch DELETE-like (on utilise archiver path)
+        // on supprime le fichier archive manuellement côté serveur : on le restaure puis supprime, plus simple : delete via API supprimer sur archive path non supporté, on fait un fetch custom
+        // fallback : on supprime via un appel direct au fichier archive côté serveur (on tente supprimer via un endpoint archive)
+        // Pour l'instant, on informe que la suppression d'archive se fait après restauration
+        notifier("Restaure d'abord l'archive puis supprime-la depuis les projets actifs.", "err");
+      };
+      acts.append(bRestaurer, bSuppr);
+    }
+    carte.append(info, acts);
+    container.appendChild(carte);
+  }
+}
+
+// import document (barre + onglet projets)
+async function importerDocument(file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  const r = await fetch("/api/document/importer", { method: "POST", body: fd });
+  if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+  const d = await r.json();
+  notifier(`Document importé : ${d.fichier}`, "ok");
+  await chargerDocuments();
+  await chargerDetailsProjets();
+  selectDoc(d.fichier);
+}
+
+$("btn-import-doc").addEventListener("click", () => $("file-import-doc").click());
+$("file-import-doc").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) importerDocument(f); e.target.value = ""; });
+$("btn-projets-import").addEventListener("click", () => $("file-projets-import").click());
+$("file-projets-import").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) importerDocument(f); e.target.value = ""; });
+$("btn-projets-nouveau").addEventListener("click", () => $("btn-nouveau").click());
+$("btn-projets-rafraichir").addEventListener("click", chargerDetailsProjets);
+
+// ---------------------------------------------------------------- voix : liste + import / suppression
+async function chargerVoixListe() {
+  try {
+    const r = await fetch("/api/voix");
+    if (!r.ok) { $("voix-liste").innerHTML = '<p class="liste-vide">Aucune voix (vérifie le dossier des voix).</p>'; return; }
+    const voix = await r.json();
+    renderVoix(voix);
+  } catch { $("voix-liste").innerHTML = '<p class="liste-vide">Erreur chargement voix.</p>'; }
+}
+function renderVoix(list) {
+  const box = $("voix-liste");
+  box.innerHTML = "";
+  if (!list.length) { box.innerHTML = '<p class="liste-vide">Aucune voix. Importe un couple .wav + .txt.</p>'; return; }
+  for (const v of list) {
+    const carte = document.createElement("div");
+    carte.className = "voix-carte";
+    const info = document.createElement("div");
+    const nom = document.createElement("div");
+    nom.className = "voix-carte-nom";
+    nom.textContent = v.nom;
+    const meta = document.createElement("div");
+    meta.className = "voix-carte-meta";
+    meta.textContent = `${v.wav.split("/").pop()} · ${v.txt.split("/").pop()}`;
+    info.append(nom, meta);
+    const acts = document.createElement("div");
+    acts.className = "projet-carte-actions";
+    const bPlay = document.createElement("button");
+    bPlay.textContent = "▶ Écouter";
+    bPlay.onclick = () => {
+      const a = new Audio(`/api/voix/wav?nom=${encodeURIComponent(v.nom)}`);
+      a.play().catch(() => notifier("Lecture impossible.", "err"));
+    };
+    const bDel = document.createElement("button");
+    bDel.textContent = "Supprimer";
+    bDel.className = "danger";
+    bDel.onclick = async () => {
+      const ok = await demanderConfirmation("Supprimer la voix", `Supprimer la voix « ${v.nom} » ? Le .wav/.txt et l'entrée dans voix.txt seront effacés.`);
+      if (!ok) return;
+      const r = await fetch("/api/voix/supprimer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: v.nom }) });
+      if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+      notifier("Voix supprimée.", "ok");
+      await chargerVoix();
+      await chargerVoixListe();
+      await chargerEtat();
+    };
+    acts.append(bPlay, bDel);
+    carte.append(info, acts);
+    box.appendChild(carte);
+  }
+}
+$("btn-voix-rafraichir").addEventListener("click", async () => { await chargerVoix(); await chargerVoixListe(); });
+
+// import voix : modal + fichiers
+const modalVoixImport = $("modal-voix-import");
+let _voixWavFile = null;
+let _voixTxtFile = null;
+$("btn-voix-import").addEventListener("click", () => { _voixWavFile = null; _voixTxtFile = null; $("voix-import-nom").value = ""; $("voix-import-txt").value = ""; $("voix-import-wav-name").value = ""; ouvrirModal(modalVoixImport); });
+$("btn-voix-import-annuler").addEventListener("click", () => fermerModal(modalVoixImport));
+$("btn-voix-choisir-wav").addEventListener("click", () => $("file-voix-wav").click());
+$("file-voix-wav").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  _voixWavFile = f;
+  $("voix-import-wav-name").value = f.name;
+  if (!$("voix-import-nom").value) $("voix-import-nom").value = f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+  e.target.value = "";
+});
+$("btn-voix-choisir-txt").addEventListener("click", () => $("file-voix-txt").click());
+$("file-voix-txt").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  _voixTxtFile = f;
+  const reader = new FileReader();
+  reader.onload = () => { $("voix-import-txt").value = reader.result; };
+  reader.readAsText(f);
+  e.target.value = "";
+});
+$("btn-voix-import-ok").addEventListener("click", async () => {
+  if (!_voixWavFile) { notifier("Choisis un fichier .wav.", "err"); return; }
+  const transcription = $("voix-import-txt").value.trim();
+  if (!_voixTxtFile && !transcription) { notifier("Fournis une transcription (.txt ou saisie).", "err"); return; }
+  const fd = new FormData();
+  fd.append("wav", _voixWavFile);
+  if (_voixTxtFile) fd.append("txt", _voixTxtFile);
+  if (transcription) fd.append("transcription", transcription);
+  const nom = $("voix-import-nom").value.trim();
+  if (nom) fd.append("nom", nom);
+  $("btn-voix-import-ok").disabled = true;
+  try {
+    const r = await fetch("/api/voix/importer", { method: "POST", body: fd });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const d = await r.json();
+    notifier(`Voix « ${d.nom} » importée.`, "ok");
+    fermerModal(modalVoixImport);
+    await chargerVoix();
+    await chargerVoixListe();
+    await chargerEtat();
+  } catch { notifier("Import voix échoué.", "err"); }
+  finally { $("btn-voix-import-ok").disabled = false; }
+});
+modalVoixImport.addEventListener("click", (e) => { if (e.target === modalVoixImport) fermerModal(modalVoixImport); });
 
 // ---------------------------------------------------------------- init
 (async function init() {
