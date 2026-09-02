@@ -134,6 +134,13 @@ Priorités de l'écran principal :
    ＋ Nouveau / 📁 Fichier local / 💾 Enregistrer / 📥 Importer / 🗂️ Gérer). Contenus
    personnels **hors git** (`.gitignore`).
 6. **Réglages** : vitesse globale, pause, device, fp16 (panneau avancé).
+7. **Explorateur de fichiers** (nouveau) : onglet « Explorateur » basé sur le
+   widget `js-fileexplorer` (vendored `app/web/vendor/fileexplorer/`) pour gérer
+   les fichiers des racines virtuelles **Projets** (`texte/`), **Sorties audio**
+   (`output/`) et **Échantillons voix** : navigation, renommer, copier/déplacer,
+   supprimer, nouveau dossier/fichier, upload (découpé) et téléchargement
+   (fichier ou zip) ; double-clic → aperçu (texte/audio) et ouverture dans
+   l'éditeur des documents `.md/.txt`. API `app/server.py` `/api/explorer/*`.
 
 ```bash
 python -m app.server --host 0.0.0.0 --port 8000   # GUI serveur FastAPI (référence)

@@ -32,16 +32,20 @@ function mountVue(nom) {
   $("vue-edit").hidden = nom !== "edit";
   $("vue-montage").hidden = nom !== "montage";
   $("vue-projets").hidden = nom !== "projets";
+  $("vue-explorer").hidden = nom !== "explorer";
   $("tab-edit").classList.toggle("actif", nom === "edit");
   $("tab-montage").classList.toggle("actif", nom === "montage");
   $("tab-projets").classList.toggle("actif", nom === "projets");
+  $("tab-explorer").classList.toggle("actif", nom === "explorer");
   if (nom === "edit" && cm) cm.refresh();
   if (nom === "montage" && montageId) chargerBlocs();
   if (nom === "projets") { chargerDetailsProjets(); chargerVoixListe(); }
+  if (nom === "explorer") lancerExplorateur(true);
 }
 $("tab-edit").addEventListener("click", () => mountVue("edit"));
 $("tab-montage").addEventListener("click", () => mountVue("montage"));
 $("tab-projets").addEventListener("click", () => mountVue("projets"));
+$("tab-explorer").addEventListener("click", () => mountVue("explorer"));
 $("btn-gerer").addEventListener("click", () => mountVue("projets"));
 
 // l'onglet Montage est toujours accessible (le contenu dépend du résultat)
@@ -110,6 +114,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!modalNom.hidden) { annulerNom(); return; }
     if (!modalModeles.hidden) { fermerModal(modalModeles); return; }
+    if (!$("modal-explorer").hidden) { fermerModal($("modal-explorer")); return; }
     if (!$("modal-confirm").hidden) { fermerModal($("modal-confirm")); if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; } return; }
     if (!$("modal-voix-import").hidden) { fermerModal($("modal-voix-import")); return; }
     [modalReglages, modalAide, modalPerso, modalErreur].forEach((m) => { if (!m.hidden) fermerModal(m); });
@@ -1101,6 +1106,240 @@ $("btn-voix-import-ok").addEventListener("click", async () => {
   finally { $("btn-voix-import-ok").disabled = false; }
 });
 modalVoixImport.addEventListener("click", (e) => { if (e.target === modalVoixImport) fermerModal(modalVoixImport); });
+
+// ---------------------------------------------------------------- explorateur de fichiers (js-fileexplorer)
+let explorateurInstance = null;
+const modalExplorer = $("modal-explorer");
+
+function cheminExplorerQuery(ids) {
+  return encodeURIComponent(JSON.stringify(ids));
+}
+
+async function requeteExplorer(url, method, data) {
+  const r = await fetch(url, {
+    method: method || "GET",
+    headers: data ? { "Content-Type": "application/json" } : undefined,
+    body: data ? JSON.stringify(data) : undefined,
+  });
+  const d = await r.json().catch(() => null);
+  if (!r.ok) {
+    const m = (d && d.detail) || "Erreur " + r.status;
+    throw new Error(m);
+  }
+  return d;
+}
+
+// Rafraîchit en douceur les listes dérivées (documents, voix) après une
+// modification de fichiers qui pourrait les changer.
+let rafraichirDerivesTimer = null;
+function planifierRafraichirDerives() {
+  clearTimeout(rafraichirDerivesTimer);
+  rafraichirDerivesTimer = setTimeout(async () => {
+    try { await chargerDocuments(); } catch { /* silencieux */ }
+    try { await chargerVoix(); } catch { /* silencieux */ }
+    try { await chargerEtat(); } catch { /* silencieux */ }
+    if (!$("vue-projets").hidden) {
+      try { await chargerDetailsProjets(); } catch { /* silencieux */ }
+      try { await chargerVoixListe(); } catch { /* silencieux */ }
+    }
+  }, 250);
+}
+
+// Ouvre un document .md/.txt du projet (même flux que la barre-doc / onglet Projets).
+async function ouvrirDocumentEditeur(fichier) {
+  try {
+    const r = await fetch("/api/document/ouvrir", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fichier }),
+    });
+    if (!r.ok) {
+      let m = "Ouverture échouée.";
+      try { m = (await r.json()).detail || m; } catch { /* corps non JSON */ }
+      throw new Error(m);
+    }
+    const d = await r.json();
+    docCourant = { fichier: d.fichier, brouillon: d.brouillon };
+    cm.setValue(d.contenu ?? "");
+    majMontage();
+    await chargerPersonnagesDoc(d.fichier);
+    $("doc-statut").textContent = `brouillon : ${d.brouillon} (source non modifiée)`;
+    await chargerDocuments();
+    selectDoc(d.fichier);
+    mountVue("edit");
+    notifier(`Document « ${d.fichier} » ouvert.`, "ok");
+  } catch (e) {
+    notifier(e.message || "Ouverture échouée.", "err");
+    afficherErreur(e.message || "Ouverture échouée.");
+  }
+}
+
+// Aperçu d'un fichier (double-clic) : texte, audio… + ouvrir dans l'éditeur.
+function ouvrirApercuExplorateur(folder, entry) {
+  const path = folder.GetPathIDs();
+  const q = `path=${cheminExplorerQuery(path)}&id=${encodeURIComponent(entry.id)}`;
+  requeteExplorer(`/api/explorer/read?${q}`)
+    .then((d) => {
+      const kO = 1024, kM = kO * 1024;
+      const taille = d.taille < kO ? `${d.taille} o`
+        : d.taille < kM ? `${(d.taille / kO).toFixed(1)} Ko`
+        : `${(d.taille / kM).toFixed(1)} Mo`;
+      const racineNoms = { projets: "Projets", sorties: "Sorties", audio: "Échantillons voix" };
+      $("explorer-prev-titre").textContent = d.name;
+      $("explorer-prev-meta").textContent =
+        `${taille} · ${new Date(d.modifie * 1000).toLocaleString("fr-FR")}` +
+        (racineNoms[d.racine] ? ` · ${racineNoms[d.racine]}` : "");
+      const te = $("explorer-prev-texte");
+      const au = $("explorer-prev-audio");
+      te.hidden = true; au.hidden = true;
+      te.textContent = ""; au.removeAttribute("src");
+      if (d.kind === "audio") {
+        au.src = `/api/explorer/raw?${q}`;
+        au.hidden = false;
+      } else if (d.kind === "text") {
+        te.textContent = d.contenu || "(fichier vide)";
+        if (d.tronque) te.textContent += "\n\n… (aperçu tronqué)";
+        te.hidden = false;
+      } else {
+        te.textContent = "Pas d'aperçu pour ce type de fichier (télécharge-le).";
+        te.hidden = false;
+      }
+      // « Ouvrir dans l'éditeur » : seulement un .md/.txt directement dans texte/.
+      const idsSansRacine = path[0] === "racine" ? path.slice(1) : path;
+      const estDocumentProjet = idsSansRacine.length === 1
+        && idsSansRacine[0] === "projets"
+        && /\.(md|txt)$/i.test(d.name);
+      const btnOuvrir = $("btn-explorer-prev-ouvrir");
+      btnOuvrir.hidden = !estDocumentProjet;
+      btnOuvrir.onclick = () => { fermerModal(modalExplorer); ouvrirDocumentEditeur(d.name); };
+      $("btn-explorer-prev-telecharger").onclick = () => {
+        window.location.href = `/api/explorer/raw?${q}`;
+      };
+      ouvrirModal(modalExplorer);
+    })
+    .catch((e) => {
+      notifier(e.message, "err");
+      afficherErreur(e.message);
+    });
+}
+$("btn-explorer-prev-fermer").addEventListener("click", () => fermerModal(modalExplorer));
+modalExplorer.addEventListener("click", (e) => { if (e.target === modalExplorer) fermerModal(modalExplorer); });
+
+// Instance FileExplorer (créée à la première ouverture de l'onglet).
+function lancerExplorateur(force) {
+  if (typeof window.FileExplorer !== "function") {
+    notifier("La bibliothèque js-fileexplorer n'est pas chargée.", "err");
+    return null;
+  }
+  if (!explorateurInstance) {
+    const options = {
+      displayunits: "si",
+      adjustprecision: true,
+      messagetimeout: 2800,
+      group: "voicebuilder-fs",
+      tools: { item_checkboxes: true },
+      initpath: [["racine", "VoiceBuilder", { canmodify: true }]],
+
+      onrefresh: function (folder, required) {
+        const q = "path=" + cheminExplorerQuery(folder.GetPathIDs());
+        fetch(`/api/explorer/list?${q}`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (d && Array.isArray(d.entries)) folder.SetEntries(d.entries);
+            else if (required) folder.SetEntries([]);
+          })
+          .catch(() => { if (required) folder.SetEntries([]); });
+      },
+
+      onopenfile: function (folder, entry) { ouvrirApercuExplorateur(folder, entry); },
+
+      onrename: function (renamed, folder, entry, newname) {
+        requeteExplorer("/api/explorer/rename", "POST",
+          { path: folder.GetPathIDs(), id: entry.id, newname })
+          .then((d) => { renamed(d.entry); planifierRafraichirDerives(); })
+          .catch((e) => renamed(e.message));
+      },
+
+      onnewfolder: function (created, folder) {
+        requeteExplorer("/api/explorer/newfolder", "POST",
+          { path: folder.GetPathIDs() })
+          .then((d) => created(d.entry))
+          .catch((e) => created(e.message));
+      },
+
+      onnewfile: function (created, folder) {
+        requeteExplorer("/api/explorer/newfile", "POST",
+          { path: folder.GetPathIDs() })
+          .then((d) => created(d.entry))
+          .catch((e) => created(e.message));
+      },
+
+      ondelete: function (deleted, folder, ids, entries, recycle) {
+        const noms = entries.map((e) => e.name).join(" », « ");
+        demanderConfirmation("Supprimer définitivement",
+          `Supprimer « ${noms} » ? Cette action est irréversible.`)
+          .then(async (ok) => {
+            if (!ok) { deleted(false); return; }
+            try {
+              await requeteExplorer("/api/explorer/delete", "POST",
+                { path: folder.GetPathIDs(), ids, recycle: !!recycle });
+              deleted(true);
+              planifierRafraichirDerives();
+            } catch (e) { deleted(e.message); }
+          });
+      },
+
+      oncopy: function (copied, srcpath, srcids, destfolder) {
+        const idsPath = srcpath.map((s) => (Array.isArray(s) ? s[0] : s));
+        requeteExplorer("/api/explorer/copy", "POST",
+          { srcpath: idsPath, srcids, destpath: destfolder.GetPathIDs() })
+          .then((d) => { copied(true, d.entries); planifierRafraichirDerives(); })
+          .catch((e) => copied(e.message));
+      },
+
+      onmove: function (moved, srcpath, srcids, destfolder) {
+        const idsPath = srcpath.map((s) => (Array.isArray(s) ? s[0] : s));
+        requeteExplorer("/api/explorer/move", "POST",
+          { srcpath: idsPath, srcids, destpath: destfolder.GetPathIDs() })
+          .then((d) => { moved(true, d.entries); planifierRafraichirDerives(); })
+          .catch((e) => moved(e.message));
+      },
+
+      oninitupload: function (startupload, fileinfo) {
+        if (fileinfo.type === "dir") {
+          // dossiers : les fichiers enfants sont envoyés avec leur chemin relatif
+          startupload(false);
+          return;
+        }
+        fileinfo.url = "/api/explorer/upload";
+        fileinfo.fileparam = "file";
+        fileinfo.params = {
+          path: JSON.stringify(fileinfo.folder.GetPathIDs()),
+          relpath: fileinfo.fullPath || "/" + fileinfo.file.name,
+          uploadid: Date.now() + "_" + Math.floor(Math.random() * 1e9),
+        };
+        fileinfo.chunksize = 4 * 1024 * 1024;   // découpage → uploads volumineux tolérés
+        fileinfo.retries = 2;
+        startupload(true);
+      },
+
+      onfinishedupload: function (finalize) {
+        finalize(true);
+        planifierRafraichirDerives();
+      },
+
+      oninitdownload: function (startdownload, folder, ids) {
+        const params = [{ name: "path", value: JSON.stringify(folder.GetPathIDs()) }];
+        ids.forEach((id) => params.push({ name: "id", value: id }));
+        startdownload({ url: "/api/explorer/download", method: "POST", params });
+      },
+    };
+    explorateurInstance = new window.FileExplorer($("explorateur"), options);
+  }
+  if (force) {
+    try { explorateurInstance.RefreshFolders(true); } catch { /* pas encore prêt */ }
+  }
+  return explorateurInstance;
+}
 
 // ---------------------------------------------------------------- init
 (async function init() {

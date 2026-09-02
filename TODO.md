@@ -123,9 +123,17 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         (hors `voix.txt`) ignorés (`.gitignore:1`, `.dockerignore:1`). Import via
         `POST /api/document/importer` (multipart, `app/server.py:900`, limite 5 Mo).
   - [x] **Import/suppression des voix** : zone 🎙️ (liste + pré-écoute + suppression
-        + 📥 Importer `wav`+`txt`/`transcription`), `POST /api/voix/importer` +
+        + 📥 Importer `wav`+`txt`/transcription), `POST /api/voix/importer` +
         `POST /api/voix/supprimer` (`app/server.py:945-1045`, modal `app/web/index.html:180`,
         `python-multipart` dans `requirements.txt`). Testé en conteneur.
+- [x] **M8.4 — Explorateur de fichiers** (2026-09-02) : onglet « Explorateur »
+      (`app/web/index.html:19`) basé sur le widget `js-fileexplorer` (vendored
+      `app/web/vendor/fileexplorer/`), racines virtuelles `texte/` (Projets),
+      `output/` (Sorties) et dossier des voix ; renommer, copier/déplacer,
+      supprimer, nouveau dossier/fichier, upload découpé et téléchargement zip
+      via `GET /api/explorer/list` (+ `/read`, `/raw`) et
+      `POST /api/explorer/{newfolder,newfile,rename,delete,copy,move,upload,download}`
+      (`app/server.py`) ; double-clic → aperçu texte/audio + « Ouvrir dans l'éditeur ».
 
 ---
 

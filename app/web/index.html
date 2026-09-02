@@ -6,6 +6,7 @@
   <title>VoiceBuilder — éditeur multi-voix</title>
   <link rel="stylesheet" href="/web/style.css" />
   <link rel="stylesheet" href="/web/vendor/codemirror.min.css" />
+  <link rel="stylesheet" href="/web/vendor/fileexplorer/file-explorer.css" />
 </head>
 <body>
   <header>
@@ -15,6 +16,7 @@
       <button id="tab-edit" class="actif">Éditeur</button>
       <button id="tab-montage">Montage</button>
       <button id="tab-projets">Projets</button>
+      <button id="tab-explorer">Explorateur</button>
     </nav>
     <div class="header-btns">
       <button id="btn-aide" title="Aide à la mise en forme">❓</button>
@@ -127,6 +129,33 @@
       <div id="voix-liste" class="voix-liste"></div>
     </section>
   </main>
+
+  <main id="vue-explorer" class="vue explorateur-vue" hidden>
+    <section class="explorateur-panel">
+      <div class="explorateur-entete">
+        <h2>🗂️ Explorateur de fichiers</h2>
+        <p class="explorateur-hint">Gère les documents, les voix et les sorties
+          (renommer, copier/déplacer, télécharger, supprimer…). Double-clique sur
+          un fichier pour l'apercevoir.</p>
+      </div>
+      <div id="explorateur" class="explorateur"></div>
+    </section>
+  </main>
+
+  <!-- Modal : aperçu d'un fichier depuis l'explorateur -->
+  <div id="modal-explorer" class="modal" hidden>
+    <div class="modal-boite modal-large">
+      <h2 id="explorer-prev-titre">Aperçu</h2>
+      <p id="explorer-prev-meta" class="modal-sub"></p>
+      <div id="explorer-prev-texte" class="explorer-prev-texte" hidden></div>
+      <audio id="explorer-prev-audio" controls hidden></audio>
+      <div id="explorer-prev-actions" class="modal-actions">
+        <button id="btn-explorer-prev-ouvrir" class="secondaire" hidden>Ouvrir dans l'éditeur</button>
+        <button id="btn-explorer-prev-telecharger" class="secondaire">Télécharger</button>
+        <button id="btn-explorer-prev-fermer" class="primaire">Fermer</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal : aide à la mise en forme -->
   <div id="modal-aide" class="modal" hidden>
@@ -315,6 +344,7 @@
 
   <script src="/web/vendor/codemirror.min.js"></script>
   <script src="/web/vendor/mode_tagged.js"></script>
+  <script src="/web/vendor/fileexplorer/file-explorer.js"></script>
   <script src="/web/app.js"></script>
 </body>
 </html>
