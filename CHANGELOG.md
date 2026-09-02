@@ -8,26 +8,6 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
-### Ajout — Explorateur de fichiers (onglet « Explorateur »)
-
-- **Nouvel onglet « Explorateur »** (`app/web/index.html:19`, `app/web/app.js`) :
-  gestion des fichiers du projet via le widget **js-fileexplorer**
-  (vendored dans `app/web/vendor/fileexplorer/`, licence MIT/LGPL) :
-  navigation par dossiers, **renommer / copier / déplacer / supprimer**,
-  **nouveau dossier / nouveau fichier**, **upload** (drag & drop ou bouton,
-  découpage par morceaux) et **téléchargement** (fichier ou zip).
-- **Racines virtuelles** : l'explorateur donne accès à `texte/` (Projets),
-  `output/` (Sorties audio) et au dossier des voix (`Échantillons voix`),
-  chacune étant rattachée au bon volume (respect de `.gitignore` : rien de
-  personnel n'est poussé). Double-clic → **aperçu** (texte/audio) et bouton
-  « Ouvrir dans l'éditeur » pour les documents `.md/.txt` de `texte/`.
-- **API** : `GET /api/explorer/list` (+ `/read`, `/raw`, `/racine`),
-  `POST /api/explorer/{newfolder,newfile,rename,delete,copy,move,upload,download}`
-  (`app/server.py`), chemins validés anti-traversal, suppression par recopie
-  sûre, upload **multipart découpé** compatible `Content-Range` (idempotent aux
-  retries), téléchargement multi-éléments compressé en **zip**.
-- Les listes dérivées (documents, voix) sont rafraîchies après les opérations.
-
 ### Ajout — Gestion des projets (documents) + import voix
 
 - **Onglet « Projets »** (`app/web/index.html:69`, `app/web/style.css:312`) : nouveau

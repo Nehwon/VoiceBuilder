@@ -177,8 +177,7 @@ python -m app.server --host 0.0.0.0 --port 8000
 # puis ouvrir http://127.0.0.1:8000
 ```
 
-L'éditeur est **plein écran** : 4 onglets **Éditeur** / **Montage** / **Projets** /
-**Explorateur**,
+L'éditeur est **plein écran** : 3 onglets **Éditeur** / **Montage** / **Projets**,
 barre de documents réorganisée (sélecteur + Ouvrir / ＋ Nouveau / 📁 Fichier local /
 💾 Enregistrer / 📥 Importer / 🗂️ Gérer), boutons personnage en toolbar,
 réglages / aide / personnages en modales.
@@ -191,14 +190,6 @@ réglages / aide / personnages en modales.
   actions **Ouvrir / Renommer / Dupliquer / Archiver / Supprimer**, section **📦 Archives**
   (Restaurer), zone **🎙️ Voix** (pré-écoute, suppression, 📥 Importer un couple
   `wav`+`txt`/transcription). Thème clair/sombre via `🌙`.
-- **Onglet Explorateur** : gestion des fichiers (widget `js-fileexplorer`
-  vendored dans `app/web/vendor/fileexplorer/`) sur les racines virtuelles
-  **Projets** (`texte/`), **Sorties audio** (`output/`) et **Échantillons voix**
-  (dossier des voix) : renommer, copier/déplacer, nouveau dossier/fichier,
-  upload (drag & drop, découpé), téléchargement (fichier ou zip), double-clic
-  pour l'aperçu (texte/audio) et « Ouvrir dans l'éditeur » pour les documents
-  de `texte/`. API : `GET /api/explorer/list` (+ `/read`, `/raw`) et
-  `POST /api/explorer/{newfolder,newfile,rename,delete,copy,move,upload,download}`.
 
 > **Projets personnels hors git** : `texte/*.md`/`*.map`/`*.txt` (hors `exemple_demo`)
 > et `texte/brouillons/` / `texte/archives/` sont ignorés par `.gitignore` — seul
