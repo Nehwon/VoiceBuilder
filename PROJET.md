@@ -134,6 +134,15 @@ Priorités de l'écran principal :
    ＋ Nouveau / 📁 Fichier local / 💾 Enregistrer / 📥 Importer / 🗂️ Gérer). Contenus
    personnels **hors git** (`.gitignore`).
 6. **Réglages** : vitesse globale, pause, device, fp16 (panneau avancé).
+7. **Nettoyage des voix** : bouton « 🧹 Nettoyer » par échantillon dans
+   Projets → 🎙️ Voix. Pipeline **Demucs** (séparation vocale — retire la
+   musique / les autres voix) puis **DeepFilterNet** (débruitage /
+   dé-réverbération, sur CPU). Écoute **A/B** avant/après, puis **écraser**
+   l'original ou **enregistrer une nouvelle voix** `<nom>_clean` (transcription
+   inchangée). Modèles (~180 Mo) téléchargés au premier usage dans
+   `VOICEBUILDER_ENHANCE_DIR` (`engine/config.py`, volume
+   `/models/enhance_models` en Docker) ; repli GPU fp16 → fp32 → CPU en cas
+   d'OOM. API `app/server.py` (`/api/voix/nettoyer*`, job SSE).
 
 ```bash
 python -m app.server --host 0.0.0.0 --port 8000   # GUI serveur FastAPI (référence)

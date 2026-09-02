@@ -57,6 +57,7 @@ services:
       - VOICEBUILDER_AUDIO_DIR=/data/voice
       - COSYVOICE_MODEL_DIR=/models
       - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
+      - VOICEBUILDER_ENHANCE_DIR=/models/enhance_models
     volumes:
       # Dossier des voix : volume DockerNamed, writable, interface y écrit.
       - volume-audio:/data/voice
@@ -92,6 +93,7 @@ services:
       - VOICEBUILDER_AUDIO_DIR=/data/voice
       - COSYVOICE_MODEL_DIR=/models
       - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
+      - VOICEBUILDER_ENHANCE_DIR=/models/enhance_models
     volumes:
       # Dossier des voix : volume DockerNamed, writable.
       - volume-audio:/data/voice

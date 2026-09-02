@@ -110,6 +110,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!modalNom.hidden) { annulerNom(); return; }
     if (!modalModeles.hidden) { fermerModal(modalModeles); return; }
+    if (!$("modal-nettoyage").hidden) { fermerModal($("modal-nettoyage")); return; }
     if (!$("modal-confirm").hidden) { fermerModal($("modal-confirm")); if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; } return; }
     if (!$("modal-voix-import").hidden) { fermerModal($("modal-voix-import")); return; }
     [modalReglages, modalAide, modalPerso, modalErreur].forEach((m) => { if (!m.hidden) fermerModal(m); });
@@ -1016,6 +1017,7 @@ function renderVoix(list) {
   for (const v of list) {
     const carte = document.createElement("div");
     carte.className = "voix-carte";
+    carte.dataset.nom = v.nom;
     const info = document.createElement("div");
     const nom = document.createElement("div");
     nom.className = "voix-carte-nom";
@@ -1032,6 +1034,10 @@ function renderVoix(list) {
       const a = new Audio(`/api/voix/wav?nom=${encodeURIComponent(v.nom)}`);
       a.play().catch(() => notifier("Lecture impossible.", "err"));
     };
+    const bClean = document.createElement("button");
+    bClean.textContent = "🧹 Nettoyer";
+    bClean.title = "Retirer musique/bruit de fond (Demucs + DeepFilterNet)";
+    bClean.onclick = () => nettoyerVoix(v.nom, bClean);
     const bDel = document.createElement("button");
     bDel.textContent = "Supprimer";
     bDel.className = "danger";
@@ -1045,7 +1051,7 @@ function renderVoix(list) {
       await chargerVoixListe();
       await chargerEtat();
     };
-    acts.append(bPlay, bDel);
+    acts.append(bPlay, bClean, bDel);
     carte.append(info, acts);
     box.appendChild(carte);
   }
@@ -1101,6 +1107,118 @@ $("btn-voix-import-ok").addEventListener("click", async () => {
   finally { $("btn-voix-import-ok").disabled = false; }
 });
 modalVoixImport.addEventListener("click", (e) => { if (e.target === modalVoixImport) fermerModal(modalVoixImport); });
+
+// ---------------------------------------------------------------- nettoyage des voix (Demucs + DeepFilterNet)
+const modalClean = $("modal-nettoyage");
+let cleanJobNom = null;      // nom de la voix en cours de nettoyage
+let cleanJobId = null;       // id du job terminé (lecture A/B)
+
+function voixCarte(nom) {
+  return document.querySelector(`#voix-liste .voix-carte[data-nom="${CSS.escape(nom)}"]`);
+}
+
+// Lance le nettoyage d'une voix et suit la progression (SSE).
+async function nettoyerVoix(nom, btn) {
+  if (!btn) btn = voixCarte(nom)?.querySelector("button:not(.danger)");
+  btn.disabled = true;
+  btn.textContent = "🧹 Nettoyage…";
+  try {
+    const r = await fetch("/api/voix/nettoyer", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nom, mode: "auto" }),
+    });
+    if (!r.ok) {
+      let m = "Nettoyage impossible.";
+      try { m = (await r.json()).detail || m; } catch { /* non JSON */ }
+      throw new Error(m);
+    }
+    const { id } = await r.json();
+
+    const ev = new EventSource(`/api/voix/nettoyer/${id}/stream`);
+    const fin = () => {
+      ev.close();
+      btn.disabled = false;
+      btn.textContent = "🧹 Nettoyer";
+    };
+    ev.addEventListener("prog", (e) => {
+      const d = JSON.parse(e.data);
+      btn.textContent = d.etape ? `🧹 ${d.etape}` : "🧹 Nettoyage…";
+    });
+    ev.addEventListener("result", () => {
+      cleanJobNom = nom;
+      cleanJobId = id;
+      ouvrirModal(modalClean);
+      modalClean.querySelector(".clean-nom").textContent = nom;
+      modalClean.querySelector("audio.clean-original").src =
+        `/api/voix/wav?nom=${encodeURIComponent(nom)}&v=${Date.now()}`;
+      const a = modalClean.querySelector("audio.clean-result");
+      a.src = `/api/voix/nettoyer/${id}/wav?v=${Date.now()}`;
+      $("nettoyer-nouveau-nom").value = nom + "_clean";
+    });
+    ev.addEventListener("error", (e) => {
+      if (e.data) {
+        const m = JSON.parse(e.data).error;
+        notifier(m, "err");
+        afficherErreur(m);
+      }
+    });
+    ev.addEventListener("end", fin);
+  } catch (e) {
+    notifier(e.message, "err");
+    afficherErreur(e.message);
+    btn.disabled = false;
+    btn.textContent = "🧹 Nettoyer";
+  }
+}
+
+$("btn-nettoyer-annuler").addEventListener("click", () => {
+  fermerModal(modalClean);
+  const a = modalClean.querySelector("audio.clean-result");
+  a.removeAttribute("src");
+  cleanJobId = null;
+});
+
+// Écraser l'original par le résultat nettoyé.
+$("btn-nettoyer-ecraser").addEventListener("click", async () => {
+  if (cleanJobId == null) return;
+  const ok = await demanderConfirmation("Écraser la voix",
+    `Remplacer le .wav d'origine de « ${cleanJobNom} » par la version nettoyée ? L'original sera perdu.`);
+  if (!ok) return;
+  const btn = $("btn-nettoyer-ecraser");
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/voix/nettoyer/${cleanJobId}/ecraser`, { method: "POST" });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    notifier(`Voix « ${cleanJobNom} » remplacée par sa version nettoyée.`, "ok");
+    fermerModal(modalClean);
+    await chargerVoix();
+    await chargerVoixListe();
+    await chargerEtat();
+  } finally { btn.disabled = false; }
+});
+
+// Enregistrer comme nouvelle voix « <nom>_<suffixe> ».
+$("btn-nettoyer-sauver").addEventListener("click", async () => {
+  if (cleanJobId == null) return;
+  const nom = $("nettoyer-nouveau-nom").value.trim();
+  if (!nom) { notifier("Indique un nom pour la nouvelle voix.", "err"); return; }
+  const btn = $("btn-nettoyer-sauver");
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/voix/nettoyer/${cleanJobId}/sauver_clean`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nom }),
+    });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const d = await r.json();
+    notifier(`Nouvelle voix « ${d.nom} » enregistrée.`, "ok");
+    fermerModal(modalClean);
+    await chargerVoix();
+    await chargerVoixListe();
+    await chargerEtat();
+  } finally { btn.disabled = false; }
+});
+modalClean.addEventListener("click", (e) => { if (e.target === modalClean) { fermerModal(modalClean); } });
 
 // ---------------------------------------------------------------- init
 (async function init() {

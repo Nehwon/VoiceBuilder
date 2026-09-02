@@ -257,6 +257,15 @@ class VoixSupprimerIn(BaseModel):
     nom: str
 
 
+class VoixNettoyerIn(BaseModel):
+    nom: str
+    mode: str | None = "auto"   # auto | cuda_fp16 | cuda_fp32 | cpu
+
+
+class VoixNettoyerSauverIn(BaseModel):
+    nom: str                    # nom de la voix nettoyée à créer (sans crochets)
+
+
 # ---------------------------------------------------------------------------
 # API : voix & config
 # ---------------------------------------------------------------------------
@@ -1141,6 +1150,202 @@ def api_voix_supprimer(payload: VoixSupprimerIn):
             except OSError:
                 pass
     return {"supprime": nom}
+
+
+# ---------------------------------------------------------------------------
+# Nettoyage des voix (Demucs + DeepFilterNet) — job d'arrière-plan + SSE
+# ---------------------------------------------------------------------------
+
+# Espace de travail des nettoyages (dans le volume temporaire, sinon /tmp).
+_CLEAN_WORK = config.OUTPUT_DIR / ".clean"
+_clean_jobs: dict[int, dict] = {}
+_clean_jobid = itertools.count()
+
+
+def _clean_dispo() -> dict:
+    """Dépendances de nettoyage installées ? (sans import lourd au boot)."""
+    import importlib.util
+    demucs = importlib.util.find_spec("demucs") is not None
+    df = importlib.util.find_spec("df") is not None and \
+        importlib.util.find_spec("libdf") is not None
+    return {"dispo": demucs and df, "demucs": demucs,
+            "deepfilternet": df,
+            "dossier_modeles": str(Path(config.ENHANCE_MODEL_DIR))}
+
+
+@app.get("/api/voix/nettoyer/dispo")
+def api_voix_nettoyer_dispo():
+    return _clean_dispo()
+
+
+@app.post("/api/voix/nettoyer")
+def api_voix_nettoyer(payload: VoixNettoyerIn):
+    """Lance le nettoyage d'une voix (Demucs vocals → DeepFilterNet)."""
+    nom = (payload.nom or "").strip()
+    if not nom:
+        raise HTTPException(400, "Nom de voix invalide.")
+    try:
+        v = _voix().get(nom)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(404, f"Voix inconnue : {nom} ({exc})")
+    if not v.wav or not Path(v.wav).exists():
+        raise HTTPException(404, f"Fichier wav introuvable : {v.wav}")
+    dispo = _clean_dispo()
+    if not dispo["dispo"]:
+        raise HTTPException(501,
+                            "Dépendances de nettoyage absentes (demucs / deepfilternet) — "
+                            "l'image doit être reconstruite.")
+    if any(j["status"] == "running" for j in _jobs.values()):
+        raise HTTPException(409, "Une génération est déjà en cours.")
+    if any(j["status"] == "running" for j in _clean_jobs.values()):
+        raise HTTPException(409, "Un nettoyage est déjà en cours.")
+
+    config.ensure_dirs()
+    _CLEAN_WORK.mkdir(parents=True, exist_ok=True)
+    jid = next(_clean_jobid)
+    sortie = _CLEAN_WORK / f"clean_{jid}.wav"
+    q: "queue.Queue[tuple]" = queue.Queue()
+    job = {
+        "status": "running", "nom": nom, "queue": q, "wav": str(v.wav),
+        "resultat": str(sortie), "mode": payload.mode or "auto",
+        "error": None, "result": None, "etape": "initialisation",
+    }
+    _clean_jobs[jid] = job
+
+    def _run():
+        from engine import enhance
+        try:
+            def progress(etape, pct):
+                job["etape"] = etape
+                q.put(("prog", {"etape": etape, "pct": pct}))
+            res = enhance.nettoyer(job["wav"], sortie, mode=job["mode"],
+                                   progress=progress)
+            job["result"] = res
+            job["status"] = "done"
+        except Exception as exc:  # noqa: BLE001
+            job["error"] = str(exc)
+            job["status"] = "error"
+        finally:
+            q.put(("fin", None))
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"id": jid, "nom": nom}
+
+
+@app.get("/api/voix/nettoyer/{jid}/stream")
+def api_voix_nettoyer_stream(jid: int):
+    job = _clean_jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "Nettoyage inconnu.")
+
+    def gen():
+        yield ": connected\n\n"
+        while job["status"] == "running":
+            try:
+                kind, data = job["queue"].get(timeout=0.5)
+            except queue.Empty:
+                yield ": ping\n\n"
+                continue
+            if kind == "prog":
+                yield f"event: prog\ndata: {json.dumps(data)}\n\n"
+            elif kind == "fin":
+                break
+        if job["error"]:
+            yield f"event: error\ndata: {json.dumps({'error': job['error']})}\n\n"
+        elif job["result"]:
+            r = job["result"]
+            yield f"event: result\ndata: {json.dumps({'duree': r['duree'], 'mode': r['mode']})}\n\n"
+        yield "event: end\ndata: {}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+def _clean_job_done(jid: int) -> dict:
+    job = _clean_jobs.get(jid)
+    if not job or job["status"] != "done" or not job["result"]:
+        raise HTTPException(404, "Nettoyage indisponible ou pas terminé.")
+    return job
+
+
+@app.get("/api/voix/nettoyer/{jid}/wav")
+def api_voix_nettoyer_wav(jid: int):
+    """Écoute le résultat nettoyé (A/B)."""
+    job = _clean_job_done(jid)
+    return FileResponse(job["resultat"], media_type="audio/wav",
+                        filename=f"{job['nom']}_clean.wav")
+
+
+@app.post("/api/voix/nettoyer/{jid}/ecraser")
+def api_voix_nettoyer_ecraser(jid: int):
+    """Remplace le .wav d'origine de la voix par le résultat nettoyé."""
+    job = _clean_job_done(jid)
+    wav = Path(job["wav"])
+    resultat = Path(job["resultat"])
+    if not resultat.exists():
+        raise HTTPException(404, "Résultat nettoyé introuvable.")
+    try:
+        shutil.copyfile(str(resultat), str(wav))
+    except OSError as exc:
+        raise HTTPException(500, f"Écrasement échoué : {exc}")
+    return {"ok": True, "nom": job["nom"], "wav": str(wav)}
+
+
+@app.post("/api/voix/nettoyer/{jid}/sauver_clean")
+def api_voix_nettoyer_sauver(jid: int, payload: VoixNettoyerSauverIn):
+    """Enregistre le résultat comme nouvelle voix « <nom>_<suffixe> »."""
+    job = _clean_job_done(jid)
+    base = Path(job["wav"])
+    resultat = Path(job["resultat"])
+    if not resultat.exists():
+        raise HTTPException(404, "Résultat nettoyé introuvable.")
+    audio_dir = Path(config.VOIX_AUDIO_DIR)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+
+    # nom de la voix cible
+    suffixe = (payload.nom or "clean").strip() or "clean"
+    suffixe = "".join(c for c in suffixe if c not in "/\\").strip()
+    cible_nom = f"{job['nom']}_{suffixe}"
+
+    # évite un doublon dans voix.txt
+    existants = set()
+    if config.VOIX_FILE.exists():
+        for raw in config.VOIX_FILE.read_text(encoding="utf-8").splitlines():
+            raw = raw.strip()
+            if raw.startswith("[") and "]" in raw:
+                existants.add(raw.split("]")[0].lstrip("["))
+    if cible_nom in existants:
+        raise HTTPException(409, f"Une voix « {cible_nom} » existe déjà.")
+
+    # fichier wav : stem_clean.wav (unique)
+    nom_wav = f"{Path(job['wav']).stem}_{suffixe}.wav"
+    wav_dest = audio_dir / nom_wav
+    i = 2
+    while wav_dest.exists():
+        wav_dest = audio_dir / f"{Path(job['wav']).stem}_{suffixe}_{i}.wav"
+        i += 1
+    # transcription copiée à l'identique
+    txt_src = Path(base).with_suffix(".txt")
+    txt_dest = wav_dest.with_suffix(".txt")
+    try:
+        shutil.copyfile(str(resultat), str(wav_dest))
+        if txt_src.exists():
+            shutil.copyfile(str(txt_src), str(txt_dest))
+    except OSError as exc:
+        raise HTTPException(500, f"Copie échouée : {exc}")
+
+    config.ensure_dirs()
+    with open(config.VOIX_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{cible_nom}], {wav_dest.name}, {txt_dest.name}\n")
+    return {"ok": True, "nom": cible_nom, "wav": wav_dest.name,
+            "txt": txt_dest.name}
+
+
+@app.get("/api/etat/clean")
+def api_clean_etat():
+    """État du nettoyage (dépendances) pour la bannière/UI."""
+    d = _clean_dispo()
+    running = any(j["status"] == "running" for j in _clean_jobs.values())
+    return {"nettoyage": d, "running": running}
 
 
 # ---------------------------------------------------------------------------

@@ -35,6 +35,18 @@ RUN python3.10 -m venv /opt/venv \
     && pip install --no-deps --extra-index-url https://download.pytorch.org/whl/cu130 -r /tmp/requirements/requirements-lock.txt \
     && rm -rf /tmp/requirements
 
+# --- Nettoyage des voix : Demucs (séparation vocale) + DeepFilterNet (débruitage) ---
+# NB : deepfilternet==0.5.6 exige packaging<24 (l'image a packaging 24.x) →
+# installé en --no-deps --ignore-installed, puis ses dépendances d'exécution à
+# la main. Demucs s'installe normalement (torch>=2.1, aucun conflit).
+COPY scripts/patch_deepfilternet.py /tmp/patch_deepfilternet.py
+RUN pip install "demucs==4.1.0" \
+    && pip install --no-deps --ignore-installed "deepfilternet==0.5.6" \
+    && pip install --no-deps "deepfilterlib==0.5.6" \
+    && pip install --quiet loguru appdirs requests icecream omegaconf rich resampy pystoi \
+    && python /tmp/patch_deepfilternet.py \
+    && rm -f /tmp/patch_deepfilternet.py
+
 # La couche du venv est figée ici : l'image finale n'installera plus jamais
 # les dépendances Python, seulement le code applicatif + patches.
 CMD ["bash"]

@@ -248,6 +248,31 @@
     </div>
   </div>
 
+  <!-- Modal : nettoyage d'une voix (A/B) -->
+  <div id="modal-nettoyage" class="modal" hidden>
+    <div class="modal-boite">
+      <h2>🧹 Voix nettoyée</h2>
+      <p class="modal-sub">Échantillon « <span class="clean-nom"></span> » : la musique et le bruit
+        de fond ont été retirés (Demucs + DeepFilterNet). Compare avant / après,
+        puis choisis quoi en faire. La transcription <code>.txt</code> reste inchangée.</p>
+
+      <h3>Avant (original)</h3>
+      <audio class="clean-original" controls preload="none"></audio>
+      <h3>Après (nettoyé)</h3>
+      <audio class="clean-result" controls preload="none"></audio>
+
+      <label>Enregistrer comme nouvelle voix
+        <input id="nettoyer-nouveau-nom" type="text" />
+      </label>
+
+      <div class="modal-actions">
+        <button id="btn-nettoyer-annuler" class="secondaire">Fermer</button>
+        <button id="btn-nettoyer-ecraser" class="danger">Écraser l'original</button>
+        <button id="btn-nettoyer-sauver" class="primaire">Enregistrer la nouvelle voix</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal : nom de document (Nouveau / Enregistrer) -->
   <div id="modal-nom" class="modal" hidden>
     <div class="modal-boite">

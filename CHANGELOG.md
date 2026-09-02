@@ -8,6 +8,30 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Nettoyage des voix (Demucs + DeepFilterNet)
+
+- **Bouton « 🧹 Nettoyer »** dans Projets → 🎙️ Voix (`app/web/app.js`) :
+  nettoie un échantillon en arrière-plan puis ouvre une **modale A/B**
+  (avant/après) pour **Écraser l'original** ou **Enregistrer une nouvelle voix**
+  (`_clean`). La transcription `.txt` reste inchangée.
+- **`engine/enhance.py`** (nouveau) : pipeline **Demucs** (htdemucs,
+  séparation vocale, retire la musique/les autres voix) puis **DeepFilterNet**
+  (`df`, modèle DeepFilterNet3, débruitage/dé-réverbération sur CPU pour ne pas
+  concurrencer CosyVoice sur le GPU). Demucs tente **cuda fp16 → cuda fp32 →
+  CPU** avec repli automatique en cas d'OOM ; les modèles (~80 Mo + ~100 Mo)
+  sont téléchargés au premier usage dans le volume `/models/enhance_models`
+  (`VOICEBUILDER_ENHANCE_DIR`, `engine/config.py:ENHANCE_MODEL_DIR`).
+- **API** : `POST /api/voix/nettoyer` (job + progression SSE), `/dispo`,
+  `GET /api/voix/nettoyer/{id}/wav` (A/B), `POST …/ecraser` et
+  `POST …/sauver_clean` (`app/server.py`). Garde-fous : refus si génération ou
+  nettoyage déjà en cours (`409`), dépendances absentes → `501`.
+- **Build** : `demucs==4.1.0` installé normalement ;
+  `deepfilternet==0.5.6` en `--no-deps --ignore-installed` (il exige
+  `packaging<24`, incompatible avec l'image) + ses libs runtime
+  (`docker/vb/Dockerfile`). **Patch DeepFilterNet** (`scripts/patch_deepfilternet.py` +
+  `scripts/setup_enhance.sh`) : remplace `torchaudio.backend.common`
+  (supprimé de torchaudio ≥ 2.9) par `soundfile` dans `df/io.py`.
+
 ### Ajout — Gestion des projets (documents) + import voix
 
 - **Onglet « Projets »** (`app/web/index.html:69`, `app/web/style.css:312`) : nouveau

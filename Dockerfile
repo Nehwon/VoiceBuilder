@@ -4,10 +4,10 @@
 # + pipeline engine/ + GUI FastAPI.
 #
 # FROM l'image `voicebuilder-vb` (docker/vb/Dockerfile) qui apporte déjà le
-# venv + requirements + lock. Cette image-ci ne fait que copier le code
-# applicatif et appliquer les patches CosyVoice : elle ne réinstalle JAMAIS
-# ni torch, ni les dépendances Python. D'où des builds "à la demande" en
-# quelques minutes.
+# venv + requirements + lock. Cette image-ci copie le code applicatif, applique
+# les patches CosyVoice et (filet de sécurité) installe Demucs/DeepFilterNet si
+# une image vb périmée ne les contient pas encore. Elle ne réinstalle JAMAIS ni
+# torch ni les dépendances principales.
 #
 # Build :
 #   docker compose build          # tire voicebuilder-vb du registre ou cache local
@@ -22,6 +22,19 @@ FROM ${VB_IMAGE}
 # --- Copie du projet (sans venv/modèles, voir .dockerignore) ---
 WORKDIR /app
 COPY . .
+
+# --- Nettoyage des voix : filet de sécurité si l'image vb ne contient pas déjà
+# Demucs + DeepFilterNet (vb quotidienne pouvant être périmée au moment du build).
+# Normalement présents (docker/vb/Dockerfile) → ce bloc ne fait rien.
+COPY scripts/patch_deepfilternet.py /tmp/patch_deepfilternet.py
+RUN python -c "import demucs, df, libdf" 2>/dev/null \
+    || { echo "==> Ajout Demucs + DeepFilterNet (vb périmée)…" \
+         && pip install "demucs==4.1.0" \
+         && pip install --no-deps --ignore-installed "deepfilternet==0.5.6" \
+         && pip install --no-deps "deepfilterlib==0.5.6" \
+         && pip install --quiet loguru appdirs requests icecream omegaconf rich resampy pystoi \
+         && python /tmp/patch_deepfilternet.py; }
+RUN rm -f /tmp/patch_deepfilternet.py
 
 # --- Patches locaux du moteur ---
 # L'image vb n'a PAS les patches (elle ne contient que les dépendances pip).

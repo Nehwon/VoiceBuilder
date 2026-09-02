@@ -272,6 +272,14 @@ button.secondaire { border-color: var(--bor); }
 
 /* ---------------------------------------------------------------- modal erreur */
 .modal-erreur { border-left: 4px solid #d33; }
+
+/* ---------------------------------------------------------------- modal nettoyage voix (A/B) */
+#modal-nettoyage h3 { margin: 10px 0 4px; font-size: 12px; color: var(--dim); }
+#modal-nettoyage audio { width: 100%; margin: 4px 0 6px; }
+#modal-nettoyage .modal-actions button.danger { border-color: #d33; color: #d33; }
+#modal-nettoyage .modal-actions button.danger:hover { background: #d33; color: #fff; }
+#modal-nettoyage .clean-nom { font-weight: 700; color: var(--acc); }
+
 .modal-erreur h2 { color: #d33; }
 .erreur-msg {
   background: var(--panel2); border: 1px solid var(--bor); border-radius: 6px;

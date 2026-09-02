@@ -5,3 +5,4 @@
 *
 !requirements.txt
 !requirements-lock.txt
+!scripts/patch_deepfilternet.py

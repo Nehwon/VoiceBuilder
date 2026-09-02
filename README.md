@@ -130,6 +130,21 @@ Les chemins listés dans `voix.txt` sont alors résolus, dans l'ordre, parmi :
 `PROJECT_ROOT`, `voix/` (racine du projet), puis `VOICEBUILDER_AUDIO_DIR`
 (cf. `config.VOIX_SEARCH_DIRS`).
 
+### Nettoyer une voix (retirer musique / bruit de fond)
+
+Onglet **Projets** → 🎙️ Voix → bouton **« 🧹 Nettoyer »** sur un échantillon :
+le fichier passe dans **Demucs** (extraction de la voix seule, la musique et
+les autres voix sont retirées) puis **DeepFilterNet** (débruitage /
+dé-réverbération). Une modale compare **avant / après** et permet d'**écraser
+l'original** ou d'enregistrer une **nouvelle voix** (`<nom>_clean`) — la
+transcription `.txt` est recopiée telle quelle.
+
+Les modèles de nettoyage (~180 Mo au total) sont téléchargés au **premier
+usage** dans `VOICEBUILDER_ENHANCE_DIR` (défaut : `engine/config.py`,
+`enhance_models/` ; en Docker : `/models/enhance_models`, volume
+`volume-model`). Demucs passe automatiquement de `cuda fp16` → `cuda fp32` →
+`cpu` selon la VRAM disponible.
+
 ---
 
 ## Personnages & voix (mapping par document)

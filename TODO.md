@@ -172,6 +172,14 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 > À faire — **non développé** (noté à l'issue de la session du 2026-08-10, sera
 > traité un autre jour).
 
+- [x] **M13.0 — Nettoyage des voix (pré-requis qualité)** (2026-09-02) :
+      bouton « 🧹 Nettoyer » dans Projets → 🎙️ Voix ; pipeline **Demucs**
+      (séparation vocale) puis **DeepFilterNet** (débruitage, CPU), écoute A/B,
+      écraser ou enregistrer `<nom>_clean`. `engine/enhance.py`, API
+      `/api/voix/nettoyer*` (SSE), modèles dans `/models/enhance_models`
+      (`VOICEBUILDER_ENHANCE_DIR`), patch DeepFilterNet `df/io.py`
+      (torchaudio ≥ 2.9). Intégré au build (`docker/vb/Dockerfile`).
+
 - [ ] **M11 — Test bout en bout minimal**
   - [ ] Couvrir le scénario : **une phrase par balise, une voix par balise**,
         génération de la voix et **ouverture de l'espace de montage**.

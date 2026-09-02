@@ -19,6 +19,14 @@ COSYVOICE_MODEL_DIR = Path(
 )
 COSYVOICE2_MODEL_DIR = COSYVOICE_ROOT / "pretrained_models" / "CosyVoice2-0.5B"
 
+# Nettoyage des voix (Demucs + DeepFilterNet) : dossier où ranger les modèles
+# téléchargés (poids Demucs via TORCH_HOME, poids DeepFilterNet via cache).
+# Réglable via VOICEBUILDER_ENHANCE_DIR ; en Docker : /models/enhance_models.
+ENHANCE_MODEL_DIR = Path(
+    os.environ.get("VOICEBUILDER_ENHANCE_DIR")
+    or (COSYVOICE_MODEL_DIR.parent / "enhance_models")
+)
+
 # Source de téléchargement du modèle au premier lancement (engine/modeles.py).
 #   - "modelscope" : FunAudioLLM/Fun-CosyVoice3-0.5B-2512 (défaut, source officielle)
 #   - "huggingface": FunAudioLLM/Fun-CosyVoice3-0.5B-2512 (miroir, si réseau bloqué)
