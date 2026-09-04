@@ -154,7 +154,9 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ## Phase 5 — Qualité & performance
 
-- [ ] M4.x — Benchmark fidélité : loi variation de `max_chars`, seuil de vérif.
+- [x] **M4.x — Benchmark fidélité** (`tools/benchmark_fidelite.py`, `docs/BENCHMARK_FIDELITE.md`) :
+      test de `max_chars` (150–1200) et du seuil Whisper (0.60–0.95). Résultat :
+      `max_chars=600` (défaut) = meilleur compromis, seuil 0.85 = conservative mais sûr.
 - [ ] M5 — (optionnel) accélération vLLM (~0.9–0.11) ou TensorRT pour la génération.
 - [~] **M5.x — Normalisation du texte FR** :
   - [x] **Nombres en français** (`engine/text_fr.py` + `num2words` `lang="fr"`,

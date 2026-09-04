@@ -84,16 +84,16 @@ DEFAULT_SPEED = 1.0
 DEFAULT_PAUSE = 0.5          # silence (s) entre deux blocs de locuteurs
 DEFAULT_FP16 = False
 
-# Découpage adaptatif (validé expérimentalement) :
-DEFAULT_MAX_BLOCK_CHARS = 600      # longueur max cible d'un bloc (fusionner plus de
-                                   # texte par lot → moins de ruptures de ton)
+# Découpage adaptatif (validé par benchmark M4.x, 2026-09-04) :
+DEFAULT_MAX_BLOCK_CHARS = 600      # sweet spot : 4 blocs, 95.7% couverture, 37 s
+                                   # (< 200 → overhead Whisper ×3 ; > 800 → couverture baisse)
 DEFAULT_MIN_BLOCK_WORDS = 8        # en dessous, on ne re-split plus
 
 # --- Vérification (Whisper) -----------------------------------------------------------
-WHISPER_MODEL = "small"
+WHISPER_MODEL = "small"            # validé : assez précis, pas trop lent
 WHISPER_LANG = "fr"
-VERIFY_THRESHOLD = 0.85            # fraction des mots attendus retrouvés
-VERIFY_ENABLED = True
+VERIFY_THRESHOLD = 0.85            # conservative mais sûr (0.70 = 96.8% couv, +rapide)
+VERIFY_ENABLED = True              # active = +rapide (RTF ×2.4) ET meilleure couverture
 
 
 def ensure_dirs() -> None:

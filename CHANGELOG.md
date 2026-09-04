@@ -8,6 +8,19 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Benchmark de fidélité (M4.x)
+
+- **`tools/benchmark_fidelite.py`** : script automatisé testant systématiquement
+  l'impact de `max_chars` (150–1200) et du seuil Whisper (0.60–0.95) sur la
+  couverture, le nombre de blocs et le temps de génération.
+- **`tools/benchmark_verify.py`** : script dédié au test vérif ON vs OFF.
+- **`docs/BENCHMARK_FIDELITE.md`** : rapport détaillé avec recommandations.
+  Résultats clés : `max_chars=600` (défaut) = meilleur compromis (4 blocs,
+  95.7% couverture, 37 s) ; vérif ON = RTF ×2.4 vs OFF (re-split améliore
+  performance ET qualité) ; seuil 0.85 = conservative mais sûr.
+- **`engine/config.py`** : commentaires mis à jour avec les résultats du
+  benchmark (sweet spot, validation des seuils).
+
 ### Ajout — Nettoyage des voix (Demucs + DeepFilterNet)
 
 - **Bouton « 🧹 Nettoyer »** dans Projets → 🎙️ Voix (`app/web/app.js`) :
