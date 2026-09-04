@@ -526,6 +526,8 @@ $("generer").addEventListener("click", async () => {
       max_chars: parseInt($("maxchars").value, 10),
       verify: $("verify").checked,
       device: $("device").value,
+      load_vllm: $("load-vllm").checked,
+      load_trt: $("load-trt").checked,
     }),
   });
   if (!r.ok) {

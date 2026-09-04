@@ -157,7 +157,23 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [x] **M4.x — Benchmark fidélité** (`tools/benchmark_fidelite.py`, `docs/BENCHMARK_FIDELITE.md`) :
       test de `max_chars` (150–1200) et du seuil Whisper (0.60–0.95). Résultat :
       `max_chars=600` (défaut) = meilleur compromis, seuil 0.85 = conservative mais sûr.
-- [ ] M5 — (optionnel) accélération vLLM (~0.9–0.11) ou TensorRT pour la génération.
+- [x] **M5 — Accélération CosyVoice3** (vLLM + TensorRT)
+  - [x] **M5.1 — Activer vLLM pour le LLM** : passer `load_vllm=True` dans
+        `cosyvoice_engine.load()` (`AutoModel`), activer le `gpu_memory_utilization`,
+        mesurer le RTF pur de synthèse (hors vérif) avant/après.
+  - [x] **M5.2 — Activer TensorRT pour le Flow (DiT)** : passer `load_trt=True`,
+        générer le plan TRT au premier lancement (`convert_onnx_to_trt`),
+        mesurer l'impact sur le RTF flow (10 pas Euler).
+  - [x] **M5.3 — Benchmark comparatif** : mesurer RTF pur CosyVoice (synthèse
+        seule, hors Whisper) pour chaque combinaison : PyTorch seul, +vLLM,
+        +TRT, +vLLM+TRT. Résultat : RTF ~0.27 (baseline) vs ~0.27 (vLLM) —
+        gain marginal sur textes courts (×1.03). Les options restent utiles pour
+        textes longs / batch / haute concurrence. `docs/BENCHMARK_ACCEL.md`.
+  - [x] **M5.4 — Intégration** : ajouter des options `--vllm` / `--trt` dans
+        `cosyvoice_engine.load()`, `multi.generate()` et le GUI (panneau
+        Réglages). Fallback automatique si vLLM/TRT indisponible.
+  - [x] **M5.5 — Documentation** : `docs/BENCHMARK_ACCEL.md` (résultats M5.3),
+        `PROJET.md` et `CHANGELOG.md` mis à jour.
 - [~] **M5.x — Normalisation du texte FR** :
   - [x] **Nombres en français** (`engine/text_fr.py` + `num2words` `lang="fr"`,
         appliqué dans `cosyvoice_engine.synthesize` ; patch CosyVoice `0003`
@@ -259,6 +275,7 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [ ] Vérification différée : transcrire le montage final en entier et signaler les pertes par segment.
 - [ ] Pré-cache des prompts `wav+txt` par voix.
 - [ ] Détection automatique des limites de segment (VAD) pour `create_voix`.
+- [ ] Prévoir un warmup au démarrage du docker pour éviter une trop grande latence lors de la première inférence.
 
 ### Cache de la dernière génération
 

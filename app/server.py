@@ -220,6 +220,8 @@ class GenererIn(BaseModel):
     max_chars: int = 600
     verify: bool = True
     device: str = "cuda:0"
+    load_vllm: bool = False
+    load_trt: bool = False
 
 
 class PersonnagesSaveIn(BaseModel):
@@ -445,6 +447,7 @@ def api_generer(payload: GenererIn):
                 verify=payload.verify, device=payload.device,
                 block_dir=str(bloc_dir), fp16=False, verbose=False,
                 progress=progress_wrapper,
+                load_vllm=payload.load_vllm, load_trt=payload.load_trt,
             )
             job["result"] = res
             job["blocs"] = res.get("blocs", [])

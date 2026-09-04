@@ -21,6 +21,24 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 - **`engine/config.py`** : commentaires mis à jour avec les résultats du
   benchmark (sweet spot, validation des seuils).
 
+### Ajout — Accélération CosyVoice3 (vLLM + TensorRT, M5)
+
+- **`engine/cosyvoice_engine.py`** : `load()` accepte `load_vllm` et `load_trt`
+  (passés à `AutoModel`). Fallback automatique si `vllm` ou `tensorrt` non
+  installés (warning + continuation en PyTorch pur).
+- **`engine/multi.py`** : `generate()` propage `load_vllm`/`load_trt` vers
+  `cosyvoice_engine.load()`.
+- **`engine/config.py`** : ajouts `DEFAULT_VLLM = False`, `DEFAULT_TRT = False`.
+- **CLI** (`tools/gen_multi_voix.py`) : options `--vllm` et `--trt`.
+- **GUI** (`app/web/index.html`) : cases à cocher « vLLM (LLM) » et
+  « TensorRT (Flow) » dans le panneau Réglages.
+- **API** (`app/server.py`) : `GenererIn` accepte `load_vllm`/`load_trt`,
+  transmis à `multi.generate()`.
+- **Benchmark M5.3** (`tools/benchmark_accel.py`, `docs/BENCHMARK_ACCEL.md`) :
+  RTF ~0.27 (baseline PyTorch) vs ~0.27 (vLLM) vs ~0.27 (TRT) — gain marginal
+  sur textes courts (×1.03). vLLM/TRT utiles pour textes longs (> 1000 chars),
+  batch ou haute concurrence.
+
 ### Ajout — Nettoyage des voix (Demucs + DeepFilterNet)
 
 - **Bouton « 🧹 Nettoyer »** dans Projets → 🎙️ Voix (`app/web/app.js`) :

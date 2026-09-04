@@ -47,6 +47,13 @@ RUN pip install "demucs==4.1.0" \
     && python /tmp/patch_deepfilternet.py \
     && rm -f /tmp/patch_deepfilternet.py
 
+# --- Accélération vLLM + TensorRT (optionnel) ---
+# vLLM accélère le LLM autoregressif (continuous batching, PagedAttention).
+# TensorRT accélère le Flow (DiT, 10 pas Euler).
+# Les deux sont optionnels : si l'install échoue, CosyVoice continue en PyTorch pur.
+RUN pip install "vllm>=0.9.0" || echo "vLLM install failed — continuing without it" \
+    && pip install "tensorrt>=10.0.0" || echo "TensorRT install failed — continuing without it"
+
 # La couche du venv est figée ici : l'image finale n'installera plus jamais
 # les dépendances Python, seulement le code applicatif + patches.
 CMD ["bash"]

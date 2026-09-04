@@ -28,9 +28,11 @@ def _synthesize_for(
     )
 
 
-def load(device: Optional[str] = None, fp16: Optional[bool] = None):
+def load(device: Optional[str] = None, fp16: Optional[bool] = None,
+         load_vllm: bool = False, load_trt: bool = False):
     """Ré-export du chargement (une seule fois) du modèle CosyVoice3."""
-    return cosyvoice_engine.load(device=device, fp16=fp16)
+    return cosyvoice_engine.load(device=device, fp16=fp16,
+                                 load_vllm=load_vllm, load_trt=load_trt)
 
 
 def synth_bloc(
@@ -57,6 +59,8 @@ def generate(
     block_dir: Optional[str] = None,
     verbose: bool = True,
     progress=None,
+    load_vllm: bool = False,
+    load_trt: bool = False,
 ) -> dict:
     """Génère l'audio complet pour un texte taggé et une liste de voix.
 
@@ -84,7 +88,8 @@ def generate(
     if inconnus:
         raise ValueError(f"Personnage(s) sans voix définie : {inconnus}")
 
-    model, sr = cosyvoice_engine.load(device=device, fp16=fp16)
+    model, sr = cosyvoice_engine.load(device=device, fp16=fp16,
+                                       load_vllm=load_vllm, load_trt=load_trt)
     max_chars = config.DEFAULT_MAX_BLOCK_CHARS if max_block_chars is None else max_block_chars
     pause = config.DEFAULT_PAUSE if pause is None else pause
     if verify is None:

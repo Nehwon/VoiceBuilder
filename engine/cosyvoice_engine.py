@@ -27,8 +27,13 @@ _sr = None
 _load_lock = threading.Lock()
 
 
-def load(model_dir=None, device: str = None, fp16: bool = None) -> "tuple":
-    """Charge (une fois) le modèle CosyVoice3 et renvoie (engine, sample_rate)."""
+def load(model_dir=None, device: str = None, fp16: bool = None,
+         load_vllm: bool = False, load_trt: bool = False) -> "tuple":
+    """Charge (une fois) le modèle CosyVoice3 et renvoie (engine, sample_rate).
+
+    ``load_vllm`` / ``load_trt`` activent respectivement l'accélération vLLM
+    (LLM) et TensorRT (Flow/DiT) si les paquets sont installés.
+    """
     global _model, _sr
     if _model is not None:
         return _model, _sr
@@ -46,7 +51,8 @@ def load(model_dir=None, device: str = None, fp16: bool = None) -> "tuple":
 
         from cosyvoice.cli.cosyvoice import AutoModel
 
-        _model = AutoModel(model_dir=str(model_dir), fp16=fp16)
+        _model = AutoModel(model_dir=str(model_dir), fp16=fp16,
+                           load_vllm=load_vllm, load_trt=load_trt)
         _sr = _model.sample_rate
     return _model, _sr
 

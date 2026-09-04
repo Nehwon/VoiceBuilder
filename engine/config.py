@@ -95,6 +95,10 @@ WHISPER_LANG = "fr"
 VERIFY_THRESHOLD = 0.85            # conservative mais sûr (0.70 = 96.8% couv, +rapide)
 VERIFY_ENABLED = True              # active = +rapide (RTF ×2.4) ET meilleure couverture
 
+# --- Accélération (vLLM / TensorRT) -------------------------------------------------
+DEFAULT_VLLM = False               # vLLM : accélère le LLM autoregressif (batch)
+DEFAULT_TRT = False                # TensorRT : accélère le Flow (DiT, 10 pas Euler)
+
 
 def ensure_dirs() -> None:
     for d in (VOIX_DIR, TEXTE_DIR, OUTPUT_DIR):
