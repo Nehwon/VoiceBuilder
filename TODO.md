@@ -185,8 +185,7 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ## Phase 6 — Assistant voix avancé (extraction, éditeur wav, clonage)
 
-> À faire — **non développé** (noté à l'issue de la session du 2026-08-10, sera
-> traité un autre jour).
+> **M11 / M12 / M13 sont urgents.**
 
 - [x] **M13.0 — Nettoyage des voix (pré-requis qualité)** (2026-09-02) :
       bouton « 🧹 Nettoyer » dans Projets → 🎙️ Voix ; pipeline **Demucs**
