@@ -91,7 +91,6 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       `VOICEBUILDER_AUDIO_DIR` réglable + persistance + génération auto de `voix.txt`.
 - [x] **M7.5 — Compatibilité** : module venv `uvicorn`, `requirements`
       (+ `fastapi`, `uvicorn`), doc et script de lancement.
-- [ ] (option) Déploiement derrière **nginx/caddy** en reverse proxy — non bloquant.
 
 ---
 
@@ -179,9 +178,9 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         appliqué dans `cosyvoice_engine.synthesize` ; patch CosyVoice `0003`
         désactivant `spell_out_number` anglais) — les chiffres sont lus
         correctement en français à la génération.
-  - [ ] Reste (optionnel) : frontend complet `wetext`/`ttsfrd` pour la prosodie
-        FR (dates, abréviations, ponctuation fine) — sinon le texte est passé
-        brut (sans `text_frontend=False`, la normalisation nombres est interne).
+  - [ ] Reste (optionnel, reporté) : frontend complet `wetext`/`ttsfrd` pour la
+        prosodie FR (dates, abréviations, ponctuation fine) — à reprendre à la
+        prochaine session.
 
 ---
 
