@@ -172,14 +172,16 @@ silencieusement par le moteur).
 - `[stop]` — arrête la génération (le reste est ignoré).
 - Lignes vides et `#` — commentaires, hors montage.
 
-### Lecture des nombres
+### Normalisation française
 
-Les nombres sont automatiquement lus en **français** (`engine/text_fr.py`,
-`num2words` `lang="fr"`) avant la synthèse : `600` → « six cents », `7,7` →
-« sept virgule sept », `H100` → « H cent », `1er`/`4e` → « premier »/« quatrième »,
-`85 %` → « quatre-vingt-cinq pour cent ». Sans cette normalisation, CosyVoice
-lisait les chiffres en anglais (`spell_out_number`, désactivé par le patch
-CosyVoice `0003`).
+Le texte est automatiquement converti en texte lisible à voix haute
+(`engine/text_fr.py`, `num2words` `lang="fr"`) avant la synthèse. Le pipeline
+gère les **nombres** (entiers, décimaux, pourcentages, ordinaux), **dates**
+(ISO, slash, mois abrégés), **heures** (`14h30`), **abréviations** (`M.`,
+`Dr`, `etc.`, `c.-à-d.`, `n°`…), **devises** (`€`, `$`, `£`), **chiffres
+romains** (`IV`→4, `XLII`→42) et **ponctuation fine** (`…`, tirets, guillemets
+typographiques). Sans cette normalisation, CosyVoice lisait les chiffres en
+anglais (`spell_out_number`, désactivé par le patch CosyVoice `0003`).
 
 ---
 

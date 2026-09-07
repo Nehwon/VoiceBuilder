@@ -83,13 +83,14 @@ onglet « Montage » (montage global + **liste à ascenseur de lecteurs par bloc
 : une carte audio + texte + actions Régénérer/Diviser).
 **Statut** : ✔ Terminé.
 
-### M5 — Performance (optionnel)
-**Objectif** : réduire le temps de génération via vLLM ou TensorRT ; frontend de
-normalisation (`wetext`/`ttsfrd`) pour la prosodie FR.
-**Statut** : exploration — **normalisation des nombres en français déjà en
-place** (`engine/text_fr.py` + `num2words` `lang="fr"`, patch CosyVoice `0003`
-désactivant `spell_out_number` anglais) ; un frontend complet `wetext`/`ttsfrd`
-(dates, abréviations, ponctuation fine) reste optionnel.
+### M5 — Performance & normalisation FR
+**Objectif** : réduire le temps de génération via vLLM ou TensorRT ; pipeline de
+normalisation française pour la prosodie.
+**Statut** : ✔ Terminé — vLLM/TensorRT activables (`--vllm`/`--trt`), gains
+marginaux sur textes courts mais utiles en batch/concurrence ; **normalisation
+FR complète** (`engine/text_fr.py`) : dates, heures, abréviations, devises,
+chiffres romains, ponctuation fine, nombres → mots (`num2words`). Tests
+unitaires (`tests/test_text_fr.py`, 62 tests).
 
 ### M8.3 — Gestion des projets (prochaine itération pratique)
 **Objectif** : réorganiser la barre de documents et fournir un onglet dédié pour

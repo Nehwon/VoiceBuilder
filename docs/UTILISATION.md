@@ -186,14 +186,24 @@ Les anciens tags de commande (`[confirmation-en]`, `[question-en]`, …) ne sont
 
 ## 5. Génération
 
-> **Lecture des nombres** — avant la synthèse, les nombres sont automatiquement
-> écrits en **français** (`engine/text_fr.py`, `num2words` `lang="fr"` ; patch
-> CosyVoice `0003` désactivant le `spell_out_number` anglais). Exemples :
-> `600` → « six cents », `7,7` → « sept virgule sept », `2 290` →
-> « deux mille deux cent quatre-vingt-dix », `H100` → « H cent », `CO2` →
-> « CO deux », `1er`/`4e` → « premier »/« quatrième », `85 %` →
-> « quatre-vingt-cinq pour cent ». Vous pouvez donc écrire vos chiffres en
-> chiffres : ils seront lus correctement en français à l'écoute.
+> **Normalisation française** — avant la synthèse, le texte est automatiquement
+> converti en texte lisible à voix haute (`engine/text_fr.py`). Le pipeline
+> gère :
+>
+> - **Nombres** : `600` → « six cents », `7,7` → « sept virgule sept »,
+>   `2 290` → « deux mille deux cent quatre-vingt-dix », `85 %` →
+>   « quatre-vingt-cinq pour cent », `1er`/`4e` → « premier »/« quatrième ».
+> - **Dates** : `2026-09-04`/`04/09/2026`/`4 sept. 2026` →
+>   « quatre septembre deux mille vingt-six ».
+> - **Heures** : `14h30`/`14:30` → « quatorze heures trente ».
+> - **Abréviations** : `M.`→« monsieur », `Dr`→« docteur », `etc.`→
+>   « et cetera », `c.-à-d.`→« c'est-à-dire », `n°`→« numéro », etc.
+> - **Devises** : `10 €`→« dix euros », `10 $`→« dix dollars ».
+> - **Chiffres romains** : `IV`→« quatre », `XLII`→« quarante-deux ».
+> - **Ponctuation** : `…`→`...`, tirets/guillemets typographiques normalisés.
+>
+> Vous pouvez donc écrire vos chiffres, dates et abréviations en chiffres
+> et sigles : ils seront lus correctement en français à l'écoute.
 
 ### CLI (`tools/gen_multi_voix.py`)
 

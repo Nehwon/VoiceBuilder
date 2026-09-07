@@ -39,6 +39,30 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
   sur textes courts (×1.03). vLLM/TRT utiles pour textes longs (> 1000 chars),
   batch ou haute concurrence.
 
+### Ajout — Normalisation française prosodie (M5.x)
+
+- **`engine/text_fr.py`** : pipeline complet de normalisation du texte français
+  pour la synthèse TTS, en 7 étapes :
+  1. **Dates** : ISO (`2026-09-04`), barre oblique (`04/09/2026`), point
+     (`04.09.2026`), mois abrégés (`4 sept. 2026`) → « quatre septembre
+     deux mille vingt-six ».
+  2. **Heures** : `14h30`, `14:30`, `8h`, `14h30min` → « quatorze heures trente ».
+  3. **Abréviations** : 30+ patterns (titres `M.`/`Mme`/`Dr`/`Pr`, académique
+     `etc.`/`c.-à-d.`/`p. ex.`, admin `n°`/`art.`/`tél.`, unités `hab.`/`env.`)
+     → formes complètes, casse préservée.
+  4. **Devises** : `€`/`$`/`£`/`¥` + codes (`EUR`/`USD`/`GBP`/`JPY`/`CHF`/`CAD`/`AUD`)
+     → « dix euros », décimales incluses.
+  5. **Chiffres romains** : `IV`→4, `XLII`→42, `CMXCIX`→999 (vérification
+     stricte, min. 2 caractères, max. 3999).
+  6. **Ponctuation** : `…`→`...`, tirets `–`/`—` espacés, guillemets
+     typographiques `« »`.
+  7. **Nombres** : entiers, décimaux, milliers espacés, pourcentages, ordinaux
+     → mots français (`num2words`).
+- **Tests** : `tests/test_text_fr.py` — 62 tests unitaires couvrant chaque
+  catégorie de normalisation.
+- L'API (`cosyvoice_engine.synthesize`) applique `text_fr.normalize()` sur le
+  texte et le prompt avant `inference_zero_shot`, sans changer l'interface.
+
 ### Ajout — Nettoyage des voix (Demucs + DeepFilterNet)
 
 - **Bouton « 🧹 Nettoyer »** dans Projets → 🎙️ Voix (`app/web/app.js`) :

@@ -173,13 +173,15 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         Réglages). Fallback automatique si vLLM/TRT indisponible.
   - [x] **M5.5 — Documentation** : `docs/BENCHMARK_ACCEL.md` (résultats M5.3),
         `PROJET.md` et `CHANGELOG.md` mis à jour.
-- [~] **M5.x — Normalisation du texte FR** :
+- [x] **M5.x — Normalisation du texte FR** :
   - [x] **Nombres en français** (`engine/text_fr.py` + `num2words` `lang="fr"`,
         appliqué dans `cosyvoice_engine.synthesize` ; patch CosyVoice `0003`
         désactivant `spell_out_number` anglais) — les chiffres sont lus
         correctement en français à la génération.
-  - [ ] **Frontend FR** `wetext`/`ttsfrd` pour la prosodie (dates, abréviations,
-        ponctuation fine) — à reprendre à la prochaine session.
+  - [x] **Frontend FR complet** : dates (ISO, slash, mois abrégés), heures
+        (14h30, 14:30), abréviations (M., Dr, etc., c.-à-d., n°, art.),
+        devises (€, $, £, ¥), chiffres romains (IV, XII), ponctuation fine
+        (…, —, guillemets typographiques). Tests unitaires (`tests/test_text_fr.py`).
 
 ---
 
