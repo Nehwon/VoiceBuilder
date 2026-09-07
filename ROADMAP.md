@@ -110,6 +110,15 @@ avant l'onglet complet de création de voix (extraction vidéo, éditeur onde).
 `voix/*.wav`/`*.txt` hors git (`.gitignore:22`), `python-multipart` ajouté.
 **Statut** : ✔ Terminé (2026-09-01) — pré-écoute, suppression, import testé en conteneur.
 
+### M11 — Test bout en bout minimal
+**Objectif** : couvrir le scénario de base (1 phrase/balise, 1 voix/balise,
+génération audio, montée en montage) sans GPU via mocks du moteur CosyVoice.
+**Livrables** : `tests/conftest.py` (fixtures voix temporaires, mock
+cosyvoice/verifier) + `tests/test_e2e_minimal.py` (21 tests : parsing,
+adaptive, voix, `multi.generate()`, progress callback, personnages→voix,
+bloc_dir, synth_bloc).
+**Statut** : ✔ Terminé — 83 tests au total (62 text_fr + 21 e2e).
+
 ### M14/M15 — Packaging & infra (sous-module CosyVoice + Docker GPU)
 **Objectif** : intégrer **CosyVoice comme sous-module git du projet** (`vendor/CosyVoice`,
 fini le clone voisin dans `~/Projets/CosyVoice`) et fournir un **conteneur Docker avec

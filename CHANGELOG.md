@@ -63,6 +63,22 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 - L'API (`cosyvoice_engine.synthesize`) applique `text_fr.normalize()` sur le
   texte et le prompt avant `inference_zero_shot`, sans changer l'interface.
 
+### Ajout — Test bout en bout minimal (M11)
+
+- **`tests/conftest.py`** (nouveau) : fixtures partagées — voix temporaires
+  (WAV sinusoïdale + transcription), mock du moteur CosyVoice (`load`/`synthesize`/
+  `save`) et de la vérification Whisper, sans GPU requis.
+- **`tests/test_e2e_minimal.py`** (nouveau) : 21 tests couvrant le pipeline
+  complet :
+  - **Parsing** (7 tests) : `parse_texte` + `regrouper` (balises, lignes nues,
+    tags inline `[sigh]`, `[stop]`, texte vide, personnage inconnu).
+  - **Adaptive** (3 tests) : `split_sentences`, `build_blocks` (court, long).
+  - **Voix** (3 tests) : `load_voix` (2 voix, wav+txt, erreur manquante).
+  - **multi.generate()** (7 tests) : scénario M11 minimal (2 personnages,
+    1 phrase chacun, sortie WAV valide), callback progress, sans sortie,
+    personnages→voix (M9), voix introuvable, bloc_dir, verify=False.
+  - **synth_bloc** (1 test) : régénération d'un bloc isolé.
+
 ### Ajout — Nettoyage des voix (Demucs + DeepFilterNet)
 
 - **Bouton « 🧹 Nettoyer »** dans Projets → 🎙️ Voix (`app/web/app.js`) :

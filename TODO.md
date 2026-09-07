@@ -197,9 +197,12 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       (`VOICEBUILDER_ENHANCE_DIR`), patch DeepFilterNet `df/io.py`
       (torchaudio ≥ 2.9). Intégré au build (`docker/vb/Dockerfile`).
 
-- [ ] **M11 — Test bout en bout minimal**
-  - [ ] Couvrir le scénario : **une phrase par balise, une voix par balise**,
+- [x] **M11 — Test bout en bout minimal**
+  - [x] Couvrir le scénario : **une phrase par balise, une voix par balise**,
         génération de la voix et **ouverture de l'espace de montage**.
+        Tests (`tests/test_e2e_minimal.py`, 21 tests) : parsing, regroupement,
+        découpage adaptatif, chargement voix, `multi.generate()` avec moteur
+        mocké, callback progress, personnages→voix, bloc_dir, synth_bloc.
 - [ ] **M12 — Espace de montage**
   - [ ] Développer l'**espace de montage** (lecture de l'ensemble, navigation par
         bloc).
