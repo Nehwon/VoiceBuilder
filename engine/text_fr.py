@@ -146,21 +146,27 @@ _TIME_H_RE = re.compile(
 
 
 def _normalize_times(text: str) -> str:
+    def _feminize_hours(expr: str) -> str:
+        """Convertit 'un' → 'une' en fin de nombre pour l'heure (féminin)."""
+        if expr.endswith("un"):
+            return expr[:-2] + "une"
+        return expr
+
     def _hm(m: re.Match) -> str:
         h, mi = int(m.group(1)), int(m.group(2))
         if h > 23 or mi > 59:
             return m.group(0)
-        h_mot = _mots(str(h))
+        h_mot = _feminize_hours(_mots(str(h)))
         mi_mot = _mots(str(mi))
         if mi == 0:
-            return f"{h_mot} heures"
+            return f"{h_mot} heure"
         return f"{h_mot} heures {mi_mot}"
 
     def _h(m: re.Match) -> str:
         h = int(m.group(1))
         if h > 23:
             return m.group(0)
-        return f"{_mots(str(h))} heures"
+        return f"{_feminize_hours(_mots(str(h)))} heure"
 
     text = _TIME_HM_RE.sub(_hm, text)
     text = _TIME_H_RE.sub(_h, text)
@@ -175,7 +181,8 @@ _ABBREV = {
     "m.": "monsieur", "mr": "monsieur",
     "mme": "madame", "mlle": "mademoiselle",
     "dr": "docteur", "pr": "professeur",
-    "me": "maître", "me.": "maître",
+    # "me" → pas dans la liste : c'est un pronom, pas une abréviation.
+    # Seul "Me" (majuscule) suivi d'un nom propre est traité ci-dessous.
     # académique / administratif
     "etc.": "et cetera", "etc": "et cetera",
     "c.-à-d.": "c'est-à-dire", "c‑à‑d": "c'est-à-dire",
@@ -201,6 +208,12 @@ _ABBREV = {
 }
 
 _ABBREV_SORTED = sorted(_ABBREV, key=len, reverse=True)
+
+# Cas spécial : "Me" (majuscule) = Maître (titre d'avocat).
+# On ne le traite QUE quand il est suivi d'un espace + une majuscule
+# (ex. « Me Dupont »), sinon c'est le pronom « me ».
+_ME_TITLE_RE = re.compile(r"\bMe\s+(?=[A-ZÀÂÉÈÊËÏÎÔÙÛÜÇ])")
+
 # (?!\w) au lieu de \b final : les abréviations se terminent souvent par un
 # point ou un caractère spécial (°) qui ne passe pas le test \b.
 _ABBREV_RE = re.compile(
@@ -217,6 +230,8 @@ def _normalize_abbreviations(text: str) -> str:
             replacement = replacement[0].upper() + replacement[1:]
         return replacement
 
+    # D'abord le cas spécial "Me" → "Maître" (uniquement avant un nom propre)
+    text = _ME_TITLE_RE.sub("Maître ", text)
     return _ABBREV_RE.sub(_replace, text)
 
 
