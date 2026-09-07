@@ -8,6 +8,24 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Onglet Voix : extraction audio, waveform, transcription (M13)
+
+- **`engine/audio_extract.py`** : module backend pour l'extraction audio depuis
+  vidéo (ffmpeg), la génération de données waveform (pics d'amplitude), et le
+  découpage de segment en WAV.
+- **API** (`app/server.py`) : 6 nouveaux endpoints :
+  - `POST /api/voix/extraire-audio` — upload vidéo → piste audio WAV mono 24 kHz.
+  - `GET /api/voix/waveform` — pics d'amplitude pour rendu graphique.
+  - `GET /api/voix/wav-raw` — sert un fichier WAV brut (WaveSurfer).
+  - `POST /api/voix/decouper` — découpe un segment [start, stop].
+  - `POST /api/voix/transcrire-segment` — transcription Whisper + horodatages.
+  - `POST /api/voix/enregistrer` — enregistre couple wav+txt et met à jour `voix.txt`.
+- **Frontend** (`app/web/`) : nouvel onglet « Voix » avec upload vidéo/audio,
+  éditeur WaveSurfer.js v7 (régions drag+resize), transcription Whisper éditable,
+  formulaire d'enregistrement.
+- **Vendor** (`app/web/vendor/`) : WaveSurfer.js 7 + plugins Regions/Timeline.
+- **Tests** (`tests/test_audio_extract.py`) : 13 tests. Total : 96 tests (tous passent).
+
 ### Ajout — Benchmark de fidélité (M4.x)
 
 - **`tools/benchmark_fidelite.py`** : script automatisé testant systématiquement

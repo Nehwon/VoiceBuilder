@@ -206,15 +206,15 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [ ] **M12 — Espace de montage**
   - [ ] Développer l'**espace de montage** (lecture de l'ensemble, navigation par
         bloc).
-- [ ] **M13 — Onglet « Voix »**
-  - [ ] **Extraction d'une piste son depuis une vidéo** (nouvel onglet « Voix »).
-  - [ ] **Conversion de la piste au bon format `.wav`** (après upload).
-  - [ ] **Éditeur de forme d'onde (style Audacity)** pour **extraire une voix
+- [x] **M13 — Onglet « Voix »**
+  - [x] **Extraction d'une piste son depuis une vidéo** (nouvel onglet « Voix »).
+  - [x] **Conversion de la piste au bon format `.wav`** (après upload).
+  - [x] **Éditeur de forme d'onde (style Audacity)** pour **extraire une voix
         (10–20 s)** depuis la piste convertie.
-  - [ ] **Transcription d'un `.wav`** (extrait complet ou phrase unique) — Whisper.
-  - [ ] **Synchroniser la transcription avec l'éditeur wav** pour une sélection
+  - [x] **Transcription d'un `.wav`** (extrait complet ou phrase unique) — Whisper.
+  - [x] **Synchroniser la transcription avec l'éditeur wav** pour une sélection
         efficace de l'extrait.
-  - [ ] **Enregistrer la voix** sous forme d'un **couple `.wav` / `.txt`** pour le
+  - [x] **Enregistrer la voix** sous forme d'un **couple `.wav` / `.txt`** pour le
         clonage (et mise à jour de `voix.txt`).
 
 ---

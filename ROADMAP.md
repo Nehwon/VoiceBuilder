@@ -110,6 +110,15 @@ avant l'onglet complet de création de voix (extraction vidéo, éditeur onde).
 `voix/*.wav`/`*.txt` hors git (`.gitignore:22`), `python-multipart` ajouté.
 **Statut** : ✔ Terminé (2026-09-01) — pré-écoute, suppression, import testé en conteneur.
 
+### M13 — Onglet Voix (extraction audio, waveform, transcription)
+**Objectif** : permettre la création complète d'une voix depuis une vidéo :
+upload vidéo → extraction piste audio → éditeur waveform avec sélection de
+segment (10–20 s) → transcription Whisper → enregistrement couple wav+txt.
+**Livrables** : `engine/audio_extract.py` (extraction ffmpeg, waveform, découpage),
+6 endpoints API, onglet « Voix » dans le frontend (upload, WaveSurfer.js v7 avec
+régions, transcription, formulaire d'enregistrement), 13 tests unitaires.
+**Statut** : ✔ Terminé (2026-09-07) — 96 tests au total.
+
 ### M11 — Test bout en bout minimal
 **Objectif** : couvrir le scénario de base (1 phrase/balise, 1 voix/balise,
 génération audio, montée en montage) sans GPU via mocks du moteur CosyVoice.

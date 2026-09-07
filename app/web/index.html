@@ -14,6 +14,7 @@
     <nav class="onglets">
       <button id="tab-edit" class="actif">Éditeur</button>
       <button id="tab-montage">Montage</button>
+      <button id="tab-voix">Voix</button>
       <button id="tab-projets">Projets</button>
     </nav>
     <div class="header-btns">
@@ -90,6 +91,57 @@
       <h2>Blocs générés</h2>
       <div id="liste-blocs" class="liste-blocs">
         <!-- Un cartouche par bloc : audio + texte + infos/boutons -->
+      </div>
+    </section>
+  </main>
+
+  <main id="vue-voix" class="vue voix-vue" hidden>
+    <section class="voix-extraction">
+      <h2>🎙️ Extraire une voix depuis une vidéo</h2>
+      <p class="modal-sub">Charge un fichier vidéo/audio, sélectionne un segment (10–20 s), transcrit et enregistre la voix pour le clonage.</p>
+
+      <div class="voix-upload">
+        <button id="btn-voix-upload" class="primaire">📁 Charger un fichier vidéo/audio</button>
+        <input type="file" id="file-voix-video" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.wav,.mp3,.flac" hidden />
+        <span id="voix-upload-nom" class="voix-upload-info"></span>
+      </div>
+
+      <div id="voix-progress" class="voix-progress" hidden>
+        <span id="voix-progress-label">Extraction en cours…</span>
+        <div class="progression-barre"><div id="voix-progress-fill" class="progression-remplie"></div></div>
+      </div>
+
+      <div id="voix-editor" class="voix-editor" hidden>
+        <div id="voix-waveform" class="voix-waveform"></div>
+        <div id="voix-timeline"></div>
+        <div class="voix-controls">
+          <button id="btn-voix-play" title="Lecture">▶ Lecture</button>
+          <button id="btn-voix-play-region" title="Lire la sélection">▶ Selection</button>
+          <label>Début <input id="voix-start" type="number" step="0.1" min="0" value="0" class="voix-time-input" /> s</label>
+          <label>Fin <input id="voix-stop" type="number" step="0.1" min="0" value="0" class="voix-time-input" /> s</label>
+          <span id="voix-duree-selection" class="voix-duree"></span>
+          <button id="btn-voix-zoom-in" title="Zoom avant">🔍+</button>
+          <button id="btn-voix-zoom-out" title="Zoom arrière">🔍−</button>
+        </div>
+      </div>
+
+      <div id="voix-transcription-section" class="voix-transcription-section" hidden>
+        <h3>Transcription</h3>
+        <button id="btn-voix-transcrire" class="primaire">🎤 Transcrire le segment sélectionné</button>
+        <div id="voix-transcription-progress" class="voix-progress" hidden>
+          <span>Transcription en cours (Whisper)…</span>
+        </div>
+        <textarea id="voix-transcription-text" class="voix-transcription-text" rows="4" placeholder="Transcription (éditable)…"></textarea>
+      </div>
+
+      <div id="voix-save-section" class="voix-save-section" hidden>
+        <h3>Enregistrer la voix</h3>
+        <div class="voix-save-form">
+          <label>Nom de la voix
+            <input id="voix-nom" type="text" placeholder="LeNarrateur" class="voix-nom-input" />
+          </label>
+          <button id="btn-voix-enregistrer" class="primaire">💾 Enregistrer</button>
+        </div>
       </div>
     </section>
   </main>

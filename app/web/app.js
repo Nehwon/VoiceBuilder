@@ -31,9 +31,11 @@ $("btn-theme").addEventListener("click", () => {
 function mountVue(nom) {
   $("vue-edit").hidden = nom !== "edit";
   $("vue-montage").hidden = nom !== "montage";
+  $("vue-voix").hidden = nom !== "voix";
   $("vue-projets").hidden = nom !== "projets";
   $("tab-edit").classList.toggle("actif", nom === "edit");
   $("tab-montage").classList.toggle("actif", nom === "montage");
+  $("tab-voix").classList.toggle("actif", nom === "voix");
   $("tab-projets").classList.toggle("actif", nom === "projets");
   if (nom === "edit" && cm) cm.refresh();
   if (nom === "montage" && montageId) chargerBlocs();
@@ -41,6 +43,7 @@ function mountVue(nom) {
 }
 $("tab-edit").addEventListener("click", () => mountVue("edit"));
 $("tab-montage").addEventListener("click", () => mountVue("montage"));
+$("tab-voix").addEventListener("click", () => mountVue("voix"));
 $("tab-projets").addEventListener("click", () => mountVue("projets"));
 $("btn-gerer").addEventListener("click", () => mountVue("projets"));
 
@@ -1221,6 +1224,200 @@ $("btn-nettoyer-sauver").addEventListener("click", async () => {
   } finally { btn.disabled = false; }
 });
 modalClean.addEventListener("click", (e) => { if (e.target === modalClean) { fermerModal(modalClean); } });
+
+// ---------------------------------------------------------------- onglet Voix — extraction audio, waveform, transcription
+let wsVoix = null;
+let wsRegions = null;
+let voixFichier = null;
+
+function voixReset() {
+  if (wsVoix) { wsVoix.destroy(); wsVoix = null; wsRegions = null; }
+  voixFichier = null;
+  $("voix-editor").hidden = true;
+  $("voix-transcription-section").hidden = true;
+  $("voix-save-section").hidden = true;
+  $("voix-progress").hidden = true;
+  $("voix-upload-nom").textContent = "";
+  $("voix-start").value = 0;
+  $("voix-stop").value = 0;
+  $("voix-duree-selection").textContent = "";
+  $("voix-transcription-text").value = "";
+  $("voix-nom").value = "";
+}
+
+$("btn-voix-upload").addEventListener("click", () => $("file-voix-video").click());
+$("file-voix-video").addEventListener("change", async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  voixReset();
+  $("voix-upload-nom").textContent = file.name;
+  $("voix-progress").hidden = false;
+  $("voix-progress-label").textContent = "Extraction de la piste audio…";
+  $("voix-progress-fill").style.width = "20%";
+
+  const fd = new FormData();
+  fd.append("fichier", file);
+  try {
+    const r = await fetch("/api/voix/extraire-audio", { method: "POST", body: fd });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || "Extraction échouée"); }
+    const d = await r.json();
+    voixFichier = d.wav;
+    $("voix-progress-fill").style.width = "50%";
+    $("voix-progress-label").textContent = "Chargement du waveform…";
+    await voixInitWaveform(d.wav, d.duree);
+  } catch (e) {
+    notifier(e.message, "err");
+    afficherErreur(e.message);
+    $("voix-progress").hidden = true;
+  }
+  ev.target.value = "";
+});
+
+async function voixInitWaveform(wavPath, duree) {
+  const container = $("voix-waveform");
+  container.innerHTML = "";
+
+  if (!window.WaveSurfer) await voixLoadScript("/vendor/wavesurfer.min.js");
+  if (!window.WaveSurfer.Regions) await voixLoadScript("/vendor/wavesurfer-regions.min.js");
+  if (!window.WaveSurfer.Timeline) await voixLoadScript("/vendor/wavesurfer-timeline.min.js");
+
+  wsRegions = WaveSurfer.Regions.create();
+  wsVoix = WaveSurfer.create({
+    container,
+    waveColor: "#999",
+    progressColor: "#c05000",
+    cursorColor: "#c05000",
+    height: 128,
+    normalize: true,
+    plugins: [
+      wsRegions,
+      WaveSurfer.Timeline.create({ timeInterval: 1, primaryLabelInterval: 5, style: { fontSize: "11px", color: "var(--dim)" } }),
+    ],
+  });
+
+  const audioUrl = `/api/voix/wav-raw?file=${encodeURIComponent(wavPath)}`;
+  await wsVoix.load(audioUrl);
+
+  const finDefaut = Math.min(10, duree);
+  wsRegions.addRegion({
+    start: 0, end: finDefaut,
+    color: "rgba(192, 80, 0, 0.18)",
+    drag: true, resize: true,
+  });
+
+  $("voix-editor").hidden = false;
+  $("voix-progress").hidden = true;
+  $("voix-start").value = 0;
+  $("voix-stop").value = finDefaut.toFixed(1);
+  $("voix-duree-selection").textContent = `${finDefaut.toFixed(1)} s`;
+  $("voix-transcription-section").hidden = false;
+
+  wsRegions.on("region-updated", (region) => {
+    $("voix-start").value = region.start.toFixed(1);
+    $("voix-stop").value = region.end.toFixed(1);
+    $("voix-duree-selection").textContent = `${(region.end - region.start).toFixed(1)} s`;
+  });
+}
+
+function voixLoadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error(`Échec chargement ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+$("btn-voix-play").addEventListener("click", () => { if (wsVoix) wsVoix.playPause(); });
+$("btn-voix-play-region").addEventListener("click", () => {
+  if (!wsVoix || !wsRegions) return;
+  const regions = wsRegions.getRegions();
+  if (regions[0]) {
+    wsVoix.setTime(regions[0].start);
+    wsVoix.play();
+    const stopHandler = () => {
+      if (wsVoix.getCurrentTime() >= regions[0].end) {
+        wsVoix.pause();
+        wsVoix.un("timeupdate", stopHandler);
+      }
+    };
+    wsVoix.on("timeupdate", stopHandler);
+  }
+});
+
+$("btn-voix-zoom-in").addEventListener("click", () => { if (wsVoix) wsVoix.zoom(Math.min((wsVoix.options.minPxPerSec || 20) * 1.5, 500)); });
+$("btn-voix-zoom-out").addEventListener("click", () => { if (wsVoix) wsVoix.zoom(Math.max((wsVoix.options.minPxPerSec || 20) / 1.5, 5)); });
+
+$("btn-voix-transcrire").addEventListener("click", async () => {
+  if (!voixFichier) return;
+  $("btn-voix-transcrire").disabled = true;
+  $("voix-transcription-progress").hidden = false;
+  $("voix-transcription-text").value = "";
+  try {
+    const r = await fetch("/api/voix/transcrire-segment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fichier: voixFichier }),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || "Transcription échouée"); }
+    const d = await r.json();
+    $("voix-transcription-text").value = d.texte || "";
+    $("voix-save-section").hidden = false;
+    const nom = $("voix-upload-nom").textContent.replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9À-ÿ _-]/g, "").trim();
+    if (nom && !$("voix-nom").value) $("voix-nom").value = nom;
+  } catch (e) {
+    notifier(e.message, "err");
+    afficherErreur(e.message);
+  } finally {
+    $("btn-voix-transcrire").disabled = false;
+    $("voix-transcription-progress").hidden = true;
+  }
+});
+
+$("btn-voix-enregistrer").addEventListener("click", async () => {
+  if (!voixFichier) return;
+  const nom = $("voix-nom").value.trim();
+  const texte = $("voix-transcription-text").value.trim();
+  if (!nom) { notifier("Indique un nom pour la voix.", "err"); return; }
+  if (!texte) { notifier("La transcription est vide.", "err"); return; }
+
+  const btn = $("btn-voix-enregistrer");
+  btn.disabled = true;
+  try {
+    const regions = wsRegions ? wsRegions.getRegions() : [];
+    const start = regions[0] ? regions[0].start : 0;
+    const stop = regions[0] ? regions[0].end : 0;
+    if (stop <= start) { notifier("Sélectionne un segment valide.", "err"); return; }
+
+    const decR = await fetch("/api/voix/decouper", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fichier: voixFichier, start, stop }),
+    });
+    if (!decR.ok) { const d = await decR.json(); throw new Error(d.detail || "Découpage échoué"); }
+    const decD = await decR.json();
+
+    const wavBlob = await (await fetch(`/api/voix/wav-raw?file=${encodeURIComponent(decD.wav)}`)).blob();
+    const fd = new FormData();
+    fd.append("wav", wavBlob, `${nom}.wav`);
+    fd.append("nom", nom);
+    fd.append("transcription", texte);
+
+    const r = await fetch("/api/voix/enregistrer", { method: "POST", body: fd });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || "Enregistrement échoué"); }
+    const d = await r.json();
+    notifier(`Voix « ${d.nom} » enregistrée.`, "ok");
+    await chargerVoix();
+    await chargerVoixListe();
+    voixReset();
+  } catch (e) {
+    notifier(e.message, "err");
+    afficherErreur(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 // ---------------------------------------------------------------- init
 (async function init() {

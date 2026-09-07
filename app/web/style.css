@@ -357,3 +357,60 @@ button.secondaire { border-color: var(--bor); }
   padding: 8px; font-family: ui-monospace, monospace; font-size: 12px; color: var(--txt);
   max-height: 26vh; overflow: auto; white-space: pre-wrap;
 }
+
+/* ---------------------------------------------------------------- onglet Voix — extraction audio */
+.voix-vue { padding: 20px 28px; }
+.voix-extraction { max-width: 900px; }
+.voix-extraction h2 { margin: 0 0 4px; }
+.voix-extraction h3 { margin: 16px 0 8px; font-size: 15px; }
+
+.voix-upload {
+  display: flex; align-items: center; gap: 12px;
+  margin: 12px 0;
+}
+.voix-upload-info { color: var(--dim); font-size: 13px; }
+
+.voix-progress { margin: 10px 0; }
+.voix-progress span { font-size: 13px; color: var(--dim); }
+
+.voix-editor { margin: 16px 0; }
+.voix-waveform {
+  border: 1px solid var(--bor); border-radius: 8px;
+  background: var(--panel2); min-height: 128px;
+  overflow: hidden; cursor: text;
+}
+.voix-waveform wave { overflow: hidden !important; }
+
+.voix-controls {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 8px; font-size: 13px;
+}
+.voix-controls button {
+  background: var(--panel2); border: 1px solid var(--bor); color: var(--txt);
+  border-radius: 5px; padding: 4px 10px; cursor: pointer; font-size: 13px;
+}
+.voix-controls button:hover { background: var(--bor); }
+.voix-time-input {
+  width: 70px; background: var(--panel2); border: 1px solid var(--bor);
+  color: var(--txt); border-radius: 4px; padding: 3px 6px; font-size: 13px;
+}
+.voix-duree { color: var(--acc); font-weight: 600; min-width: 50px; }
+
+.voix-transcription-section { margin-top: 16px; }
+.voix-transcription-text {
+  width: 100%; background: var(--panel2); border: 1px solid var(--bor);
+  color: var(--txt); border-radius: 6px; padding: 8px;
+  font-size: 14px; resize: vertical; min-height: 80px;
+  box-sizing: border-box;
+}
+
+.voix-save-section { margin-top: 16px; }
+.voix-save-form {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+}
+.voix-save-form label { font-size: 13px; }
+.voix-nom-input {
+  display: block; margin-top: 4px;
+  width: 260px; background: var(--panel2); border: 1px solid var(--bor);
+  color: var(--txt); border-radius: 5px; padding: 6px 8px; font-size: 14px;
+}

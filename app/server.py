@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engine import config, cosyvoice_engine, modeles, multi, voix
 from engine.voix import load_voix
+from engine import audio_extract
 
 # ---------------------------------------------------------------------------
 # Réglages persistants (mêmes clés que le GUI Gradio).
@@ -266,6 +267,22 @@ class VoixNettoyerIn(BaseModel):
 
 class VoixNettoyerSauverIn(BaseModel):
     nom: str                    # nom de la voix nettoyée à créer (sans crochets)
+
+
+class VoixDecouperIn(BaseModel):
+    fichier: str
+    start: float
+    stop: float
+
+
+class VoixTranscrireIn(BaseModel):
+    fichier: str
+    lang: str | None = None
+
+
+class VoixEnregistrerIn(BaseModel):
+    nom: str
+    transcription: str
 
 
 # ---------------------------------------------------------------------------
@@ -1153,6 +1170,125 @@ def api_voix_supprimer(payload: VoixSupprimerIn):
             except OSError:
                 pass
     return {"supprime": nom}
+
+
+# ---------------------------------------------------------------------------
+# Onglet Voix — extraction audio depuis vidéo, waveform, segment, transcription
+# ---------------------------------------------------------------------------
+
+_VOIX_WORK = config.OUTPUT_DIR / ".voix_work"
+_VOIX_WORK.mkdir(parents=True, exist_ok=True)
+
+
+@app.post("/api/voix/extraire-audio")
+async def api_voix_extraire_audio(fichier: UploadFile = File(...)):
+    """Upload d'un fichier vidéo/audio, extraction de la piste son en WAV."""
+    nom = (fichier.filename or "upload").replace("/", "_").replace("\\", "_")
+    src = _VOIX_WORK / nom
+    data = await fichier.read()
+    if len(data) > 500 * 1024 * 1024:
+        raise HTTPException(413, "Fichier trop volumineux (max 500 Mo)")
+    src.write_bytes(data)
+
+    out_wav = _VOIX_WORK / f"{src.stem}.wav"
+    try:
+        result = audio_extract.extraire_audio(str(src), str(out_wav))
+    except Exception as exc:
+        raise HTTPException(400, f"Extraction échouée : {exc}")
+    return result
+
+
+@app.get("/api/voix/waveform")
+def api_voix_waveform(file: str, points: int = 2000):
+    """Renvoie les pics d'amplitude pour le rendu waveform."""
+    path = Path(file)
+    if not path.is_file():
+        raise HTTPException(404, "Fichier introuvable")
+    try:
+        data = audio_extract.waveform_data(str(path), num_points=points)
+    except Exception as exc:
+        raise HTTPException(400, f"Erreur waveform : {exc}")
+    return {"peaks": data, "num_points": len(data)}
+
+
+@app.get("/api/voix/wav-raw")
+def api_voix_wav_raw(file: str):
+    """Sert un fichier WAV brut pour WaveSurfer."""
+    path = Path(file)
+    if not path.is_file():
+        raise HTTPException(404, "Fichier introuvable")
+    return FileResponse(path, media_type="audio/wav")
+
+
+@app.post("/api/voix/decouper")
+def api_voix_decouper(payload: VoixDecouperIn):
+    """Découpe un segment [start, stop] d'un fichier audio."""
+    path = Path(payload.fichier)
+    if not path.is_file():
+        raise HTTPException(404, "Fichier introuvable")
+    try:
+        result = audio_extract.decouper_segment(
+            str(path), payload.start, payload.stop,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return result
+
+
+@app.post("/api/voix/transcrire-segment")
+def api_voix_transcrire_segment(payload: VoixTranscrireIn):
+    """Transcrit un fichier audio complet via Whisper."""
+    path = Path(payload.fichier)
+    if not path.is_file():
+        raise HTTPException(404, "Fichier introuvable")
+    import librosa
+    import numpy as np
+    from engine import verifier
+    try:
+        audio, sr = librosa.load(str(path), sr=None, mono=True)
+        audio = audio.astype(np.float32)
+        lang = payload.lang or config.WHISPER_LANG
+        texte_complet = verifier.transcribe(audio, sr, lang=lang).strip()
+        texte_horo = verifier.transcribe_timestamped(audio, sr, lang=lang).strip()
+    except Exception as exc:
+        raise HTTPException(500, f"Transcription échouée : {exc}")
+    return {"texte": texte_complet, "horodates": texte_horo}
+
+
+@app.post("/api/voix/enregistrer")
+async def api_voix_enregistrer(payload: VoixEnregistrerIn,
+                               wav: UploadFile = File(...)):
+    """Enregistre un couple wav + txt et met à jour voix.txt."""
+    import re as _re
+    nom = payload.nom.strip()
+    if not nom:
+        raise HTTPException(400, "Le nom ne peut pas être vide")
+    nom = _re.sub(r"[\[\]]", "", nom).strip()
+    nom = _re.sub(r"[^A-Za-z0-9À-ÿ _-]", "", nom)[:80]
+    if not nom:
+        raise HTTPException(400, "Nom invalide")
+
+    existing = load_voix() if config.VOIX_FILE.exists() else None
+    if existing and nom in existing:
+        raise HTTPException(409, f"La voix « {nom} » existe déjà")
+
+    wav_data = await wav.read()
+    wav_name = f"{nom}.wav"
+    wav_path = config.VOIX_AUDIO_DIR / wav_name
+    wav_path.parent.mkdir(parents=True, exist_ok=True)
+    wav_path.write_bytes(wav_data)
+
+    txt_name = f"{nom}.txt"
+    txt_path = config.VOIX_AUDIO_DIR / txt_name
+    txt_path.write_text(payload.transcription + "\n", encoding="utf-8")
+
+    lignes = []
+    if config.VOIX_FILE.exists():
+        lignes = [l.strip() for l in config.VOIX_FILE.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lignes.append(f"[{nom}], {wav_name}, {txt_name}")
+    config.VOIX_FILE.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+
+    return {"nom": nom, "wav": wav_name, "txt": txt_name}
 
 
 # ---------------------------------------------------------------------------
