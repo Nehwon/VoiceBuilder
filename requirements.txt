@@ -1,6 +1,7 @@
 numpy==1.26.4
 soundfile==0.12.1
 num2words==0.5.14
+tqdm==4.70.0
 librosa==0.10.2
 openai-whisper==20250625
 torch==2.13.0

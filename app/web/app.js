@@ -39,7 +39,8 @@ function mountVue(nom) {
   $("tab-projets").classList.toggle("actif", nom === "projets");
   if (nom === "edit" && cm) cm.refresh();
   if (nom === "montage" && montageId) chargerBlocs();
-  if (nom === "projets") { chargerDetailsProjets(); chargerVoixListe(); }
+  if (nom === "projets") chargerDetailsProjets();
+  if (nom === "voix") chargerVoixListe();
 }
 $("tab-edit").addEventListener("click", () => mountVue("edit"));
 $("tab-montage").addEventListener("click", () => mountVue("montage"));
@@ -580,7 +581,14 @@ $("generer").addEventListener("click", async () => {
       $("log").textContent += `\n❌ ${d}\n`;
       notifier(d, "err");
       afficherErreur(d);
+    } else {
+      // Erreur de connexion SSE (serveur interrompu) : il faut impérativement
+      // débloquer le bouton « Générer » pour pouvoir relancer la génération.
+      const m = "Connexion interrompue pendant la génération.";
+      $("log").textContent += `\n❌ ${m}\n`;
+      notifier(m, "err");
     }
+    fin();
   });
   ev.addEventListener("end", fin);
 });

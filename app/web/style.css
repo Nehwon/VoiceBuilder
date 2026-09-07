@@ -358,11 +358,16 @@ button.secondaire { border-color: var(--bor); }
   max-height: 26vh; overflow: auto; white-space: pre-wrap;
 }
 
-/* ---------------------------------------------------------------- onglet Voix — extraction audio */
+/* ---------------------------------------------------------------- onglet Voix — gestion complète */
 .voix-vue { padding: 20px 28px; }
-.voix-extraction { max-width: 900px; }
-.voix-extraction h2 { margin: 0 0 4px; }
-.voix-extraction h3 { margin: 16px 0 8px; font-size: 15px; }
+.voix-section { margin-bottom: 28px; }
+.voix-section:last-child { margin-bottom: 0; }
+
+.voix-bibliotheque .projets-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.voix-bibliotheque h2 { margin: 0; }
+
+.voix-creation h2 { margin: 0 0 4px; }
+.voix-creation h3 { margin: 16px 0 8px; font-size: 15px; }
 
 .voix-upload {
   display: flex; align-items: center; gap: 12px;

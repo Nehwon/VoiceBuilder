@@ -96,8 +96,25 @@
   </main>
 
   <main id="vue-voix" class="vue voix-vue" hidden>
-    <section class="voix-extraction">
-      <h2>🎙️ Extraire une voix depuis une vidéo</h2>
+    <!-- Section 1 : Mes voix (liste + actions) -->
+    <section class="voix-section voix-bibliotheque">
+      <div class="projets-header">
+        <h2>🎙️ Mes voix</h2>
+        <div class="projets-actions">
+          <button id="btn-voix-import" title="Importer une voix (wav + txt)">📥 Importer une voix</button>
+          <input type="file" id="file-voix-wav" accept=".wav,.mp3,.flac,.ogg,audio/*" hidden />
+          <input type="file" id="file-voix-txt" accept=".txt" hidden />
+          <button id="btn-voix-rafraichir" title="Rafraîchir les voix">🔄</button>
+        </div>
+      </div>
+      <p class="modal-sub">Les voix sont <strong>hors git</strong> (<code>voix/*.wav</code>, <code>voix/*.txt</code> ignorés).
+        Importe un couple <code>.wav</code> + <code>.txt</code> (transcription) ou crée une voix depuis une vidéo (ci-dessous).</p>
+      <div id="voix-liste" class="voix-liste"></div>
+    </section>
+
+    <!-- Section 2 : Créer une voix depuis une vidéo -->
+    <section class="voix-section voix-creation">
+      <h2>🎬 Créer une voix depuis une vidéo</h2>
       <p class="modal-sub">Charge un fichier vidéo/audio, sélectionne un segment (10–20 s), transcrit et enregistre la voix pour le clonage.</p>
 
       <div class="voix-upload">
@@ -163,20 +180,6 @@
         <summary>📦 Archives (<span id="archives-count">0</span>)</summary>
         <div id="archives-liste" class="projets-liste"></div>
       </details>
-    </section>
-
-    <section class="projets-col projets-voix">
-      <div class="projets-header">
-        <h2>🎙️ Voix — échantillons</h2>
-        <div class="projets-actions">
-          <button id="btn-voix-import" title="Importer une voix (wav + txt)">📥 Importer une voix</button>
-          <input type="file" id="file-voix-wav" accept=".wav,.mp3,.flac,.ogg,audio/*" hidden />
-          <input type="file" id="file-voix-txt" accept=".txt" hidden />
-          <button id="btn-voix-rafraichir" title="Rafraîchir les voix">🔄</button>
-        </div>
-      </div>
-      <p class="modal-sub">Les voix sont <strong>hors git</strong> (<code>voix/*.wav</code>, <code>voix/*.txt</code> ignorés). Importe un couple <code>.wav</code> + <code>.txt</code> (transcription). Le fichier <code>voix.txt</code> est mis à jour automatiquement.</p>
-      <div id="voix-liste" class="voix-liste"></div>
     </section>
   </main>
 

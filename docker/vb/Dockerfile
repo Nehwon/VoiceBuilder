@@ -43,7 +43,7 @@ COPY scripts/patch_deepfilternet.py /tmp/patch_deepfilternet.py
 RUN pip install "demucs==4.1.0" \
     && pip install --no-deps --ignore-installed "deepfilternet==0.5.6" \
     && pip install --no-deps "deepfilterlib==0.5.6" \
-    && pip install --quiet loguru appdirs requests icecream omegaconf rich resampy pystoi \
+    && pip install --quiet loguru appdirs requests icecream omegaconf rich resampy pystoi tqdm \
     && python /tmp/patch_deepfilternet.py \
     && rm -f /tmp/patch_deepfilternet.py
 

@@ -27,12 +27,12 @@ COPY . .
 # Demucs + DeepFilterNet (vb quotidienne pouvant être périmée au moment du build).
 # Normalement présents (docker/vb/Dockerfile) → ce bloc ne fait rien.
 COPY scripts/patch_deepfilternet.py /tmp/patch_deepfilternet.py
-RUN python -c "import demucs, df, libdf" 2>/dev/null \
-    || { echo "==> Ajout Demucs + DeepFilterNet (vb périmée)…" \
+RUN python -c "import demucs, df, libdf, tqdm" 2>/dev/null \
+    || { echo "==> Ajout Demucs + DeepFilterNet + tqdm (vb périmée)…" \
          && pip install "demucs==4.1.0" \
          && pip install --no-deps --ignore-installed "deepfilternet==0.5.6" \
          && pip install --no-deps "deepfilterlib==0.5.6" \
-         && pip install --quiet loguru appdirs requests icecream omegaconf rich resampy pystoi \
+         && pip install --quiet loguru appdirs requests icecream omegaconf rich resampy pystoi tqdm \
          && python /tmp/patch_deepfilternet.py; }
 RUN rm -f /tmp/patch_deepfilternet.py
 
