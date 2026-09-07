@@ -157,6 +157,14 @@ jobs:
             PIP_NO_CACHE_DIR=1
             VB_IMAGE=${{ env.VB_IMAGE }}
 
+      - name: Deploy local
+        if: steps.skip.outputs.build == 'yes' && github.event_name == 'push'
+        run: |
+          curl -sf -X POST "http://192.168.0.120:63200/deploy/voicebuilder" \
+            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"tag":"${{ needs.prepare.outputs.new }}"}' || echo "Deploy webhook failed (non-fatal)"
+
   release:
     name: Create Gitea Release
     needs: [prepare, build]
