@@ -1,0 +1,80 @@
+# VoiceBuilder — orchestration Docker : mode « registre Gitea ».
+#
+# Variante de docker-compose.yml qui UTILISE les images publiées sur le
+# registre container Gitea (construites par le CI, cf. .gitea/workflows/)
+# au lieu de construire localement. Aucune section `build:` : tout est tiré
+# du registre distant (`docker compose pull`).
+#
+# Images utilisées (toutes construites par le CI Gitea) :
+#   gitea.lamachere.fr/fabrice/voicebuilder:latest   (image finale)
+#
+# Usage (tests / déploiement sans rebuild) :
+#   docker compose -f docker-compose.gitea.yml --env-file .env.gitea up -d
+#   docker compose -f docker-compose.gitea.yml --env-file .env.gitea pull
+#   docker compose -f docker-compose.gitea.yml --env-file .env.gitea down
+#
+# NB : le modèle CosyVoice3 (~11 Go) n'est pas dans l'image ; il est
+# téléchargé au premier lancement dans le volume `volume-model` (/models).
+
+x-app-image: &app-image
+  image: ${GITEA_REGISTRY:-gitea.lamachere.fr}/fabrice/voicebuilder:${GITEA_TAG:-latest}
+
+services:
+  # GUI FastAPI — http://127.0.0.1:8001
+  gui:
+    <<: *app-image
+    container_name: voicebuilder-gui
+    command: python -m app.server --host 0.0.0.0 --port 8000
+    ports:
+      - "${HOST_PORT:-8001}:8000"
+    environment:
+      - VOICEBUILDER_AUDIO_DIR=/data/voice
+      - COSYVOICE_MODEL_DIR=/models
+      - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
+      - VOICEBUILDER_ENHANCE_DIR=/models/enhance_models
+    volumes:
+      - volume-audio:/data/voice
+      - volume-model:/models
+      - volume-texte:/app/texte
+      - volume-output:/app/output
+      - volume-tmp:/app/tmp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # CLI — génération multi-voix dans le conteneur
+  #   docker compose -f docker-compose.gitea.yml --env-file .env.gitea run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
+  cli:
+    <<: *app-image
+    profiles: ["cli"]
+    command: ["python", "-m", "tools.gen_multi_voix"]
+    environment:
+      - VOICEBUILDER_AUDIO_DIR=/data/voice
+      - COSYVOICE_MODEL_DIR=/models
+      - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
+      - VOICEBUILDER_ENHANCE_DIR=/models/enhance_models
+    volumes:
+      - volume-audio:/data/voice
+      - volume-model:/models
+      - volume-texte:/app/texte
+      - volume-output:/app/output
+      - volume-tmp:/app/tmp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  volume-audio: {}
+  volume-model: {}
+  volume-texte: {}
+  volume-output: {}
+  volume-tmp: {}
