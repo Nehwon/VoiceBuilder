@@ -548,11 +548,11 @@ $("generer").addEventListener("click", async () => {
 
   const ev = new EventSource(`/api/generer/${id}/stream`);
   let fini = false;
-  const fin = () => {
+  const fin = (erreur = false) => {
     if (fini) return;
     fini = true;
     ev.close();
-    contenuGenere = cm.getValue();
+    if (!erreur) contenuGenere = cm.getValue();
     generationActive = false;
     majBoutonGenerer();
     terminerProgression();
@@ -588,7 +588,7 @@ $("generer").addEventListener("click", async () => {
       $("log").textContent += `\n❌ ${m}\n`;
       notifier(m, "err");
     }
-    fin();
+    fin(true);
   });
   ev.addEventListener("end", fin);
 });
