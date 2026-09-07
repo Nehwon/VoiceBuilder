@@ -1277,9 +1277,9 @@ async function voixInitWaveform(wavPath, duree) {
   const container = $("voix-waveform");
   container.innerHTML = "";
 
-  if (!window.WaveSurfer) await voixLoadScript("/vendor/wavesurfer.min.js");
-  if (!window.WaveSurfer.Regions) await voixLoadScript("/vendor/wavesurfer-regions.min.js");
-  if (!window.WaveSurfer.Timeline) await voixLoadScript("/vendor/wavesurfer-timeline.min.js");
+  if (!window.WaveSurfer) await voixLoadScript("/web/vendor/wavesurfer.min.js");
+  if (!window.WaveSurfer.Regions) await voixLoadScript("/web/vendor/wavesurfer-regions.min.js");
+  if (!window.WaveSurfer.Timeline) await voixLoadScript("/web/vendor/wavesurfer-timeline.min.js");
 
   wsRegions = WaveSurfer.Regions.create();
   wsVoix = WaveSurfer.create({
