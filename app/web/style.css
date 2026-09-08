@@ -335,7 +335,7 @@ button.secondaire { border-color: var(--bor); }
 .projet-carte-actions button.danger:hover { background: #d33; color: #fff; }
 .archives-details { margin-top: 16px; }
 .archives-details summary { cursor: pointer; color: var(--dim); font-size: 13px; }
-.voix-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.voix-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-height: calc(100vh - 220px); overflow-y: auto; }
 .voix-carte {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
   background: var(--panel2); border: 1px solid var(--bor); border-radius: 8px;
@@ -360,8 +360,15 @@ button.secondaire { border-color: var(--bor); }
 
 /* ---------------------------------------------------------------- onglet Voix — gestion complète */
 .voix-vue { padding: 20px 28px; }
-.voix-section { margin-bottom: 28px; }
-.voix-section:last-child { margin-bottom: 0; }
+
+.voix-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.voix-section { margin-bottom: 0; }
 
 .voix-bibliotheque .projets-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .voix-bibliotheque h2 { margin: 0; }
