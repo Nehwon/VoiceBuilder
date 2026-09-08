@@ -1185,10 +1185,19 @@ async def api_voix_extraire_audio(fichier: UploadFile = File(...)):
     """Upload d'un fichier vidéo/audio, extraction de la piste son en WAV."""
     nom = (fichier.filename or "upload").replace("/", "_").replace("\\", "_")
     src = _VOIX_WORK / nom
-    data = await fichier.read()
-    if len(data) > 500 * 1024 * 1024:
-        raise HTTPException(413, "Fichier trop volumineux (max 500 Mo)")
-    src.write_bytes(data)
+    MAX_SIZE = 2 * 1024 * 1024 * 1024  # 2 Go
+    total = 0
+    CHUNK = 1024 * 1024  # 1 Mo
+    with open(src, "wb") as f:
+        while True:
+            chunk = await fichier.read(CHUNK)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_SIZE:
+                src.unlink(missing_ok=True)
+                raise HTTPException(413, "Fichier trop volumineux (max 2 Go)")
+            f.write(chunk)
 
     out_wav = _VOIX_WORK / f"{src.stem}.wav"
     try:
