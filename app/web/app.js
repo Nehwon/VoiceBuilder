@@ -1273,39 +1273,58 @@ $("file-voix-video").addEventListener("change", async (ev) => {
   $("btn-voix-upload-annuler").hidden = false;
   $("voix-progress").hidden = false;
   $("voix-progress-label").textContent = "Extraction de la piste audio…";
-  $("voix-progress-fill").style.width = "20%";
+  $("voix-progress-fill").style.width = "0%";
 
   const fd = new FormData();
   fd.append("fichier", file);
-  voixAbort = new AbortController();
+
+  // Upload avec progression via XMLHttpRequest
+  const uploadPromise = new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    voixAbort = { abort: () => xhr.abort() };
+    xhr.open("POST", "/api/voix/extraire-audio");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 40); // 0–40% pour l'upload
+        $("voix-progress-fill").style.width = pct + "%";
+        const loaded = (e.loaded / 1048576).toFixed(0);
+        const total = (e.total / 1048576).toFixed(0);
+        $("voix-progress-label").textContent = `Extraction de la piste audio… (${loaded}/${total} Mo)`;
+      }
+    };
+    xhr.onload = () => {
+      voixAbort = null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText));
+      } else {
+        let msg = "Extraction échouée.";
+        try { msg = JSON.parse(xhr.responseText).detail || msg; } catch {}
+        if (xhr.status === 413) msg = "Fichier trop volumineux (max 2 Go). Réduis la durée du fichier source avant réimport.";
+        if (xhr.status === 400 && msg.includes("ffmpeg")) msg = "Format non reconnu ou fichier corrompu. Vérifie le format (mp4, mkv, wav, mp3…).";
+        reject(new Error(msg));
+      }
+    };
+    xhr.onerror = () => {
+      voixAbort = null;
+      reject(new Error("Impossible de contacter le serveur. Vérifie que le serveur tourne."));
+    };
+    xhr.onabort = () => { voixAbort = null; reject(new DOMException("abort", "AbortError")); };
+    xhr.send(fd);
+  });
+
   try {
-    const r = await fetch("/api/voix/extraire-audio", {
-      method: "POST", body: fd, signal: voixAbort.signal,
-    });
-    voixAbort = null;
-    if (!r.ok) {
-      let msg = "Extraction échouée.";
-      try {
-        const d = await r.json();
-        msg = d.detail || msg;
-      } catch { /* réponse non-JSON */ }
-      if (r.status === 413) msg = "Fichier trop volumineux (max 2 Go). Réduis la durée du fichier source avant réimport.";
-      if (r.status === 400 && msg.includes("ffmpeg")) msg = "Format non reconnu ou fichier corrompu. Vérifie le format (mp4, mkv, wav, mp3…).";
-      throw new Error(msg);
-    }
-    const d = await r.json();
+    $("voix-progress-fill").style.width = "40%";
+    $("voix-progress-label").textContent = "Extraction de la piste audio…";
+    const d = await uploadPromise;
     voixFichier = d.wav;
-    $("voix-progress-fill").style.width = "50%";
+    $("voix-progress-fill").style.width = "60%";
     $("voix-progress-label").textContent = "Chargement du waveform…";
     await voixInitWaveform(d.wav, d.duree);
     $("btn-voix-upload-annuler").hidden = false;
   } catch (e) {
     if (e.name === "AbortError") return;
-    const msg = e.message.includes("Failed to fetch")
-      ? "Impossible de contacter le serveur. Vérifie que le serveur tourne."
-      : e.message;
-    notifier(msg, "err");
-    afficherErreur(msg);
+    notifier(e.message, "err");
+    afficherErreur(e.message);
     $("voix-progress").hidden = true;
     $("btn-voix-upload").hidden = false;
     $("btn-voix-upload-annuler").hidden = true;
@@ -1336,7 +1355,11 @@ async function voixInitWaveform(wavPath, duree) {
   });
 
   const audioUrl = `/api/voix/wav-raw?file=${encodeURIComponent(wavPath)}`;
-  await wsVoix.load(audioUrl);
+  try {
+    await wsVoix.load(audioUrl);
+  } catch (err) {
+    throw new Error("Impossible de charger l'audio extrait. Le fichier est peut-être corrompu ou trop volumineux pour l'éditeur waveform.");
+  }
 
   const finDefaut = Math.min(10, duree);
   wsRegions.addRegion({
