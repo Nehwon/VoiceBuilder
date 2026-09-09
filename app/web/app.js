@@ -1314,8 +1314,10 @@ $("file-voix-video").addEventListener("change", async (ev) => {
 
   try {
     $("voix-progress-fill").style.width = "40%";
-    $("voix-progress-label").textContent = "Extraction de la piste audio…";
+    $("voix-progress-label").textContent = "Extraction de la piste audio en cours… (peut prendre quelques minutes)";
+    $("voix-progress-fill").classList.add("indeterminate");
     const d = await uploadPromise;
+    $("voix-progress-fill").classList.remove("indeterminate");
     voixFichier = d.wav;
     $("voix-progress-fill").style.width = "60%";
     $("voix-progress-label").textContent = "Chargement du waveform…";
@@ -1348,6 +1350,7 @@ async function voixInitWaveform(wavPath, duree) {
     cursorColor: "#c05000",
     height: 128,
     normalize: true,
+    backend: "MediaElement",
     plugins: [
       wsRegions,
       WaveSurfer.Timeline.create({ timeInterval: 1, primaryLabelInterval: 5, style: { fontSize: "11px", color: "var(--dim)" } }),

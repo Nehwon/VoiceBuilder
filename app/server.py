@@ -15,6 +15,7 @@ Lancement :
 from __future__ import annotations
 
 import argparse
+import asyncio
 import itertools
 import json
 import os
@@ -1201,7 +1202,7 @@ async def api_voix_extraire_audio(fichier: UploadFile = File(...)):
 
     out_wav = _VOIX_WORK / f"{src.stem}.wav"
     try:
-        result = audio_extract.extraire_audio(str(src), str(out_wav))
+        result = await asyncio.to_thread(audio_extract.extraire_audio, str(src), str(out_wav))
     except Exception as exc:
         raise HTTPException(400, f"Extraction échouée : {exc}")
     return result

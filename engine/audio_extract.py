@@ -33,7 +33,7 @@ def extraire_audio(video_path: str, out_wav: str, sr: int = 24000) -> dict:
         str(out_wav),
     ]
     result = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=300,
+        cmd, capture_output=True, text=True, timeout=600,
     )
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg a échoué :\n{result.stderr[-500:]}")

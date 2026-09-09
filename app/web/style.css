@@ -265,9 +265,19 @@ button.secondaire { border-color: var(--bor); }
   height: 8px; border-radius: 4px; overflow: hidden;
   background: var(--panel2); border: 1px solid var(--bor);
 }
-#progression-remplie, #modele-progress-remplie {
+#progression-remplie, #modele-progress-remplie, #voix-progress-fill {
   height: 100%; width: 0%;
   background: var(--acc); transition: width 0.25s ease;
+}
+#voix-progress-fill.indeterminate {
+  width: 100% !important;
+  background: linear-gradient(90deg, transparent 0%, var(--acc) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: voix-pulse 1.5s ease-in-out infinite;
+}
+@keyframes voix-pulse {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* ---------------------------------------------------------------- modal erreur */
