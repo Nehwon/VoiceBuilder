@@ -1249,7 +1249,7 @@ function voixReset() {
   $("voix-save-section").hidden = true;
   $("voix-progress").hidden = true;
   $("voix-upload-nom").textContent = "";
-  $("voix-upload-annuler").hidden = true;
+  $("btn-voix-upload-annuler").hidden = true;
   $("btn-voix-upload").hidden = false;
   $("voix-start").value = 0;
   $("voix-stop").value = 0;
@@ -1270,7 +1270,7 @@ $("file-voix-video").addEventListener("change", async (ev) => {
   voixReset();
   $("voix-upload-nom").textContent = file.name;
   $("btn-voix-upload").hidden = true;
-  $("voix-upload-annuler").hidden = false;
+  $("btn-voix-upload-annuler").hidden = false;
   $("voix-progress").hidden = false;
   $("voix-progress-label").textContent = "Extraction de la piste audio…";
   $("voix-progress-fill").style.width = "20%";
@@ -1298,7 +1298,7 @@ $("file-voix-video").addEventListener("change", async (ev) => {
     $("voix-progress-fill").style.width = "50%";
     $("voix-progress-label").textContent = "Chargement du waveform…";
     await voixInitWaveform(d.wav, d.duree);
-    $("voix-upload-annuler").hidden = false;
+    $("btn-voix-upload-annuler").hidden = false;
   } catch (e) {
     if (e.name === "AbortError") return;
     const msg = e.message.includes("Failed to fetch")
@@ -1308,7 +1308,7 @@ $("file-voix-video").addEventListener("change", async (ev) => {
     afficherErreur(msg);
     $("voix-progress").hidden = true;
     $("btn-voix-upload").hidden = false;
-    $("voix-upload-annuler").hidden = true;
+    $("btn-voix-upload-annuler").hidden = true;
   }
   ev.target.value = "";
 });
