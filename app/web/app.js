@@ -1238,7 +1238,10 @@ let wsVoix = null;
 let wsRegions = null;
 let voixFichier = null;
 
+let voixAbort = null;
+
 function voixReset() {
+  if (voixAbort) { voixAbort.abort(); voixAbort = null; }
   if (wsVoix) { wsVoix.destroy(); wsVoix = null; wsRegions = null; }
   voixFichier = null;
   $("voix-editor").hidden = true;
@@ -1246,6 +1249,8 @@ function voixReset() {
   $("voix-save-section").hidden = true;
   $("voix-progress").hidden = true;
   $("voix-upload-nom").textContent = "";
+  $("voix-upload-annuler").hidden = true;
+  $("btn-voix-upload").hidden = false;
   $("voix-start").value = 0;
   $("voix-stop").value = 0;
   $("voix-duree-selection").textContent = "";
@@ -1253,30 +1258,57 @@ function voixReset() {
   $("voix-nom").value = "";
 }
 
+$("btn-voix-upload-annuler").addEventListener("click", () => {
+  voixReset();
+  $("file-voix-video").value = "";
+});
+
 $("btn-voix-upload").addEventListener("click", () => $("file-voix-video").click());
 $("file-voix-video").addEventListener("change", async (ev) => {
   const file = ev.target.files[0];
   if (!file) return;
   voixReset();
   $("voix-upload-nom").textContent = file.name;
+  $("btn-voix-upload").hidden = true;
+  $("voix-upload-annuler").hidden = false;
   $("voix-progress").hidden = false;
   $("voix-progress-label").textContent = "Extraction de la piste audio…";
   $("voix-progress-fill").style.width = "20%";
 
   const fd = new FormData();
   fd.append("fichier", file);
+  voixAbort = new AbortController();
   try {
-    const r = await fetch("/api/voix/extraire-audio", { method: "POST", body: fd });
-    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || "Extraction échouée"); }
+    const r = await fetch("/api/voix/extraire-audio", {
+      method: "POST", body: fd, signal: voixAbort.signal,
+    });
+    voixAbort = null;
+    if (!r.ok) {
+      let msg = "Extraction échouée.";
+      try {
+        const d = await r.json();
+        msg = d.detail || msg;
+      } catch { /* réponse non-JSON */ }
+      if (r.status === 413) msg = "Fichier trop volumineux (max 2 Go). Réduis la durée du fichier source avant réimport.";
+      if (r.status === 400 && msg.includes("ffmpeg")) msg = "Format non reconnu ou fichier corrompu. Vérifie le format (mp4, mkv, wav, mp3…).";
+      throw new Error(msg);
+    }
     const d = await r.json();
     voixFichier = d.wav;
     $("voix-progress-fill").style.width = "50%";
     $("voix-progress-label").textContent = "Chargement du waveform…";
     await voixInitWaveform(d.wav, d.duree);
+    $("voix-upload-annuler").hidden = false;
   } catch (e) {
-    notifier(e.message, "err");
-    afficherErreur(e.message);
+    if (e.name === "AbortError") return;
+    const msg = e.message.includes("Failed to fetch")
+      ? "Impossible de contacter le serveur. Vérifie que le serveur tourne."
+      : e.message;
+    notifier(msg, "err");
+    afficherErreur(msg);
     $("voix-progress").hidden = true;
+    $("btn-voix-upload").hidden = false;
+    $("voix-upload-annuler").hidden = true;
   }
   ev.target.value = "";
 });

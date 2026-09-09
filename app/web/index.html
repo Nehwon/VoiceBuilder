@@ -115,13 +115,14 @@
 
       <!-- Droite : Créer une voix depuis une vidéo -->
       <section class="voix-section voix-creation">
-        <h2>🎬 Créer une voix depuis une vidéo</h2>
-        <p class="modal-sub">Charge un fichier vidéo/audio, sélectionne un segment (10–20 s), transcrit et enregistre la voix pour le clonage.</p>
+        <h2>🎬 Créer une voix</h2>
+        <p class="modal-sub">Charge un fichier audio ou vidéo, sélectionne un segment (10–20 s), transcrit et enregistre la voix pour le clonage.</p>
 
         <div class="voix-upload">
-          <button id="btn-voix-upload" class="primaire">📁 Charger un fichier vidéo/audio</button>
-          <input type="file" id="file-voix-video" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.wav,.mp3,.flac" hidden />
+          <button id="btn-voix-upload" class="primaire">📁 Charger un fichier audio/vidéo</button>
+          <input type="file" id="file-voix-video" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.wav,.mp3,.flac,.ogg,.m4a,.aac" hidden />
           <span id="voix-upload-nom" class="voix-upload-info"></span>
+          <button id="btn-voix-upload-annuler" class="secondaire" hidden title="Annuler et réinitialiser">✕ Annuler</button>
         </div>
 
         <div id="voix-progress" class="voix-progress" hidden>
