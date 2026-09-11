@@ -279,6 +279,8 @@ class VoixDecouperIn(BaseModel):
 class VoixTranscrireIn(BaseModel):
     fichier: str
     lang: str | None = None
+    start: float | None = None
+    stop: float | None = None
 
 
 class VoixEnregistrerIn(BaseModel):
@@ -1247,7 +1249,7 @@ def api_voix_decouper(payload: VoixDecouperIn):
 
 @app.post("/api/voix/transcrire-segment")
 def api_voix_transcrire_segment(payload: VoixTranscrireIn):
-    """Transcrit un fichier audio complet via Whisper."""
+    """Transcrit un segment audio (ou la totalité) via Whisper."""
     path = Path(payload.fichier)
     if not path.is_file():
         raise HTTPException(404, "Fichier introuvable")
@@ -1257,6 +1259,11 @@ def api_voix_transcrire_segment(payload: VoixTranscrireIn):
     try:
         audio, sr = librosa.load(str(path), sr=None, mono=True)
         audio = audio.astype(np.float32)
+        if payload.start is not None and payload.stop is not None and payload.stop > payload.start:
+            i0, i1 = int(payload.start * sr), int(payload.stop * sr)
+            i0 = max(0, i0)
+            i1 = min(len(audio), i1)
+            audio = audio[i0:i1]
         lang = payload.lang or config.WHISPER_LANG
         texte_complet = verifier.transcribe(audio, sr, lang=lang).strip()
         texte_horo = verifier.transcribe_timestamped(audio, sr, lang=lang).strip()

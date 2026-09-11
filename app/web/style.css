@@ -373,18 +373,20 @@ button.secondaire { border-color: var(--bor); }
 
 .voix-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
 
-.voix-section { margin-bottom: 0; }
+.voix-section { margin-bottom: 0; min-width: 0; overflow: hidden; }
 
 .voix-bibliotheque .projets-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .voix-bibliotheque h2 { margin: 0; }
+.voix-bibliotheque { min-width: 0; overflow: hidden; }
 
 .voix-creation h2 { margin: 0 0 4px; }
 .voix-creation h3 { margin: 16px 0 8px; font-size: 15px; }
+.voix-creation { min-width: 0; overflow: hidden; }
 
 .voix-upload {
   display: flex; align-items: center; gap: 12px;
@@ -395,13 +397,13 @@ button.secondaire { border-color: var(--bor); }
 .voix-progress { margin: 10px 0; }
 .voix-progress span { font-size: 13px; color: var(--dim); }
 
-.voix-editor { margin: 16px 0; }
+.voix-editor { margin: 16px 0; overflow-x: auto; }
 .voix-waveform {
   border: 1px solid var(--bor); border-radius: 8px;
   background: var(--panel2); min-height: 128px;
-  overflow: hidden; cursor: text;
+  overflow-x: auto; overflow-y: hidden; cursor: text;
 }
-.voix-waveform wave { overflow: hidden !important; }
+.voix-waveform wave { overflow: hidden !important; max-width: 100%; }
 
 .voix-controls {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -418,7 +420,7 @@ button.secondaire { border-color: var(--bor); }
 }
 .voix-duree { color: var(--acc); font-weight: 600; min-width: 50px; }
 
-.voix-transcription-section { margin-top: 16px; }
+.voix-transcription-section { margin-top: 16px; min-width: 0; }
 .voix-transcription-text {
   width: 100%; background: var(--panel2); border: 1px solid var(--bor);
   color: var(--txt); border-radius: 6px; padding: 8px;

@@ -1421,10 +1421,13 @@ $("btn-voix-transcrire").addEventListener("click", async () => {
   $("voix-transcription-progress").hidden = false;
   $("voix-transcription-text").value = "";
   try {
+    const regions = wsRegions ? wsRegions.getRegions() : [];
+    const start = regions[0] ? regions[0].start : undefined;
+    const stop = regions[0] ? regions[0].end : undefined;
     const r = await fetch("/api/voix/transcrire-segment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fichier: voixFichier }),
+      body: JSON.stringify({ fichier: voixFichier, start, stop }),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || "Transcription échouée"); }
     const d = await r.json();
