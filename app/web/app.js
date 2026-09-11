@@ -1237,6 +1237,7 @@ modalClean.addEventListener("click", (e) => { if (e.target === modalClean) { fer
 let wsVoix = null;
 let wsRegions = null;
 let voixFichier = null;
+let voixFichierOriginal = null;
 
 let voixAbort = null;
 
@@ -1244,6 +1245,7 @@ function voixReset() {
   if (voixAbort) { voixAbort.abort(); voixAbort = null; }
   if (wsVoix) { wsVoix.destroy(); wsVoix = null; wsRegions = null; }
   voixFichier = null;
+  voixFichierOriginal = null;
   $("voix-editor").hidden = true;
   $("voix-transcription-section").hidden = true;
   $("voix-save-section").hidden = true;
@@ -1319,6 +1321,7 @@ $("file-voix-video").addEventListener("change", async (ev) => {
     const d = await uploadPromise;
     $("voix-progress-fill").classList.remove("indeterminate");
     voixFichier = d.wav;
+    voixFichierOriginal = d.wav;
     $("voix-progress-fill").style.width = "60%";
     $("voix-progress-label").textContent = "Chargement du waveform…";
     await voixInitWaveform(d.wav, d.duree);
@@ -1414,6 +1417,49 @@ $("btn-voix-play-region").addEventListener("click", () => {
 
 $("btn-voix-zoom-in").addEventListener("click", () => { if (wsVoix) wsVoix.zoom(Math.min((wsVoix.options.minPxPerSec || 20) * 1.5, 500)); });
 $("btn-voix-zoom-out").addEventListener("click", () => { if (wsVoix) wsVoix.zoom(Math.max((wsVoix.options.minPxPerSec || 20) / 1.5, 5)); });
+
+$("btn-voix-stop").addEventListener("click", () => { if (wsVoix) { wsVoix.pause(); wsVoix.setTime(0); } });
+
+$("btn-voix-couper").addEventListener("click", async () => {
+  if (!voixFichier) return;
+  const regions = wsRegions ? wsRegions.getRegions() : [];
+  const start = regions[0] ? regions[0].start : 0;
+  const stop = regions[0] ? regions[0].end : 0;
+  if (stop <= start) { notifier("Sélectionne un segment valide.", "err"); return; }
+  const btn = $("btn-voix-couper");
+  btn.disabled = true;
+  try {
+    const r = await fetch("/api/voix/decouper", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fichier: voixFichier, start, stop }),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || "Découpage échoué"); }
+    const d = await r.json();
+    voixFichier = d.wav;
+    if (wsVoix) { wsVoix.destroy(); wsVoix = null; wsRegions = null; }
+    await voixInitWaveform(d.wav, d.duree);
+    notifier(`Segment découpé (${d.duree.toFixed(1)} s).`, "ok");
+  } catch (e) {
+    notifier(e.message, "err");
+    afficherErreur(e.message);
+  } finally { btn.disabled = false; }
+});
+
+$("btn-voix-reset").addEventListener("click", async () => {
+  if (!voixFichierOriginal) return;
+  if (wsVoix) { wsVoix.destroy(); wsVoix = null; wsRegions = null; }
+  voixFichier = voixFichierOriginal;
+  try {
+    const r = await fetch(`/api/voix/wav-raw?file=${encodeURIComponent(voixFichier)}`);
+    const blob = await r.blob();
+    const duree = blob.size / (16000 * 2);
+    await voixInitWaveform(voixFichier, duree);
+    notifier("Fichier original restauré.", "ok");
+  } catch (e) {
+    notifier("Impossible de restaurer le fichier original.", "err");
+  }
+});
 
 $("btn-voix-transcrire").addEventListener("click", async () => {
   if (!voixFichier) return;

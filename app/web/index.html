@@ -134,13 +134,17 @@
           <div id="voix-waveform" class="voix-waveform"></div>
           <div id="voix-timeline"></div>
           <div class="voix-controls">
-            <button id="btn-voix-play" title="Lecture">▶ Lecture</button>
-            <button id="btn-voix-play-region" title="Lire la sélection">▶ Selection</button>
+            <button id="btn-voix-play" title="Lecture / Pause">▶ Lecture</button>
+            <button id="btn-voix-stop" title="Arrêter la lecture">⏹ Stop</button>
+            <button id="btn-voix-play-region" title="Lire la sélection">▶ Sélection</button>
             <label>Début <input id="voix-start" type="number" step="0.1" min="0" value="0" class="voix-time-input" /> s</label>
             <label>Fin <input id="voix-stop" type="number" step="0.1" min="0" value="0" class="voix-time-input" /> s</label>
             <span id="voix-duree-selection" class="voix-duree"></span>
             <button id="btn-voix-zoom-in" title="Zoom avant">🔍+</button>
             <button id="btn-voix-zoom-out" title="Zoom arrière">🔍−</button>
+            <span class="voix-sep"></span>
+            <button id="btn-voix-couper" title="Couper le waveform sur la sélection (remplace le fichier)">✂️ Couper</button>
+            <button id="btn-voix-reset" title="Revenir au fichier complet d'origine">↩ Réinitialiser</button>
           </div>
         </div>
 

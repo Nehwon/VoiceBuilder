@@ -414,6 +414,7 @@ button.secondaire { border-color: var(--bor); }
   border-radius: 5px; padding: 4px 10px; cursor: pointer; font-size: 13px;
 }
 .voix-controls button:hover { background: var(--bor); }
+.voix-controls .voix-sep { width: 1px; height: 20px; background: var(--bor); margin: 0 4px; }
 .voix-time-input {
   width: 70px; background: var(--panel2); border: 1px solid var(--bor);
   color: var(--txt); border-radius: 4px; padding: 3px 6px; font-size: 13px;
