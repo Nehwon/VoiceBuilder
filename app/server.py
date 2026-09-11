@@ -283,11 +283,6 @@ class VoixTranscrireIn(BaseModel):
     stop: float | None = None
 
 
-class VoixEnregistrerIn(BaseModel):
-    nom: str
-    transcription: str
-
-
 # ---------------------------------------------------------------------------
 # API : voix & config
 # ---------------------------------------------------------------------------
@@ -1273,11 +1268,12 @@ def api_voix_transcrire_segment(payload: VoixTranscrireIn):
 
 
 @app.post("/api/voix/enregistrer")
-async def api_voix_enregistrer(payload: VoixEnregistrerIn,
+async def api_voix_enregistrer(nom: str = Form(...),
+                               transcription: str = Form(...),
                                wav: UploadFile = File(...)):
     """Enregistre un couple wav + txt et met à jour voix.txt."""
     import re as _re
-    nom = payload.nom.strip()
+    nom = nom.strip()
     if not nom:
         raise HTTPException(400, "Le nom ne peut pas être vide")
     nom = _re.sub(r"[\[\]]", "", nom).strip()
@@ -1297,7 +1293,7 @@ async def api_voix_enregistrer(payload: VoixEnregistrerIn,
 
     txt_name = f"{nom}.txt"
     txt_path = config.VOIX_AUDIO_DIR / txt_name
-    txt_path.write_text(payload.transcription + "\n", encoding="utf-8")
+    txt_path.write_text(transcription + "\n", encoding="utf-8")
 
     lignes = []
     if config.VOIX_FILE.exists():
