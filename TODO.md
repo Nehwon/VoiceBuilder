@@ -148,6 +148,23 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       porte `id`/`voix`/`texte` et l'audio est servi par l'API
       (`/api/generer/{id}/bloc/{bid}/wav`) — lecture possible dès la fin de
       chaque bloc, boutons Régénérer/Diviser opérationnels en direct.
+- [ ] **M10.2 — Barre d'outils « émotions » dans l'éditeur** : insérer en un clic
+      les tokens CosyVoice3 (`docs/UTILISATION.md` §4, `PROJET_FINE.md` palier 0)
+      directement dans le texte au curseur — émotions `<|HAPPY|>` / `<|SAD|>` /
+      `<|ANGRY|>` / `<|NEUTRAL|>`, sons `[sigh]` / `[laughter]` / `[breath]` / …,
+      emphase `<strong>` (entoure la sélection), ambiances
+      `<|Laughter|>…<|/Laughter|>` / `<|Applause|>…` / `<|BGM|>…` ; rappel de
+      sobriété (1 tag par bloc) dans l'aide.
+  - [ ] **Raccourcis clavier** : chaque token/classe de token a un raccourci
+        (ex. `Ctrl+E` puis lettre, ou `Alt+1…9`), sans conflit avec
+        l'autocomplétion `Tab` ni les `extraKeys` CodeMirror ; raccourcis
+        visibles dans les infobulles et rappelés dans l'aide.
+  - [ ] **Forme façon GrapesJS (GridStack / Interact.js)** : chaque groupe de la
+        barre d'outils (personnages, émotions, insertion `[Nom]:`) est un
+        **bloc modulaire déplaçable / réordonnable par glisser-déposer**
+        (inspiration GridStack : grille de blocs, Interact.js : gestes
+        drag/resize), repliable, masquable ; disposition persistée côté client
+        (ex. `localStorage`) et restaurée à l'ouverture.
 
 ---
 
@@ -267,8 +284,161 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [x] **Purge du registre** : workflow cron hebdomadaire (`.gitea/workflows/purge.yml`)
         qui supprime les versions obsolètes tout en gardant les tags stables
         (latest, main, cu130) et les N récentes (`scripts/ci/purge_registry.sh`).
-  - [x] `docker compose build base|vb` construit les niveaux ; `docker compose build`
-        construit le final. Les builds quotidiens ne re-téléchargent plus torch.
+- [x] `docker compose build base|vb` construit les niveaux ; `docker compose build`
+      construit le final. Les builds quotidiens ne re-téléchargent plus torch.
+
+---
+
+## Phase 8 — Outillage Palier 0 (curation des voix, `PROJET_FINE.md` §2)
+
+> Le Palier 0 (gratuit, sans entraînement) porte +30–50 % de qualité perçue :
+> curation des prompts, nettoyage, transcriptions exactes, multi-prompt, tokens
+> sobres, paramètres par voix. M13.0 (nettoyage unitaire) et M10.2 (barre
+> d'outils émotions) couvrent déjà une partie ; il manque les outils de
+> **diagnostic**, de **comparaison A/B** et de **traitement en lot**.
+
+- [ ] **M17.1 — Audit qualité des voix (`tools/audit_voix.py`)**
+  - [ ] Pour chaque entrée de `voix/voix.txt` : durée (alerte hors 5–30 s),
+        niveau/SNR, silences dominants, écrêtage ; **retranscription Whisper
+        du `.wav` prompt + diff mot à mot vs `.txt`** (mots divergents ou
+        manquants = transcription à recurer, `PROJET_FINE.md` §2 point 3).
+  - [ ] Rapport par voix : `OK` / `à recurer` (txt) / `à ré-extraire` (wav) /
+        `à nettoyer` (bruit/musique → M13.0) ; sortie console + JSON
+        (exploitable par la GUI plus tard).
+- [ ] **M17.2 — Banc A/B de prompts par personnage**
+  - [ ] Générer le **même paragraphe FR de référence** (nombres, dates,
+        dialogue, 1 émotion — cf. `PROJET_FINE.md` §3.4) avec **2–3 segments
+        candidats** par personnage (ex. variantes `_2`/`_3`, versions
+        `_clean`) : `coverage` Whisper + RTF + écoute comparative
+        (`PROJET_FINE.md` §2 point 1).
+  - [ ] CLI (`tools/bench_prompts.py`) d'abord, puis section GUI (onglet Voix
+        ou Montage) ; le gagnant devient la référence dans `voix.txt`.
+- [ ] **M17.3 — Nettoyage en lot des 14 voix**
+  - [ ] Appliquer le pipeline M13.0 (Demucs + DeepFilterNet) à toutes les voix
+        en une commande (`tools/nettoyer_voix.py --tout`), produire les
+        `<nom>_clean`, comparer avant/après (`coverage` + écoute) et promouvoir
+        les gagnants en référence dans `voix.txt`
+        (`PROJET_FINE.md` §2 point 2).
+- [ ] **M17.4 — Multi-prompt à la génération**
+  - [ ] Permettre **N prompts candidats par voix** (réutiliser les variantes
+        `_2`/`_3`/`_clean` existantes comme candidats, sans casser le format
+        `voix.txt`) : chaque bloc est généré avec chacun, le meilleur est gardé
+        (`coverage` Whisper puis écoute) ; repli sur le prompt unique si 1 seul
+        candidat (`PROJET_FINE.md` §2 point 4).
+
+---
+
+## Phase 9 — Palier 1 : LoRA CosyVoice3 sur petit GPU (`PROJET_FINE.md` §3)
+
+> Fine-tuner 1–3 personnages vedettes **sans GPU 24 Go** : entraînement LoRA
+> tenant sur **12–16 Go** (qLoRA, checkpointing, accumulation, optim 8-bit,
+> freeze partiel, échelle anti-OOM), puis validation aveugle et intégration
+> à l'inférence.
+
+- [ ] **M18.1 — Kit dataset LoRA (`tools/preparer_lora.py`)**
+  - [ ] Depuis les segments curés du Palier 0 (M17.1–M17.3) : 15–60 min/voix,
+        segments 5–12 s (pic VRAM réduit), transcriptions exactes, dédup, split
+        val ; sortie au format attendu par `vendor/CosyVoice/tools/` (parquet
+        list + tokens) ; refuser < 15 min effectives (gain marginal vs
+        zéro-shot, cf. `PROJET_FINE.md` §3.2).
+- [ ] **M18.2 — Entraînement LoRA « petit GPU » (`tools/entrainer_lora.py`)**
+  - [ ] Presets `--vram 12/16/24` appliquant l'échelle anti-OOM
+        (`PROJET_FINE.md` §3.3) : rang, qLoRA 4-bit, gradient checkpointing,
+        micro-batch 1 + accumulation, optim 8-bit/paged, freeze Flow, ZeRO-2 /
+        offload CPU en filet ; reprise sur checkpoint, logs + courbe de perte.
+  - [ ] D'abord 1 voix test (15–30 min, quelques centaines de steps) avant le
+        full ; documenter l'étage OOM retenu par voix.
+- [ ] **M18.3 — Validation + registre des LoRA**
+  - [ ] Protocole `PROJET_FINE.md` §3.4 (paragraphe FR de référence,
+        `coverage` ≥ 0.85, RTF, écoute aveugle à 2+ auditeurs) ; ne garder que
+        les LoRA gagnants ; registre (poids, config, étage OOM, scores).
+- [ ] **M18.4 — Intégration inférence (switch par personnage)**
+  - [ ] Chargement dynamique base 0.5B + LoRA du personnage courant (PEFT,
+        fusion optionnelle), cache des adaptateurs (alternance rapide des
+        personnages), sans régression RTF ; documenter quel LoRA sert quelle
+        voix de `voix.txt`.
+
+---
+
+## Phase 10 — Multi-moteurs : workers locaux / distants (`PROJET_FINE.md` §4)
+
+> Ajouter des moteurs spécialisés qualité (**XTTS-v2, puis Fish-Speech v1.5+**)
+> **sans remplacer CosyVoice3** : abstraction worker commune, routage par voix,
+> **workers installables sur différentes machines pour chaque type de calcul**
+> (synthèse GPU, vérif, enhance, audit, entraînement), avec un mode **CPU-only**
+> (2 serveurs bi-Xeon 128 Go RAM, sans GPU). Le pipeline (blocs adaptatifs,
+> vérif Whisper, montage, GUI) est réutilisé à l'identique.
+
+- [ ] **M19.0 — Bench hors GUI avant toute intégration**
+  - [ ] Comparer **XTTS-v2 puis Fish-Speech v1.5+** vs CosyVoice3 curé (Palier 0)
+        sur le paragraphe FR de référence (`PROJET_FINE.md` §3.4 : nombres,
+        dates, dialogue, 1 émotion) : `coverage` ≥ 0.85, RTF, écoute aveugle ;
+        n'intégrer que sur victoire mesurée. Trancher au passage le point
+        licence **XTTS-v2 = CPML** (usage commercial restreint) avant d'investir.
+  - [ ] Calibrer en même temps le **RTF CPU-only de référence** sur les bi-Xeon
+        (par moteur et par tâche) pour dimensionner le mode batch (M19.5).
+- [ ] **M19.1 — Abstraction worker moteur + routage par voix**
+  - [ ] Interface commune `synthesize(texte, prompt_wav, prompt_text, speed)`
+        (même signature que `cosyvoice_engine.synthesize`, injectable comme
+        `SynthesizeFn` dans `adaptive.py`) ; wrappers `engine/xtts_engine.py`
+        **puis `engine/fishspeech_engine.py`**.
+  - [ ] **Rôles de workers par type de calcul** (un rôle = déployable seul sur
+        n'importe quelle machine) : `synthese` (CosyVoice3 / XTTS-v2 /
+        Fish-Speech), `verify` (Whisper), `enhance` (Demucs + DeepFilterNet),
+        `audit` (M17.1), `lora-train` (M18.2) ; chaque worker s'annonce
+        (rôle, moteur, VRAM/CPU, version de modèle) au coordinateur.
+  - [ ] Colonne `moteur` dans `voix.txt` (défaut `cosyvoice3`, rétrocompatible) ;
+        `multi.generate()` dispatche chaque bloc vers le bon worker ; panneau
+        « 🧠 Modèles » étendu au téléchargement/détection des modèles par
+        moteur et par machine.
+- [ ] **M19.2 — Cohérence du montage multi-moteurs**
+  - [ ] Resample + alignement de loudness par bloc (sample rates / niveaux
+        différents selon moteur), sinon les changements de voix s'entendent ;
+        non-régression sur montage témoin.
+  - [ ] Adapter `create_voix`/import au format de prompt par moteur (XTTS :
+        wav seul 6–30 s sans `.txt` ; Fish-Speech : avec/sans texte de
+        référence).
+- [ ] **M19.3 — Placement multi-GPU local (1 moteur / GPU)**
+  - [ ] Un processus worker par moteur, chacun avec son `CUDA_VISIBLE_DEVICES`
+        (ex. CosyVoice → `cuda:0`, XTTS → `cuda:1`) : isolation des OOM,
+        redémarrage indépendant, **génération en parallèle** (zéro switch) ;
+        repli chargement/déchargement séquentiel sur GPU unique.
+- [ ] **M19.4 — Workers distants (autres machines, GPU ou CPU)**
+  - [ ] Adressage réseau des workers (`http://machine-b:8001`, token d'auth,
+        TLS hors LAN de confiance) ; file de jobs + retries/timeouts, warmup au
+        démarrage, **épinglage des versions de modèles** entre machines,
+        fan-in SSE vers le GUI ; **presets de déploiement par machine**
+        (ex. `gpu-synth`, `cpu-service`, `cpu-batch`, `lora-train`).
+- [ ] **M19.5 — Mode CPU-only (2× bi-Xeon 128 Go, sans GPU)**
+  - [ ] Preset `cpu-only` : `verify` (Whisper, voire modèle supérieur au
+        `small` puisque la RAM le permet), `enhance` (DeepFilterNet léger ;
+        Demucs en batch), `audit`, préparation datasets — tous à l'aise sur
+        Xeon ; plusieurs workers par serveur (128 Go RAM : modèles + cache).
+  - [ ] Synthèse CPU (CosyVoice / XTTS / Fish-Speech) : RTF ≫ 1 assumé —
+        **batch de nuit uniquement**, pas d'interactif ; thread pools torch
+        réglés (intra/inter-op), quantification/ONNX à évaluer par moteur si
+        le RTF batch reste trop lent.
+  - [ ] Ordonnancement : la GUI envoie le batch le soir, les Xeon traitent la
+        nuit (synthèse + vérif + enhance), résultats prêts au matin ; suivi
+        via la file de jobs (M19.4).
+- [ ] **M19.6 — Cache applicatif explicite VRAM ↔ RAM (offload maîtrisé)**
+  - [ ] Principe repris (pas de swapping transparent subi) : **le programme
+        décide ce qui réside en VRAM** — placement explicite des couches
+        (GPU/CPU), pool de staging pinned **limité** (8–32 Go sur 128 Go, jamais
+        de pinned massif = pression mémoire), transferts async là où le moteur
+        les expose, préchargement du prochain worker pendant le calcul courant.
+  - [ ] Limite d'applicabilité honnête : CosyVoice3 / XTTS-v2 / Fish-Speech sont
+        **denses, pas MoE** — il n'y a pas de granularité « experts » à cacher
+        (pas de « 4 experts actifs sur 128 ») ; l'offload utile ici = couches
+        statiques vers CPU, quantification, ZeRO-offload (entraînement, M18.2),
+        `--gpu-layers` là où supporté. **Pas de réimplémentation maison d'un
+        cache d'experts.**
+  - [ ] 3 tiers pour la bibliothèque de modèles/LoRA (bi-Xeon 128 Go) : NVMe
+        (stockage froid) → RAM mmap (backing store chaud) → VRAM (actif).
+  - [ ] Bench décisionnel : RTF offload vs full-GPU par moteur/tâche — si le
+        transfert PCIe dépasse le calcul (cas typique des denses en inférence),
+        réserver l'offload à l'entraînement/stockage et garder l'inférence
+        full-GPU ou CPU-batch (M19.5).
 
 ---
 
