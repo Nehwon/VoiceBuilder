@@ -781,9 +781,19 @@ async function sauvegarderAvantGeneration() {
 }
 
 let generationActive = false;
+let arretEnCours = false;
 let contenuGenere = null;   // contenu éditeur au moment de la génération
 
+function majBoutonArret() {
+  const b = $("generer-stop");
+  if (!b) return;
+  b.hidden = !generationActive;
+  b.disabled = !generationActive || arretEnCours;
+  b.textContent = arretEnCours ? "Arrêt…" : "⏹ Arrêter";
+}
+
 function majBoutonGenerer() {
+  majBoutonArret();
   const peutRegenerer = !generationActive && contenuGenere !== null &&
     contenuGenere !== cm.getValue();
   if (generationActive) {
@@ -872,6 +882,7 @@ $("generer").addEventListener("click", async () => {
     ev.close();
     if (!erreur) contenuGenere = cm.getValue();
     generationActive = false;
+    arretEnCours = false;
     majBoutonGenerer();
     terminerProgression();
   };
@@ -883,6 +894,22 @@ $("generer").addEventListener("click", async () => {
     if (b.wav) {
       ajouterBlocTempsReel(b);
     }
+  });
+  ev.addEventListener("stop", (e) => {
+    let d = {};
+    try { d = JSON.parse(e.data); } catch { /* données non JSON */ }
+    const n = (d.blocs || []).length;
+    $("log").textContent += n > 0
+      ? `\n⏹ Génération arrêtée : ${n} bloc(s) conservé(s).\n`
+      : "\n⏹ Génération arrêtée avant le premier bloc.\n";
+    notifier("Génération arrêtée.", "ok");
+    if (n > 0) {
+      $("montage").src = `/api/generer/${id}/result`;
+      montageId = id;
+      majMontage();
+      mountVue("montage");
+    }
+    fin(true);
   });
   ev.addEventListener("result", (e) => {
     const res = JSON.parse(e.data);
@@ -909,6 +936,28 @@ $("generer").addEventListener("click", async () => {
     fin(true);
   });
   ev.addEventListener("end", fin);
+});
+
+$("generer-stop").addEventListener("click", async () => {
+  if (!generationActive || arretEnCours || !montageId) return;
+  arretEnCours = true;
+  majBoutonArret();
+  try {
+    const r = await fetch(`/api/generer/${montageId}/arret`, { method: "POST" });
+    if (!r.ok) {
+      let m = "Impossible d'arrêter la génération.";
+      try { m = (await r.json()).detail || m; } catch { /* corps non JSON */ }
+      $("log").textContent += `\n⏹ ${m}\n`;
+      notifier(m, "err");
+      arretEnCours = false;
+      majBoutonArret();
+    }
+  } catch {
+    $("log").textContent += "\n⏹ Impossible d'arrêter (connexion au serveur interrompue).\n";
+    notifier("Impossible d'arrêter (réseau).", "err");
+    arretEnCours = false;
+    majBoutonArret();
+  }
 });
 
 // ---------------------------------------------------------------- montage : blocs

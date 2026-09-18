@@ -59,6 +59,7 @@ def generate(
     block_dir: Optional[str] = None,
     verbose: bool = True,
     progress=None,
+    stop_event=None,
     load_vllm: bool = False,
     load_trt: bool = False,
 ) -> dict:
@@ -75,6 +76,10 @@ def generate(
     ``progress`` : callback ``progress(dict)`` appelé à la fin de chaque bloc avec
     ``{index, total, personnage, chars, duree}`` puis, une fois concaténé, avec
     ``{duree: ..., blocs: [...]}`` (utile au GUI serveur).
+
+    ``stop_event`` : ``threading.Event`` optionnel. S'il est levé, la boucle
+    abandonne à la fin du bloc en cours : le résultat (partiel) est rendu avec
+    ``stopped: True`` et le WAV (si ``out``) contient les blocs déjà générés.
     """
     if verbose:
         print(f"Voix disponibles : {voices.names()}")
@@ -118,7 +123,12 @@ def generate(
 
     total = len(sous_blocs)
     pers_precedent = None
+    stopped = False
     for i, (pers, voix_nom, voice, t, block_chars, block_speed) in enumerate(sous_blocs, 1):
+        # Arrêt demandé : on laisse le bloc en cours se terminer puis on abandonne.
+        if stop_event is not None and stop_event.is_set():
+            stopped = True
+            break
         audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed, verify)
         # Pause uniquement au changement de personnage : les sous-blocs d'un même
         # locuteur s'enchaînent sans coupure dans le montage final.
@@ -144,7 +154,7 @@ def generate(
                       "chars": len(t), "duree": round(dur, 2),
                       "wav": info.get("wav")})
 
-    final = np.concatenate(parts)
+    final = np.concatenate(parts) if parts else np.zeros(0, dtype=np.float32)
     res = {
         "audio": final,
         "sample_rate": sr,
@@ -152,10 +162,15 @@ def generate(
         "blocs": blocs_report,
         "out": out,
     }
-    if out:
+    if stopped:
+        res["stopped"] = True
+        if not parts:
+            res["duration"] = 0.0
+    if out and parts:
         cosyvoice_engine.save(final, sr, out)
         if verbose:
-            print(f"\nEnregistré : {out} ({res['duration']} s)")
+            label = "Arrêté (partiel)" if stopped else "Enregistré"
+            print(f"\n{label} : {out} ({res['duration']} s)")
     if progress:
         progress({"duree": res["duration"], "blocs": len(blocs_report)})
     return res

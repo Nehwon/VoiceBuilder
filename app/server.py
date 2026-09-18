@@ -445,7 +445,8 @@ def api_generer(payload: GenererIn):
            "error": None, "tmp": tmp, "out": sortie, "bloc_dir": str(bloc_dir),
            "pause": payload.pause, "vitesse": payload.vitesse,
            "max_chars": payload.max_chars, "verify": payload.verify,
-           "device": payload.device, "personnages": payload.personnages}
+           "device": payload.device, "personnages": payload.personnages,
+           "stop_event": threading.Event(), "stopped": False}
     _jobs[jid] = job
 
     def _run():
@@ -462,12 +463,14 @@ def api_generer(payload: GenererIn):
                 verify=payload.verify, device=payload.device,
                 block_dir=str(bloc_dir), fp16=False, verbose=False,
                 progress=progress_wrapper,
+                stop_event=job["stop_event"],
                 load_vllm=payload.load_vllm, load_trt=payload.load_trt,
             )
             job["result"] = res
             job["blocs"] = res.get("blocs", [])
             job["sample_rate"] = res.get("sample_rate")
-            job["status"] = "done"
+            job["stopped"] = bool(res.get("stopped"))
+            job["status"] = "stopped" if job["stopped"] else "done"
         except Exception as exc:  # noqa: BLE001
             job["error"] = str(exc)
             job["status"] = "error"
@@ -499,6 +502,12 @@ def api_stream(jid: int):
                 break
         if job["error"]:
             yield f"event: error\ndata: {json.dumps({'error': job['error']})}\n\n"
+        elif job.get("stopped"):
+            r = job["result"] or {}
+            data = json.dumps({"status": "stopped",
+                               "duree": r.get("duration"),
+                               "blocs": job.get("blocs", [])})
+            yield f"event: stop\ndata: {data}\n\n"
         elif job["result"]:
             r = job["result"]
             data = json.dumps({
@@ -510,13 +519,29 @@ def api_stream(jid: int):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+@app.post("/api/generer/{jid}/arret")
+def api_generer_arret(jid: int):
+    """Demande l'arrêt propre : le bloc en cours se termine, le reste est abandonné.
+
+    Le résultat partiel (blocs déjà générés + WAV montage partiel) reste disponible.
+    """
+    job = _job_live(jid)
+    if job.get("status") != "running":
+        raise HTTPException(409, "La génération n'est plus en cours.")
+    evt = job.get("stop_event")
+    if evt is not None:
+        evt.set()
+    return {"ok": True, "message": "Arrêt demandé."}
+
+
 @app.get("/api/generer/{jid}/result")
 def api_result(jid: int):
-    job = _jobs.get(jid)
-    if not job or job["status"] != "done" or not job["result"]:
+    """Renvoie le WAV complet (génération normale) ou partiel (génération arrêtée)."""
+    job = _job_live(jid)
+    f = Path(job["out"])
+    if not f.exists():
         raise HTTPException(404, "Résultat indisponible.")
-    return FileResponse(job["out"], media_type="audio/wav",
-                        filename=Path(job["out"]).name)
+    return FileResponse(f, media_type="audio/wav", filename=f.name)
 
 
 def _job_live(jid: int) -> dict:

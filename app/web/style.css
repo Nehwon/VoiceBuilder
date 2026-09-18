@@ -171,6 +171,9 @@ h1 { font-size: 18px; margin: 0; white-space: nowrap; }
 
 .barre-boutons { display: flex; gap: 8px; margin-top: 10px; }
 .barre-boutons button { margin: 0; }
+#generer-stop { background: var(--dim); border-color: var(--dim); color: #fff; }
+#generer-stop:not([hidden]) + #generer { margin-left: 4px; }
+#generer-stop[hidden] { display: none; }
 
 /* ---------------------------------------------------------------- montage */
 .montage-vue {
