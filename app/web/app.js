@@ -151,7 +151,18 @@ function initEditeur() {
     lineNumbers: true,
     lineWrapping: true,
     placeholder: "[Narrateur]: …",
-    extraKeys: { Tab: completer },
+    extraKeys: {
+      Tab: completer,
+      "Alt-1": () => insererTokenSimple("<|HAPPY|>"),
+      "Alt-2": () => insererTokenSimple("<|SAD|>"),
+      "Alt-3": () => insererTokenSimple("<|ANGRY|>"),
+      "Alt-4": () => insererTokenSimple("<|NEUTRAL|>"),
+      "Alt-5": () => insererTokenSimple("[sigh]"),
+      "Alt-6": () => insererTokenSimple("[laughter]"),
+      "Alt-7": () => insererTokenSimple("[breath]"),
+      "Alt-8": () => insererTokenEncadrant("<strong>", "</strong>"),
+      "Alt-9": () => insererTokenEncadrant("<|Laughter|>", "<|/Laughter|>"),
+    },
   });
   cm.on("change", () => { autoEnregistrer(); majMontage(); majBoutonGenerer(); });
 }
@@ -338,6 +349,313 @@ function majBoutonsPerso() {
     };
     box.appendChild(b);
   }
+}
+
+// ---------------------------------------------------------------- barre d'outils émotions (M10.2)
+// Tokens CosyVoice3 — cf. docs/UTILISATION.md §4. Un seul tag par bloc (sobres).
+const TOKENS_EMOTIONS = [
+  { token: "<|HAPPY|>",   lib: "HAPPY",   titre: "Joie",            racc: "Alt+1" },
+  { token: "<|SAD|>",     lib: "SAD",     titre: "Tristesse",       racc: "Alt+2" },
+  { token: "<|ANGRY|>",   lib: "ANGRY",   titre: "Colère",          racc: "Alt+3" },
+  { token: "<|NEUTRAL|>", lib: "NEUTRAL", titre: "Neutre",          racc: "Alt+4" },
+];
+const TOKENS_SONS = [
+  { token: "[sigh]",            lib: "sigh",            titre: "Soupir",                         racc: "Alt+5" },
+  { token: "[laughter]",        lib: "laughter",        titre: "Rire",                           racc: "Alt+6" },
+  { token: "[breath]",          lib: "breath",          titre: "Respiration",                    racc: "Alt+7" },
+  { token: "[cough]",           lib: "cough",           titre: "Toux" },
+  { token: "[quick_breath]",    lib: "quick_breath",    titre: "Respiration courte" },
+  { token: "[clucking]",        lib: "clucking",        titre: "Claquement de langue" },
+  { token: "[hissing]",         lib: "hissing",         titre: "Sifflante" },
+  { token: "[lipsmack]",        lib: "lipsmack",        titre: "Claquement de lèvres" },
+  { token: "[noise]",           lib: "noise",           titre: "Bruit" },
+  { token: "[vocalized-noise]", lib: "vocalized-noise", titre: "Bruit vocalisé" },
+  { token: "[accent]",          lib: "accent",          titre: "Accent" },
+  { token: "[mn]",              lib: "mn",              titre: "Grognement / acquiescement" },
+];
+const TOKENS_EMPASE = { ouvre: "<strong>", ferme: "</strong>", lib: "strong", titre: "Emphase (entoure la sélection)", racc: "Alt+8" };
+const TOKENS_AMBIANCE = [
+  { ouvre: "<|Laughter|>", ferme: "<|/Laughter|>", lib: "Laughter", titre: "Rires en fond (entoure la sélection)", racc: "Alt+9" },
+  { ouvre: "<|Applause|>", ferme: "<|/Applause|>", lib: "Applause", titre: "Applaudissements (entoure la sélection)" },
+  { ouvre: "<|BGM|>",      ferme: "<|/BGM|>",      lib: "BGM",      titre: "Musique d'ambiance (entoure la sélection)" },
+];
+// Insère un token sans fermeture (émotion, son) au curseur.
+function insererTokenSimple(token) {
+  if (!cm) return;
+  const avant = cm.getCursor();
+  cm.replaceSelection(token);
+  // Espace après le token s'il n'est pas déjà suivi d'un espace/nouvelle ligne.
+  const apres = cm.getCursor();
+  const ligne = cm.getLine(apres.line) || "";
+  if (avant.line === apres.line && ligne[apres.ch] !== undefined && !/[\s]/.test(ligne[apres.ch])) {
+    cm.replaceSelection(" ");
+  }
+  cm.focus();
+}
+
+// Insère un token encadrant (emphase, ambiance) autour de la sélection,
+// ou ouvre+ferme vides avec le curseur au milieu si rien n'est sélectionné.
+function insererTokenEncadrant(ouvre, ferme) {
+  if (!cm) return;
+  const { from, to } = cm.listSelections()[0];
+  const sel = cm.getSelection();
+  if (sel) {
+    cm.replaceSelection(ouvre + sel + ferme);
+    if (from.line === to.line) {
+      cm.setCursor({ line: from.line, ch: from.ch + ouvre.length + sel.length + ferme.length });
+    }
+  } else {
+    cm.replaceSelection(ouvre + ferme);
+    cm.setCursor({ line: from.line, ch: from.ch + ouvre.length });
+  }
+  cm.focus();
+}
+
+// Construit boutons + sélecteurs « autres sons » dans la barre d'outils.
+function initBarreTokens() {
+  const construireBouton = (lib, titre, onclick, extra) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = lib;
+    b.title = titre;
+    if (extra) b.className = extra;
+    b.addEventListener("click", onclick);
+    return b;
+  };
+
+  const emo = $("emo-boutons");
+  for (const e of TOKENS_EMOTIONS) {
+    emo.appendChild(construireBouton(e.lib, `${e.titre} — insère ${e.token} (${e.racc})`,
+      () => insererTokenSimple(e.token)));
+  }
+
+  const son = $("son-boutons");
+  const courants = TOKENS_SONS.slice(0, 4);
+  const suite = TOKENS_SONS.slice(4);
+  for (const s of courants) {
+    son.appendChild(construireBouton(s.lib, `${s.titre} — insère ${s.token}${s.racc ? " (" + s.racc + ")" : ""}`,
+      () => insererTokenSimple(s.token)));
+  }
+  if (suite.length) {
+    const sel = document.createElement("select");
+    const vide = document.createElement("option");
+    vide.value = "";
+    vide.textContent = "autre…";
+    sel.appendChild(vide);
+    for (const s of suite) {
+      const o = document.createElement("option");
+      o.value = s.token;
+      o.textContent = s.lib;
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => {
+      if (sel.value) { insererTokenSimple(sel.value); sel.value = ""; }
+    });
+    son.appendChild(sel);
+  }
+
+  $("btn-strong").addEventListener("click", () =>
+    insererTokenEncadrant(TOKENS_EMPASE.ouvre, TOKENS_EMPASE.ferme));
+
+  const amb = $("amb-boutons");
+  for (const a of TOKENS_AMBIANCE) {
+    amb.appendChild(construireBouton(a.lib, `${a.titre} — entoure ${a.ouvre}…${a.ferme}${a.racc ? " (" + a.racc + ")" : ""}`,
+      () => insererTokenEncadrant(a.ouvre, a.ferme)));
+  }
+}
+
+// ---------------------------------------------------------------- groupes modulaires de la barre (M10.2)
+// Chaque groupe est un bloc déplaçable (drag-n-drop natif), repliable et masquable ;
+// l'ordre et l'état sont persistés côté client et restaurés à l'ouverture.
+const CLE_GROUPES = "vb-toolbar-groupes";
+const ORDRE_DEFAUT = ["personnages", "emotions", "sons", "emphase", "ambiances"];
+let groupeDrag = null;
+
+function rendreGroupesModulables() {
+  const barre = document.querySelector(".toolbar-wysiwyg");
+  if (!barre) return;
+
+  // --- drag-and-drop (réordonner) : la prise « ⠿ » est l'élément draggable ---
+  document.querySelectorAll(".groupe-toolbar").forEach((g) => {
+    const grip = g.querySelector(".grip");
+    if (!grip) return;
+    let dans = 0;   // compteur d'enfants traversés : évite le "flicker" dragenter/dragleave
+    const marquerCible = (e) => {
+      const r = g.getBoundingClientRect();
+      g.classList.toggle("cible-gauche", e.clientX < r.left + r.width / 2);
+      g.classList.toggle("cible-droite", e.clientX >= r.left + r.width / 2);
+    };
+    grip.addEventListener("dragstart", (e) => {
+      groupeDrag = g;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", g.dataset.groupe);
+      requestAnimationFrame(() => g.classList.add("en-drag"));
+    });
+    grip.addEventListener("dragend", () => {
+      groupeDrag = null;
+      document.querySelectorAll(".groupe-toolbar").forEach((x) =>
+        x.classList.remove("en-drag", "cible-gauche", "cible-droite"));
+    });
+    g.addEventListener("dragenter", (e) => {
+      if (!groupeDrag || groupeDrag === g) return;
+      e.preventDefault();
+      dans++;
+      marquerCible(e);
+    });
+    g.addEventListener("dragover", (e) => {
+      if (!groupeDrag || groupeDrag === g) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      marquerCible(e);
+    });
+    g.addEventListener("dragleave", () => {
+      dans--;
+      if (dans <= 0) {
+        dans = 0;
+        g.classList.remove("cible-gauche", "cible-droite");
+      }
+    });
+    g.addEventListener("drop", (e) => {
+      if (!groupeDrag || groupeDrag === g) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const r = g.getBoundingClientRect();
+      barre.insertBefore(groupeDrag, e.clientX < r.left + r.width / 2 ? g : g.nextSibling);
+      finDeplacementGroupes();
+    });
+  });
+
+  // --- replier / déplier ---
+  document.querySelectorAll(".groupe-toolbar").forEach((g) => {
+    const btn = g.querySelector(".groupe-replier");
+    if (btn) btn.addEventListener("click", () => {
+      g.classList.toggle("replie");
+      btn.textContent = g.classList.contains("replie") ? "▸" : "▾";
+      persisterGroupes();
+    });
+    const masq = g.querySelector(".groupe-masquer");
+    if (masq) masq.addEventListener("click", () => {
+      g.classList.add("masque");
+      actualiserSelectGroupes();
+      persisterGroupes();
+    });
+  });
+
+  construireSelectGroupes();
+}
+
+function finDeplacementGroupes() {
+  document.querySelectorAll(".groupe-toolbar").forEach((x) =>
+    x.classList.remove("en-drag", "cible-gauche", "cible-droite"));
+  barreGroupes().appendChild($("sel-groupes-caches"));   // le sélecteur reste en fin de barre
+  persisterGroupes();
+  groupeDrag = null;
+}
+
+function barreGroupes() { return document.querySelector(".toolbar-wysiwyg"); }
+
+// Reconstruit le sélecteur de groupes masqués + réinitialisation.
+function construireSelectGroupes() {
+  let sel = $("sel-groupes-caches");
+  if (!sel) {
+    sel = document.createElement("select");
+    sel.id = "sel-groupes-caches";
+    sel.title = "Réafficher un groupe masqué · ↺ remettre la barre par défaut";
+    barreGroupes().appendChild(sel);
+    sel.addEventListener("change", () => {
+      const v = sel.value;
+      sel.value = "";
+      if (v === "__reset__") { reinitialiserGroupes(); return; }
+      const g = barreGroupes().querySelector(`.groupe-toolbar[data-groupe="${v}"]`);
+      if (g) { g.classList.remove("masque"); actualiserSelectGroupes(); persisterGroupes(); }
+    });
+  }
+  actualiserSelectGroupes();
+}
+
+function actualiserSelectGroupes() {
+  const sel = $("sel-groupes-caches");
+  if (!sel) return;
+  sel.innerHTML = "";
+  const vide = document.createElement("option");
+  vide.value = "";
+  vide.textContent = "groupe masqué ▷";
+  sel.appendChild(vide);
+  document.querySelectorAll(".groupe-toolbar").forEach((g) => {
+    if (g.classList.contains("masque")) {
+      const o = document.createElement("option");
+      o.value = g.dataset.groupe;
+      o.textContent = "＋ " + (g.querySelector(".groupe-label")?.textContent || g.dataset.groupe);
+      sel.appendChild(o);
+    }
+  });
+  const o = document.createElement("option");
+  o.value = "__reset__";
+  o.textContent = "↺ Réinitialiser la barre";
+  sel.appendChild(o);
+  barreGroupes().appendChild(sel);
+}
+
+function reinitialiserGroupes() {
+  const frag = document.createDocumentFragment();
+  for (const cle of ORDRE_DEFAUT) {
+    const g = barreGroupes().querySelector(`.groupe-toolbar[data-groupe="${cle}"]`);
+    if (g) {
+      g.classList.remove("masque", "replie");
+      frag.appendChild(g);
+    }
+  }
+  if ($("sel-groupes-caches")) frag.appendChild($("sel-groupes-caches"));
+  barreGroupes().innerHTML = "";
+  barreGroupes().appendChild(frag);
+  appliquerRepliBoutons();
+  actualiserSelectGroupes();
+  localStorage.removeItem(CLE_GROUPES);
+}
+
+// Persiste l'ordre et l'état courant des groupes.
+function persisterGroupes() {
+  const liste = [];
+  document.querySelectorAll(".groupe-toolbar").forEach((g) => {
+    liste.push({
+      g: g.dataset.groupe,
+      replie: g.classList.contains("replie"),
+      masque: g.classList.contains("masque"),
+    });
+  });
+  localStorage.setItem(CLE_GROUPES, JSON.stringify(liste));
+}
+
+// Rejoue l'ordre/état persisté lors de l'ouverture.
+function appliquerGroupesStockees() {
+  let stock = null;
+  try { stock = JSON.parse(localStorage.getItem(CLE_GROUPES) || "null"); } catch { stock = null; }
+  if (!Array.isArray(stock) || !stock.length) { appliquerRepliBoutons(); return; }
+  const frag = document.createDocumentFragment();
+  const connus = new Set(stock.map((e) => e.g));
+  for (const ent of stock) {
+    const g = barreGroupes().querySelector(`.groupe-toolbar[data-groupe="${ent.g}"]`);
+    if (!g) continue;
+    g.classList.toggle("replie", !!ent.replie);
+    g.classList.toggle("masque", !!ent.masque);
+    frag.appendChild(g);
+  }
+  // groupes apparus depuis (ex. après mise à jour) : placés en fin de barre
+  document.querySelectorAll(".groupe-toolbar").forEach((g) => {
+    if (!connus.has(g.dataset.groupe)) frag.appendChild(g);
+  });
+  if ($("sel-groupes-caches")) frag.appendChild($("sel-groupes-caches"));
+  barreGroupes().innerHTML = "";
+  barreGroupes().appendChild(frag);
+  appliquerRepliBoutons();
+  actualiserSelectGroupes();
+}
+
+function appliquerRepliBoutons() {
+  document.querySelectorAll(".groupe-toolbar").forEach((g) => {
+    const btn = g.querySelector(".groupe-replier");
+    if (btn) btn.textContent = g.classList.contains("replie") ? "▸" : "▾";
+  });
 }
 
 // ---------------------------------------------------------------- modal personnages
@@ -1537,6 +1855,9 @@ $("btn-voix-enregistrer").addEventListener("click", async () => {
 // ---------------------------------------------------------------- init
 (async function init() {
   initEditeur();
+  initBarreTokens();
+  rendreGroupesModulables();
+  appliquerGroupesStockees();
   majMontage();
   majBoutonsPerso();
   await chargerDocuments();

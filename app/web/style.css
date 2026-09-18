@@ -114,10 +114,42 @@ h1 { font-size: 18px; margin: 0; white-space: nowrap; }
   display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
   padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--bor);
 }
-.toolbar-wysiwyg .sep { border-left: 1px solid var(--bor); align-self: stretch; }
 .toolbar-wysiwyg button, .toolbar-wysiwyg .perso-boutons button { margin: 0; padding: 5px 10px; }
 .perso-boutons { display: flex; gap: 6px; flex-wrap: wrap; }
 .perso-boutons button { font-weight: 600; }
+
+/* Groupes modulaires de la barre d'outils (M10.2 — blocs GrapesJS/GridStack-like) */
+.groupe-toolbar {
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+  padding: 3px 6px; background: var(--panel2); border: 1px solid var(--bor); border-radius: 6px;
+}
+.groupe-toolbar.masque { display: none; }
+.groupe-toolbar.en-drag { opacity: .45; }
+.groupe-toolbar.cible-gauche { box-shadow: -3px 0 0 var(--acc); }
+.groupe-toolbar.cible-droite { box-shadow: 3px 0 0 var(--acc); }
+
+.groupe-tete { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.groupe-tete .grip { cursor: grab; color: var(--dim); user-select: none; padding: 0 2px; }
+.groupe-tete .grip:active { cursor: grabbing; }
+.groupe-tete .groupe-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--dim); user-select: none;
+}
+.groupe-tete button {
+  margin: 0; padding: 0 4px; font-size: 11px; line-height: 1;
+  background: none; border: none; color: var(--dim); cursor: pointer;
+}
+.groupe-tete button:hover { color: var(--acc); }
+.groupe-toolbar .groupe-corps {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.groupe-toolbar.replie .groupe-corps { display: none; }
+.groupe-toolbar .sep-v { border-left: 1px solid var(--bor); align-self: stretch; }
+#sel-groupes-caches { width: auto; margin: 0; padding: 3px 6px; font-size: 12px; max-width: 180px; }
+.token-boutons { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; }
+.token-boutons button { margin: 0; padding: 3px 7px; font-family: ui-monospace, monospace; font-size: 12px; }
+.toolbar-wysiwyg select { width: auto; margin: 0; padding: 3px 6px; font-size: 12px; }
+.btn-strong { font-weight: 800; font-size: 13px !important; }
 
 #zone-editeur { flex: 1 1 auto; min-height: 0; }
 

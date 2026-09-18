@@ -148,18 +148,22 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       porte `id`/`voix`/`texte` et l'audio est servi par l'API
       (`/api/generer/{id}/bloc/{bid}/wav`) — lecture possible dès la fin de
       chaque bloc, boutons Régénérer/Diviser opérationnels en direct.
-- [ ] **M10.2 — Barre d'outils « émotions » dans l'éditeur** : insérer en un clic
+- [x] **M10.2 — Barre d'outils « émotions » dans l'éditeur** : insérer en un clic
       les tokens CosyVoice3 (`docs/UTILISATION.md` §4, `PROJET_FINE.md` palier 0)
       directement dans le texte au curseur — émotions `<|HAPPY|>` / `<|SAD|>` /
       `<|ANGRY|>` / `<|NEUTRAL|>`, sons `[sigh]` / `[laughter]` / `[breath]` / …,
       emphase `<strong>` (entoure la sélection), ambiances
       `<|Laughter|>…<|/Laughter|>` / `<|Applause|>…` / `<|BGM|>…` ; rappel de
       sobriété (1 tag par bloc) dans l'aide.
-  - [ ] **Raccourcis clavier** : chaque token/classe de token a un raccourci
-        (ex. `Ctrl+E` puis lettre, ou `Alt+1…9`), sans conflit avec
-        l'autocomplétion `Tab` ni les `extraKeys` CodeMirror ; raccourcis
-        visibles dans les infobulles et rappelés dans l'aide.
-  - [ ] **Forme façon GrapesJS (GridStack / Interact.js)** : chaque groupe de la
+  - [x] **Barre d'outils émotions** (`app/web/index.html:61-88`,
+        `app/web/app.js` §« barre d'outils émotions ») : groupes modulaires
+        `groupe-toolbar` (Émotions, Sons + sélecteur « autre… », Emphase,
+        Ambiances) insérant les tokens au curseur ; emphase/ambiances autour de
+        la sélection ; rappel sobriété ajouté à la modal d'aide.
+  - [x] **Raccourcis clavier** : `Alt+1…4` émotions, `Alt+5…7` sons,
+        `Alt+8` emphase, `Alt+9` ambiance rires (`extraKeys` CodeMirror, sans
+        conflit avec `Tab`), visibles en infobulles et rappelés dans l'aide.
+  - [x] **Forme façon GrapesJS (GridStack / Interact.js)** : chaque groupe de la
         barre d'outils (personnages, émotions, insertion `[Nom]:`) est un
         **bloc modulaire déplaçable / réordonnable par glisser-déposer**
         (inspiration GridStack : grille de blocs, Interact.js : gestes

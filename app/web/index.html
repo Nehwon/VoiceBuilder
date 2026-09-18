@@ -59,9 +59,63 @@
     <section class="col-edit">
       <div class="box-editeur">
         <div class="toolbar-wysiwyg">
-          <button id="btn-personnages" title="Gérer les personnages et leurs voix">Personnages…</button>
-          <span class="sep"></span>
-          <div id="perso-boutons" class="perso-boutons"></div>
+          <div class="groupe-toolbar" data-groupe="personnages">
+            <span class="groupe-tete">
+              <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
+              <span class="groupe-label">Personnages</span>
+              <button type="button" class="groupe-replier" title="Replier / déplier le groupe">▾</button>
+              <button type="button" class="groupe-masquer" title="Masquer ce groupe">✕</button>
+            </span>
+            <span class="groupe-corps">
+              <button id="btn-personnages" title="Gérer les personnages et leurs voix">Personnages…</button>
+              <span class="sep-v"></span>
+              <span id="perso-boutons" class="perso-boutons"></span>
+            </span>
+          </div>
+          <div class="groupe-toolbar" data-groupe="emotions">
+            <span class="groupe-tete">
+              <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
+              <span class="groupe-label">Émotions</span>
+              <button type="button" class="groupe-replier" title="Replier / déplier le groupe">▾</button>
+              <button type="button" class="groupe-masquer" title="Masquer ce groupe">✕</button>
+            </span>
+            <span class="groupe-corps">
+              <div id="emo-boutons" class="token-boutons"></div>
+            </span>
+          </div>
+          <div class="groupe-toolbar" data-groupe="sons">
+            <span class="groupe-tete">
+              <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
+              <span class="groupe-label">Sons</span>
+              <button type="button" class="groupe-replier" title="Replier / déplier le groupe">▾</button>
+              <button type="button" class="groupe-masquer" title="Masquer ce groupe">✕</button>
+            </span>
+            <span class="groupe-corps">
+              <div id="son-boutons" class="token-boutons"></div>
+            </span>
+          </div>
+          <div class="groupe-toolbar" data-groupe="emphase">
+            <span class="groupe-tete">
+              <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
+              <span class="groupe-label">Emphase</span>
+              <button type="button" class="groupe-replier" title="Replier / déplier le groupe">▾</button>
+              <button type="button" class="groupe-masquer" title="Masquer ce groupe">✕</button>
+            </span>
+            <span class="groupe-corps">
+              <button id="btn-strong" class="btn-strong" title="Emphase — entoure la sélection avec &lt;strong&gt;…&lt;/strong&gt; (Alt+8)"><strong>B</strong></button>
+            </span>
+          </div>
+          <div class="groupe-toolbar" data-groupe="ambiances">
+            <span class="groupe-tete">
+              <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
+              <span class="groupe-label">Ambiances</span>
+              <button type="button" class="groupe-replier" title="Replier / déplier le groupe">▾</button>
+              <button type="button" class="groupe-masquer" title="Masquer ce groupe">✕</button>
+            </span>
+            <span class="groupe-corps">
+              <div id="amb-boutons" class="token-boutons"></div>
+            </span>
+          </div>
         </div>
         <div id="zone-editeur"></div>
       </div>
@@ -207,6 +261,21 @@
         <li>Une ligne qui ne commence pas par une balise reprend donc la voix en cours (celle du dernier personnage cité).</li>
         <li>Les lignes débutant par <code>#</code> sont des commentaires (ignorés du montage).</li>
         <li>L'éditeur complète la balise avec la touche <kbd>Tab</kbd>.</li>
+        <li>La barre d'outils est <strong>modulaire</strong> : chaque groupe se déplace
+          à la prise ⠿, se replie (▾) et se masque (✕) ; l'état est mémorisé et
+          réinitialisable via « ↺ Réinitialiser la barre ».</li>
+      </ul>
+      <h3>Émotions & tokens CosyVoice3 (barre d'outils)</h3>
+      <ul>
+        <li><strong>Émotions</strong> : <code>&lt;|HAPPY|&gt;</code> <code>&lt;|SAD|&gt;</code>
+          <code>&lt;|ANGRY|&gt;</code> <code>&lt;|NEUTRAL|&gt;</code> — <kbd>Alt+1</kbd>…<kbd>Alt+4</kbd>.</li>
+        <li><strong>Sons</strong> : <code>[sigh]</code> <code>[laughter]</code>
+          <code>[breath]</code> <code>[cough]</code>, … — <kbd>Alt+5</kbd>…<kbd>Alt+7</kbd>, et « autre… » pour la liste complète.</li>
+        <li><strong>Emphase</strong> : <code>&lt;strong&gt;…&lt;/strong&gt;</code> entoure la sélection — <kbd>Alt+8</kbd>.</li>
+        <li><strong>Ambiances</strong> : <code>&lt;|Laughter|&gt;…&lt;|/Laughter|&gt;</code>,
+          <code>&lt;|Applause|&gt;…&lt;|/Applause|&gt;</code>, <code>&lt;|BGM|&gt;…&lt;|/BGM|&gt;</code> — <kbd>Alt+9</kbd>.</li>
+        <li><strong>Sobriété</strong> : un seul tag par bloc, au même endroit — l'empilement
+          déstabilise la prosodie (voir <code>docs/UTILISATION.md</code> §4).</li>
       </ul>
       <h3>Réglages de lecture</h3>
       <ul>
