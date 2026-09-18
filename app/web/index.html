@@ -97,12 +97,12 @@
           <div class="groupe-toolbar" data-groupe="emphase">
             <span class="groupe-tete">
               <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
-              <span class="groupe-label">Emphase</span>
+              <span class="groupe-label">Emphase (gras)</span>
               <button type="button" class="groupe-replier" title="Replier / déplier le groupe">▾</button>
               <button type="button" class="groupe-masquer" title="Masquer ce groupe">✕</button>
             </span>
             <span class="groupe-corps">
-              <button id="btn-strong" class="btn-strong" title="Emphase — entoure la sélection avec &lt;strong&gt;…&lt;/strong&gt; (Alt+8)"><strong>B</strong></button>
+              <button id="btn-strong" class="btn-strong" title="Emphase — met la sélection en gras (&lt;strong&gt;…&lt;/strong&gt;), Alt+8"><strong>B</strong></button>
             </span>
           </div>
           <div class="groupe-toolbar" data-groupe="ambiances">
@@ -267,13 +267,17 @@
       </ul>
       <h3>Émotions & tokens CosyVoice3 (barre d'outils)</h3>
       <ul>
-        <li><strong>Émotions</strong> : <code>&lt;|HAPPY|&gt;</code> <code>&lt;|SAD|&gt;</code>
-          <code>&lt;|ANGRY|&gt;</code> <code>&lt;|NEUTRAL|&gt;</code> — <kbd>Alt+1</kbd>…<kbd>Alt+4</kbd>.</li>
-        <li><strong>Sons</strong> : <code>[sigh]</code> <code>[laughter]</code>
-          <code>[breath]</code> <code>[cough]</code>, … — <kbd>Alt+5</kbd>…<kbd>Alt+7</kbd>, et « autre… » pour la liste complète.</li>
-        <li><strong>Emphase</strong> : <code>&lt;strong&gt;…&lt;/strong&gt;</code> entoure la sélection — <kbd>Alt+8</kbd>.</li>
-        <li><strong>Ambiances</strong> : <code>&lt;|Laughter|&gt;…&lt;|/Laughter|&gt;</code>,
-          <code>&lt;|Applause|&gt;…&lt;|/Applause|&gt;</code>, <code>&lt;|BGM|&gt;…&lt;|/BGM|&gt;</code> — <kbd>Alt+9</kbd>.</li>
+        <li><strong>Émotions</strong> : Joie <code>&lt;|HAPPY|&gt;</code>, Tristesse
+          <code>&lt;|SAD|&gt;</code>, Colère <code>&lt;|ANGRY|&gt;</code>, Neutre
+          <code>&lt;|NEUTRAL|&gt;</code> — <kbd>Alt+1</kbd>…<kbd>Alt+4</kbd>.</li>
+        <li><strong>Sons</strong> : Soupir <code>[sigh]</code> Rire <code>[laughter]</code>
+          Respiration <code>[breath]</code> Toux <code>[cough]</code>, … — <kbd>Alt+5</kbd>…<kbd>Alt+7</kbd>, et « autre… » pour la liste complète.</li>
+        <li><strong>Emphase (gras)</strong> : <code>&lt;strong&gt;…&lt;/strong&gt;</code>
+          met la sélection en gras — <kbd>Alt+8</kbd>.</li>
+        <li><strong>Ambiances</strong> : Rires
+          <code>&lt;|Laughter|&gt;…&lt;|/Laughter|&gt;</code>, Applaudissements
+          <code>&lt;|Applause|&gt;…&lt;|/Applause|&gt;</code>, Musique de fond
+          <code>&lt;|BGM|&gt;…&lt;|/BGM|&gt;</code> — <kbd>Alt+9</kbd>.</li>
         <li><strong>Sobriété</strong> : un seul tag par bloc, au même endroit — l'empilement
           déstabilise la prosodie (voir <code>docs/UTILISATION.md</code> §4).</li>
       </ul>

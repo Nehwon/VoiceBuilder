@@ -354,30 +354,30 @@ function majBoutonsPerso() {
 // ---------------------------------------------------------------- barre d'outils émotions (M10.2)
 // Tokens CosyVoice3 — cf. docs/UTILISATION.md §4. Un seul tag par bloc (sobres).
 const TOKENS_EMOTIONS = [
-  { token: "<|HAPPY|>",   lib: "HAPPY",   titre: "Joie",            racc: "Alt+1" },
-  { token: "<|SAD|>",     lib: "SAD",     titre: "Tristesse",       racc: "Alt+2" },
-  { token: "<|ANGRY|>",   lib: "ANGRY",   titre: "Colère",          racc: "Alt+3" },
-  { token: "<|NEUTRAL|>", lib: "NEUTRAL", titre: "Neutre",          racc: "Alt+4" },
+  { token: "<|HAPPY|>",   lib: "Joie",      titre: "Joie",      racc: "Alt+1" },
+  { token: "<|SAD|>",     lib: "Tristesse", titre: "Tristesse", racc: "Alt+2" },
+  { token: "<|ANGRY|>",   lib: "Colère",    titre: "Colère",    racc: "Alt+3" },
+  { token: "<|NEUTRAL|>", lib: "Neutre",    titre: "Neutre",    racc: "Alt+4" },
 ];
 const TOKENS_SONS = [
-  { token: "[sigh]",            lib: "sigh",            titre: "Soupir",                         racc: "Alt+5" },
-  { token: "[laughter]",        lib: "laughter",        titre: "Rire",                           racc: "Alt+6" },
-  { token: "[breath]",          lib: "breath",          titre: "Respiration",                    racc: "Alt+7" },
-  { token: "[cough]",           lib: "cough",           titre: "Toux" },
-  { token: "[quick_breath]",    lib: "quick_breath",    titre: "Respiration courte" },
-  { token: "[clucking]",        lib: "clucking",        titre: "Claquement de langue" },
-  { token: "[hissing]",         lib: "hissing",         titre: "Sifflante" },
-  { token: "[lipsmack]",        lib: "lipsmack",        titre: "Claquement de lèvres" },
-  { token: "[noise]",           lib: "noise",           titre: "Bruit" },
-  { token: "[vocalized-noise]", lib: "vocalized-noise", titre: "Bruit vocalisé" },
-  { token: "[accent]",          lib: "accent",          titre: "Accent" },
-  { token: "[mn]",              lib: "mn",              titre: "Grognement / acquiescement" },
+  { token: "[sigh]",            lib: "Soupir",                 titre: "Soupir",                         racc: "Alt+5" },
+  { token: "[laughter]",        lib: "Rire",                   titre: "Rire",                           racc: "Alt+6" },
+  { token: "[breath]",          lib: "Respiration",            titre: "Respiration",                    racc: "Alt+7" },
+  { token: "[cough]",           lib: "Toux",                   titre: "Toux" },
+  { token: "[quick_breath]",    lib: "Resp. courte",           titre: "Respiration courte" },
+  { token: "[clucking]",        lib: "Claquement de langue",   titre: "Claquement de langue" },
+  { token: "[hissing]",         lib: "Sifflement",             titre: "Sifflante" },
+  { token: "[lipsmack]",        lib: "Claquement de lèvres",   titre: "Claquement de lèvres" },
+  { token: "[noise]",           lib: "Bruit",                  titre: "Bruit" },
+  { token: "[vocalized-noise]", lib: "Bruit vocalisé",         titre: "Bruit vocalisé" },
+  { token: "[accent]",          lib: "Accent",                 titre: "Accent" },
+  { token: "[mn]",              lib: "Grognement",             titre: "Grognement / acquiescement" },
 ];
-const TOKENS_EMPASE = { ouvre: "<strong>", ferme: "</strong>", lib: "strong", titre: "Emphase (entoure la sélection)", racc: "Alt+8" };
+const TOKENS_EMPASE = { ouvre: "<strong>", ferme: "</strong>", lib: "Gras", titre: "Emphase : met la sélection en gras", racc: "Alt+8" };
 const TOKENS_AMBIANCE = [
-  { ouvre: "<|Laughter|>", ferme: "<|/Laughter|>", lib: "Laughter", titre: "Rires en fond (entoure la sélection)", racc: "Alt+9" },
-  { ouvre: "<|Applause|>", ferme: "<|/Applause|>", lib: "Applause", titre: "Applaudissements (entoure la sélection)" },
-  { ouvre: "<|BGM|>",      ferme: "<|/BGM|>",      lib: "BGM",      titre: "Musique d'ambiance (entoure la sélection)" },
+  { ouvre: "<|Laughter|>", ferme: "<|/Laughter|>", lib: "Rires",               titre: "Rires en fond (entoure la sélection)", racc: "Alt+9" },
+  { ouvre: "<|Applause|>", ferme: "<|/Applause|>", lib: "Applaudissements",     titre: "Applaudissements (entoure la sélection)" },
+  { ouvre: "<|BGM|>",      ferme: "<|/BGM|>",      lib: "Musique de fond",      titre: "Musique d'ambiance (entoure la sélection)" },
 ];
 // Insère un token sans fermeture (émotion, son) au curseur.
 function insererTokenSimple(token) {
