@@ -41,6 +41,7 @@ function mountVue(nom) {
   if (nom === "montage" && montageId) chargerBlocs();
   if (nom === "projets") chargerDetailsProjets();
   if (nom === "voix") { chargerVoixListe(); chargerBenchCandidats(); }
+  majBoutonArret();  // l'état d'arrêt suit l'onglet affiché
 }
 $("tab-edit").addEventListener("click", () => mountVue("edit"));
 $("tab-montage").addEventListener("click", () => mountVue("montage"));
@@ -80,6 +81,11 @@ function majProgression(index, total, personnage, duree) {
   $("progression-compteur").textContent = `${pct}%`;
   $("progression-label").textContent =
     personnage ? `Bloc ${index}/${total} — ${personnage}${duree ? ` · ${duree} s` : ""}` : "Génération en cours…";
+  const mp = $("montage-progress");
+  if (mp) {
+    mp.hidden = false;
+    mp.textContent = personnage ? `⏳ Bloc ${index}/${total} — ${personnage}` : "⏳ Génération en cours…";
+  }
 }
 function demarrerProgression() {
   $("progression").hidden = false;
@@ -90,6 +96,8 @@ function demarrerProgression() {
 function terminerProgression() {
   $("progression").hidden = true;
   $progBar.style.width = "0%";
+  const mp = $("montage-progress");
+  if (mp) { mp.hidden = true; mp.textContent = ""; }
 }
 
 // ---------------------------------------------------------------- modals
@@ -872,11 +880,14 @@ let arretEnCours = false;
 let contenuGenere = null;   // contenu éditeur au moment de la génération
 
 function majBoutonArret() {
-  const b = $("generer-stop");
-  if (!b) return;
-  b.hidden = !generationActive;
-  b.disabled = !generationActive || arretEnCours;
-  b.textContent = arretEnCours ? "Arrêt…" : "⏹ Arrêter";
+  const libelle = arretEnCours ? "Arrêt…" : "⏹ Arrêter";
+  for (const id of ["generer-stop", "montage-stop"]) {
+    const b = $(id);
+    if (!b) continue;
+    b.hidden = !generationActive;
+    b.disabled = !generationActive || arretEnCours;
+    b.textContent = libelle;
+  }
 }
 
 function majBoutonGenerer() {
@@ -1045,7 +1056,7 @@ $("generer").addEventListener("click", async () => {
   ev.addEventListener("end", fin);
 });
 
-$("generer-stop").addEventListener("click", async () => {
+async function demanderArret() {
   if (!generationActive || arretEnCours || !montageId) return;
   arretEnCours = true;
   majBoutonArret();
@@ -1058,6 +1069,8 @@ $("generer-stop").addEventListener("click", async () => {
       notifier(m, "err");
       arretEnCours = false;
       majBoutonArret();
+    } else {
+      $("log").textContent += "\n⏹ Arrêt demandé : le bloc en cours se termine…\n";
     }
   } catch {
     $("log").textContent += "\n⏹ Impossible d'arrêter (connexion au serveur interrompue).\n";
@@ -1065,7 +1078,9 @@ $("generer-stop").addEventListener("click", async () => {
     arretEnCours = false;
     majBoutonArret();
   }
-});
+}
+$("generer-stop").addEventListener("click", demanderArret);
+$("montage-stop").addEventListener("click", demanderArret);
 
 // ---------------------------------------------------------------- montage : blocs
 let montageBlocs = [];

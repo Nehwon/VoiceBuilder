@@ -8,6 +8,17 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Correction — Arrêt de génération réactif + contrôles page Montage
+
+- **Moteur** (`engine/adaptive.py`, `engine/multi.py`) : l'arrêt demandé est
+  désormais écouté **pendant** la synthèse d'un bloc (`should_stop` : vérif
+  Whisper et re-splits sautés, le bloc en cours se termine vite au lieu
+  d'attendre plusieurs minutes) ; test stub vert (1 synthèse/0 vérif).
+- **GUI** : bouton **⏹ Arrêter** + indicateur `⏳ Bloc i/N` ajoutés dans la
+  barre d'outils de la page **Montage** (même endpoint, état synchronisé à
+  chaque changement d'onglet) ; message « Arrêt demandé : le bloc en cours
+  se termine… » dans le journal.
+
 ### Ajout — Cache de génération par projet M16
 
 - **Serveur** (`app/server.py`) : dernière génération persistée par document

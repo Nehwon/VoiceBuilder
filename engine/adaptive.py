@@ -65,14 +65,23 @@ def generate_block(
     synth: SynthesizeFn,
     sample_rate: int,
     verify: Optional[bool] = None,
+    should_stop=None,
 ) -> np.ndarray:
-    """Génère ``text``, et le re-split récursivement s'il est incomplet."""
+    """Génère ``text``, et le re-split récursivement s'il est incomplet.
+
+    ``should_stop`` : rappel optionnel renvoyant True si l'arrêt est demandé —
+    on saute alors la vérification et les re-splits (longs) et on rend
+    l'audio du premier passage pour que le bloc en cours se termine vite.
+    """
     if verify is None:
         verify = config.VERIFY_ENABLED
 
     audio = synth(text, prompt_wav, prompt_text)
 
     if not verify or _word_count(text) <= config.DEFAULT_MIN_BLOCK_WORDS:
+        return audio
+
+    if should_stop is not None and should_stop():
         return audio
 
     if verify_text(text, audio, sample_rate):
@@ -82,8 +91,13 @@ def generate_block(
     if halves is None:
         return audio
 
-    a = generate_block(halves[0], prompt_wav, prompt_text, synth, sample_rate, verify)
-    b = generate_block(halves[1], prompt_wav, prompt_text, synth, sample_rate, verify)
+    a = generate_block(halves[0], prompt_wav, prompt_text, synth, sample_rate, verify,
+                       should_stop)
+    if should_stop is not None and should_stop():
+        # arrêt demandé entre les deux moitiés : on ne relance pas une synthèse.
+        return a
+    b = generate_block(halves[1], prompt_wav, prompt_text, synth, sample_rate, verify,
+                       should_stop)
     return np.concatenate([a, b])
 
 
@@ -95,11 +109,13 @@ def synthesize_verified(
     sample_rate: int,
     max_chars: Optional[int] = None,
     verify: Optional[bool] = None,
+    should_stop=None,
 ) -> np.ndarray:
     """Découpe un paragraphe en blocs adaptatifs puis concatène les blocs générés."""
     max_chars = max_chars or config.DEFAULT_MAX_BLOCK_CHARS
     parts = [
-        generate_block(b, prompt_wav, prompt_text, synth, sample_rate, verify)
+        generate_block(b, prompt_wav, prompt_text, synth, sample_rate, verify,
+                       should_stop)
         for b in build_blocks(text, max_chars)
     ]
     return np.concatenate(parts)

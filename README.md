@@ -245,7 +245,10 @@ réglages / aide / personnages en modales.
   Régénérer/Diviser/**✕ Retirer**), écoute temps réel. Clic sur une carte ou un
   segment → lecture à partir de ce bloc (bloc en cours surligné) ; poignée ⠿
   pour réordonner les blocs (montage re-créé) ; bouton **⏹ Arrêter** pour
-  interrompre proprement une génération (blocs déjà synthétisés conservés).
+  interrompre proprement une génération (blocs déjà synthétisés conservés ;
+  bouton ⏹ aussi sur la page Montage, avec progression ⏳ Bloc i/N ;
+  l'arrêt prend effet dès la fin de la synthèse en cours, sans attendre
+  la vérification).
   Pendant une génération, le bouton **Regénérer** d'un bloc déjà synthétisé le
   met en file : il est re-synthétisé après le bloc en cours, puis la
   génération globale continue.

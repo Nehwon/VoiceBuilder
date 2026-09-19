@@ -17,7 +17,7 @@ def _read_text(path: str) -> str:
 
 
 def _synthesize_for(
-    text: str, model, sr, voice, block_chars, speed, verify
+    text: str, model, sr, voice, block_chars, speed, verify, should_stop=None,
 ) -> np.ndarray:
     """Synthetise un bloc pour une voix donnée (avec découpage adaptatif vérifié)."""
     def synth(t: str, _pw="", _pt=""):
@@ -25,7 +25,7 @@ def _synthesize_for(
                                             model, sr, speed=speed)
     return adaptive.synthesize_verified(
         text, str(voice.wav), voice.system_prompt, synth, sr,
-        max_chars=block_chars, verify=verify,
+        max_chars=block_chars, verify=verify, should_stop=should_stop,
     )
 
 
@@ -136,6 +136,11 @@ def generate(
     stopped = False
     positions: List[int] = []  # parts.index de l'audio de chaque bloc (remplacement ciblé)
 
+    def arret_demande() -> bool:
+        """Vrai si l'arrêt est demandé : la synthèse en cours finit vite
+        (vérif et re-splits sautés) puis la boucle abandonne."""
+        return stop_event is not None and stop_event.is_set()
+
     def _drain_regen():
         """Re-synthétise aussitôt les blocs mis en file (remplacement en place)."""
         if file_regen is None:
@@ -157,7 +162,8 @@ def generate(
                 # pas encore généré : la boucle le synthétisera frais. Ignoré.
                 continue
             pers, voix_nom, voice, t, block_chars, block_speed = sous_blocs[bid - 1]
-            audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed, verify)
+            audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed,
+                                    verify, arret_demande)
             parts[positions[bid - 1]] = audio
             dur = len(audio) / sr
             blocs_report[bid - 1]["duree"] = round(dur, 2)
@@ -178,7 +184,8 @@ def generate(
         if stop_event is not None and stop_event.is_set():
             stopped = True
             break
-        audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed, verify)
+        audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed,
+                                verify, arret_demande)
         # Pause uniquement au changement de personnage : les sous-blocs d'un même
         # locuteur s'enchaînent sans coupure dans le montage final.
         if pers_precedent is not None and pers != pers_precedent:
