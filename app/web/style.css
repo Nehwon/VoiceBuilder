@@ -222,6 +222,52 @@ h1 { font-size: 18px; margin: 0; white-space: nowrap; }
 .bloc-carte-actions { display: flex; gap: 8px; }
 .bloc-carte-actions button { margin: 0; }
 
+/* poignée de réordonnancement + carte surlignée en lecture */
+.grip-bloc { cursor: grab; color: var(--dim); user-select: none; padding: 0 6px 0 0; font-size: 14px; }
+.grip-bloc:active { cursor: grabbing; }
+.bloc-carte { transition: box-shadow 0.12s, border-color 0.12s, transform 0.12s; }
+.bloc-carte-tete { justify-content: flex-start; cursor: pointer; }
+.bloc-carte-tete strong { margin-right: auto; }
+.btn-ecouter {
+  margin: 0 0 0 auto; padding: 1px 8px; font-size: 12px;
+  border: 1px solid var(--bor); border-radius: 5px; background: var(--panel);
+  color: var(--acc); cursor: pointer;
+}
+.bloc-carte.bloc-en-cours {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 2px var(--acc);
+  background: color-mix(in srgb, var(--acc) 8%, var(--panel2));
+}
+.bloc-carte.en-drag { opacity: 0.5; border-style: dashed; }
+.bloc-carte.cible-montage { border-color: var(--acc); outline: 2px dashed var(--acc); }
+.bloc-carte-actions button.dangereux { background: #b3261e; color: #fff; border-color: #b3261e; }
+
+/* ---------------------------------------------------------------- timeline cliquable (M12) */
+.timeline-wrap { margin: 10px 0 0; }
+.timeline {
+  position: relative; height: 34px; background: var(--panel2);
+  border: 1px solid var(--bor); border-radius: 6px; overflow: hidden;
+}
+.tim-seg {
+  position: absolute; top: 5px; bottom: 5px; min-width: 2px;
+  background: color-mix(in srgb, var(--acc) 62%, transparent);
+  border: none; border-radius: 3px; cursor: pointer; padding: 0; margin: 0;
+}
+.tim-seg:hover { background: var(--acc); }
+.tim-curseur {
+  position: absolute; top: 0; bottom: 0; width: 2px; background: var(--txt);
+  pointer-events: none; z-index: 2;
+}
+.tim-curseur::after {
+  content: ""; position: absolute; top: -3px; left: -5px;
+  border: 6px solid transparent; border-top-color: var(--txt); border-top-width: 8px;
+}
+.timeline-sous {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-top: 4px; font-size: 12px; color: var(--dim);
+}
+.timeline-aide { flex: 1 1 auto; text-align: center; font-style: italic; }
+
 /* ---------------------------------------------------------------- contenu help (dans modal) */
 .aide h2 { margin-top: 0; }
 .aide pre {

@@ -226,6 +226,10 @@ class GenererIn(BaseModel):
     load_trt: bool = False
 
 
+class ReordonnerIn(BaseModel):
+    ids: list[int]
+
+
 class PersonnagesSaveIn(BaseModel):
     fichier: str
     personnages: dict[str, str]
@@ -489,6 +493,9 @@ def api_stream(jid: int):
 
     def gen():
         yield ": connected\n\n"
+        start_cur = 0.0
+        pers_prec = None
+        pause = float(job.get("pause", 0.0))
         while job["status"] == "running":
             try:
                 kind, data = job["queue"].get(timeout=0.5)
@@ -497,6 +504,11 @@ def api_stream(jid: int):
                 continue
             if kind == "bloc":
                 if "index" in data:
+                    if pers_prec is not None and data.get("personnage") != pers_prec:
+                        start_cur += pause
+                    data = dict(data, start=round(start_cur, 3))
+                    start_cur += data.get("duree", 0.0)
+                    pers_prec = data.get("personnage")
                     yield f"event: bloc\ndata: {json.dumps(data)}\n\n"
             elif kind == "done":
                 break
@@ -559,12 +571,83 @@ def _job_done(jid: int) -> dict:
     return job
 
 
+def _job_pret(jid: int) -> dict:
+    """Job terminé (done) ou arrêté proprement (stopped) — modifiable (réordre, suppression)."""
+    job = _job_live(jid)
+    if job.get("status") not in ("done", "stopped"):
+        raise HTTPException(409, "Génération en cours.")
+    return job
+
+
+def _offsets_blocs(blocs: list, pause: float) -> list[float]:
+    """Début (s) de chaque bloc dans le montage — pause uniquement au changement de locuteur."""
+    offsets: list[float] = []
+    start = 0.0
+    prec = None
+    for b in blocs:
+        if prec is not None and b.get("personnage") != prec:
+            start += float(pause)
+        offsets.append(round(start, 3))
+        start += b.get("duree", 0.0)
+        prec = b.get("personnage")
+    return offsets
+
+
+def _sr_blocs(job: dict) -> int:
+    sr = job.get("sample_rate")
+    if sr:
+        return int(sr)
+    import soundfile as _sf
+    for b in job.get("blocs", []):
+        if b.get("wav") and Path(b["wav"]).exists():
+            return int(_sf.info(b["wav"]).samplerate)
+    raise HTTPException(400, "Fréquence d'échantillonnage introuvable.")
+
+
+def _reconcat(job: dict, blocs: list) -> float:
+    """Réassemble le montage depuis les blocs (ordre courant, même règle que generate).
+
+    Pause (silence) uniquement au changement de locuteur, aucun silence final.
+    Met à jour le WAV ``job["out"]`` et la durée de ``job["result"]``.
+    """
+    out = Path(job["out"])
+    if not blocs:
+        if out.exists():
+            out.unlink()
+        if job.get("result") is None:
+            job["result"] = {"duration": 0.0, "blocs": [], "out": str(out)}
+        job["result"]["duration"] = 0.0
+        return 0.0
+    import numpy as _np
+    import soundfile as _sf
+    sr = _sr_blocs(job)
+    pause_n = int(float(job.get("pause", 0.0)) * sr)
+    parts = []
+    prec = None
+    for b in blocs:
+        data, _ = _sf.read(b["wav"], dtype="float32")
+        if prec is not None and b.get("personnage") != prec:
+            parts.append(_np.zeros(pause_n, dtype=_np.float32))
+        parts.append(data)
+        prec = b.get("personnage")
+    final = _np.concatenate(parts)
+    cosyvoice_engine.save(final, sr, out)
+    duree = round(len(final) / sr, 3)
+    if job.get("result") is None:
+        job["result"] = {"duration": duree, "blocs": blocs, "out": str(out)}
+    job["result"]["duration"] = duree
+    return duree
+
+
 @app.get("/api/generer/{jid}/blocs")
 def api_blocs(jid: int):
     job = _job_live(jid)
     blocs = job.get("blocs", [])
+    pause = float(job.get("pause", 0.0))
+    ofs = _offsets_blocs(blocs, pause)
+    res_list = [dict(b, start=o) for b, o in zip(blocs, ofs)]
     res = job.get("result") or {}
-    return {"blocs": blocs, "out": job["out"],
+    return {"blocs": res_list, "pause": pause, "out": job["out"],
             "duree": res.get("duration") if res else None}
 
 
@@ -655,25 +738,44 @@ def api_bloc_diviser(jid: int, bid: int):
 
 @app.post("/api/generer/{jid}/concatener")
 def api_concatener(jid: int):
-    """Re-monte le montage complet depuis les blocs courants (ordre + pauses)."""
-    job = _job_done(jid)
+    """Re-monte le montage complet depuis les blocs courants (ordre + pauses locuteur)."""
+    job = _job_pret(jid)
     blocs = job.get("blocs", [])
     if not blocs:
         raise HTTPException(400, "Aucun bloc à concaténer.")
-    sr = job.get("sample_rate")
-    model, sr = multi.load(device=job["device"], fp16=False)
-    pause_n = int(job.get("pause", 0.5) * sr)
-    import numpy as _np
-    import soundfile as _sf
-    parts = []
-    for b in blocs:
-        data, _ = _sf.read(b["wav"], dtype="float32")
-        parts.append(data)
-        parts.append(_np.zeros(pause_n, dtype=_np.float32))
-    final = _np.concatenate(parts)
-    cosyvoice_engine.save(final, sr, job["out"])
-    job["result"]["duration"] = round(len(final) / sr, 2)
-    return {"duree": job["result"]["duration"], "out": job["out"]}
+    duree = _reconcat(job, blocs)
+    return {"duree": duree, "out": job["out"]}
+
+
+@app.post("/api/generer/{jid}/blocs/reordonner")
+def api_blocs_reordonner(jid: int, payload: ReordonnerIn):
+    """Réordonne les blocs (rien à re-synthétiser : on réassemble les WAV existants)."""
+    job = _job_pret(jid)
+    blocs = job.get("blocs", [])
+    byid = {b["id"]: b for b in blocs}
+    ids = list(payload.ids)
+    if len(ids) != len(set(ids)) or set(ids) != set(byid):
+        raise HTTPException(400, "La liste des ids ne correspond pas aux blocs.")
+    job["blocs"] = [byid[i] for i in ids]
+    duree = _reconcat(job, job["blocs"])
+    ofs = _offsets_blocs(job["blocs"], float(job.get("pause", 0.0)))
+    out_blocs = [dict(b, start=o) for b, o in zip(job["blocs"], ofs)]
+    return {"blocs": out_blocs, "duree": duree}
+
+
+@app.post("/api/generer/{jid}/bloc/{bid}/supprimer")
+def api_bloc_supprimer(jid: int, bid: int):
+    """Supprime un bloc du montage (réassemble les WAV restants)."""
+    job = _job_pret(jid)
+    blocs = job.get("blocs", [])
+    restants = [b for b in blocs if b["id"] != bid]
+    if len(restants) == len(blocs):
+        raise HTTPException(404, "Bloc inconnu.")
+    job["blocs"] = restants
+    duree = _reconcat(job, job["blocs"]) if restants else 0.0
+    ofs = _offsets_blocs(job["blocs"], float(job.get("pause", 0.0)))
+    out_blocs = [dict(b, start=o) for b, o in zip(job["blocs"], ofs)]
+    return {"blocs": out_blocs, "duree": duree, "vide": not restants}
 
 
 # ---------------------------------------------------------------------------

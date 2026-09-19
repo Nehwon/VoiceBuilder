@@ -132,6 +132,17 @@
       <h2>Montage généré</h2>
       <audio id="montage" controls></audio>
 
+      <div class="timeline-wrap">
+        <div id="timeline" class="timeline" title="Clique sur un segment pour écouter le montage à partir de ce bloc">
+          <div id="timeline-curseur" class="tim-curseur" hidden></div>
+        </div>
+        <div class="timeline-sous">
+          <span id="timeline-pos">00:00</span>
+          <span class="timeline-aide">clique un segment / carte pour écouter à partir de ce bloc · glisse ▸ pour réordonner</span>
+          <span id="timeline-total">00:00</span>
+        </div>
+      </div>
+
       <div class="montage-toolbar">
         <button id="btn-concat" class="primaire">🔄 Re-créer le montage</button>
         <span id="montage-info"></span>

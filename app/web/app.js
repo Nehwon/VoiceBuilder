@@ -962,6 +962,99 @@ $("generer-stop").addEventListener("click", async () => {
 
 // ---------------------------------------------------------------- montage : blocs
 let montageBlocs = [];
+let blocEnCoursId = null;   // id du bloc en cours dans le lecteur global
+let blocDrag = null;        // carte en cours de déplacement (drag-n-drop)
+
+function fmtTmp(t) {
+  if (!isFinite(t) || t < 0) t = 0;
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60);
+  return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+}
+
+function montageTotal() {
+  if (!montageBlocs.length) return 0;
+  const b = montageBlocs[montageBlocs.length - 1];
+  return (b.start || 0) + (b.duree || 0);
+}
+
+// ---------------------------------------------------------------- timeline cliquable (M12)
+function dessinerTimeline() {
+  const tl = $("timeline");
+  tl.querySelectorAll(".tim-seg").forEach((el) => el.remove());
+  const total = montageTotal();
+  if (!total || !montageBlocs.length) {
+    $("timeline-curseur").hidden = true;
+    $("timeline-pos").textContent = "00:00";
+    $("timeline-total").textContent = "00:00";
+    return;
+  }
+  montageBlocs.forEach((b) => {
+    const deb = b.start || 0;
+    const dur = b.duree || 0;
+    if (dur <= 0) return;
+    const seg = document.createElement("button");
+    seg.type = "button";
+    seg.className = "tim-seg";
+    seg.title = `${b.personnage} — ${fmtTmp(deb)} → ${fmtTmp(deb + dur)}`;
+    seg.style.left = `${(deb / total) * 100}%`;
+    seg.style.width = `${Math.max(1.5, (dur / total) * 100)}%`;
+    seg.addEventListener("click", () => ecouterDepuis(deb));
+    tl.appendChild(seg);
+  });
+  $("timeline-total").textContent = fmtTmp(total);
+  miseAJourCurseur();
+}
+
+function miseAJourCurseur() {
+  const a = $("montage");
+  const total = montageTotal();
+  const dur = isFinite(a.duration) ? a.duration : total;
+  if (!dur) { $("timeline-curseur").hidden = true; return; }
+  $("timeline-curseur").hidden = false;
+  $("timeline-curseur").style.left = `${Math.min(100, Math.max(0, (a.currentTime / dur) * 100))}%`;
+  $("timeline-pos").textContent = fmtTmp(a.currentTime);
+}
+
+// Positionne le lecteur global au début d'un bloc puis démarre la lecture.
+function ecouterDepuis(t) {
+  const a = $("montage");
+  if (!a.src) return;
+  a.currentTime = t || 0;
+  a.play().catch(() => {});
+}
+
+function blocEnCours() {
+  const t = $("montage").currentTime;
+  return montageBlocs.find((b) => {
+    const deb = b.start || 0;
+    return t >= deb && t < deb + (b.duree || 0);
+  }) || null;
+}
+
+function surlignerBlocEnCours() {
+  const b = blocEnCours();
+  const id = b ? b.id : null;
+  if (id === blocEnCoursId) return;
+  blocEnCoursId = id;
+  document.querySelectorAll(".bloc-carte").forEach((c) =>
+    c.classList.toggle("bloc-en-cours", Number(c.dataset.id) === id));
+  if (b) {
+    const c = document.querySelector(`.bloc-carte[data-id="${id}"]`);
+    if (c) c.scrollIntoView({ block: "nearest" });
+  }
+}
+
+$("montage").addEventListener("loadedmetadata", dessinerTimeline);
+$("montage").addEventListener("timeupdate", () => {
+  miseAJourCurseur();
+  surlignerBlocEnCours();
+});
+$("montage").addEventListener("ended", () => {
+  blocEnCoursId = null;
+  document.querySelectorAll(".bloc-carte").forEach((c) => c.classList.remove("bloc-en-cours"));
+  miseAJourCurseur();
+});
 
 async function chargerBlocs() {
   if (!montageId) return;
@@ -976,50 +1069,159 @@ async function chargerBlocs() {
   } catch { notifier("Erreur au chargement des blocs.", "err"); }
 }
 
+function rechargerMontage() {
+  const a = $("montage");
+  if (montageBlocs.length) {
+    a.src = `/api/generer/${montageId}/result?v=${Date.now()}`;
+  } else {
+    a.removeAttribute("src");
+    a.load();
+  }
+  a.currentTime = 0;
+}
+
+// ------------------------------------------------------------------ cartes de blocs (M12)
+function attacherDndCarte(carte) {
+  const grip = carte.querySelector(".grip-bloc");
+  if (!grip) return;
+  grip.draggable = true;
+  let dans = 0;
+  grip.addEventListener("dragstart", (e) => {
+    blocDrag = carte;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", carte.dataset.id);
+    requestAnimationFrame(() => carte.classList.add("en-drag"));
+  });
+  grip.addEventListener("dragend", terminerDndBlocs);
+  carte.addEventListener("dragenter", (e) => {
+    if (!blocDrag || blocDrag === carte) return;
+    e.preventDefault();
+    dans++;
+    e.dataTransfer.dropEffect = "move";
+    carte.classList.add("cible-montage");
+  });
+  carte.addEventListener("dragover", (e) => {
+    if (!blocDrag || blocDrag === carte) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  });
+  carte.addEventListener("dragleave", () => {
+    dans--;
+    if (dans <= 0) { dans = 0; carte.classList.remove("cible-montage"); }
+  });
+  carte.addEventListener("drop", (e) => {
+    if (!blocDrag || blocDrag === carte) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const r = carte.getBoundingClientRect();
+    const cible = e.clientY < r.top + r.height / 2 ? carte : carte.nextSibling;
+    const box = $("liste-blocs");
+    box.insertBefore(blocDrag, cible);
+    terminerDndBlocs();
+    persisterOrdreBlocs();
+  });
+}
+
+function terminerDndBlocs() {
+  document.querySelectorAll(".bloc-carte").forEach((x) =>
+    x.classList.remove("en-drag", "cible-montage"));
+  blocDrag = null;
+}
+
+function ordreBlocsDepuisDom() {
+  return [...document.querySelectorAll("#liste-blocs .bloc-carte")]
+    .map((c) => Number(c.dataset.id));
+}
+
+async function persisterOrdreBlocs() {
+  try {
+    const r = await fetch(`/api/generer/${montageId}/blocs/reordonner`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ordreBlocsDepuisDom() }),
+    });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const d = await r.json();
+    montageBlocs = d.blocs || [];
+    remplirListeBlocs();
+    rechargerMontage();
+    notifier("Ordre des blocs mis à jour.", "ok");
+  } catch { notifier("Réordonnancement échoué.", "err"); }
+}
+
+function construireCarteBloc(b, num) {
+  const carte = document.createElement("article");
+  carte.className = "bloc-carte";
+  carte.dataset.id = b.id;
+
+  const tete = document.createElement("div");
+  tete.className = "bloc-carte-tete";
+  tete.title = "Écouter le montage à partir de ce bloc";
+  const grip = document.createElement("span");
+  grip.className = "grip-bloc";
+  grip.textContent = "⠿";
+  grip.title = "Glisser pour réordonner le bloc";
+  const titre = document.createElement("strong");
+  titre.textContent = `${num}. ${b.personnage}`;
+  const dur = document.createElement("span");
+  dur.className = "bloc-carte-duree";
+  dur.textContent = `${fmtTmp(b.start || 0)} · ${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
+  const ecouter = document.createElement("button");
+  ecouter.type = "button";
+  ecouter.className = "btn-ecouter";
+  ecouter.textContent = "▶";
+  ecouter.title = "Écouter à partir de ce bloc";
+  tete.append(grip, titre, dur, ecouter);
+  tete.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    ecouterDepuis(b.start || 0);
+  });
+  ecouter.addEventListener("click", () => ecouterDepuis(b.start || 0));
+
+  const audio = document.createElement("audio");
+  audio.controls = true;
+  audio.preload = "none";
+  audio.src = b.wav ? `/api/generer/${montageId}/bloc/${b.id}/wav` : "";
+
+  const texte = document.createElement("p");
+  texte.className = "bloc-carte-texte";
+  texte.textContent = b.texte || "—";
+
+  const actions = document.createElement("div");
+  actions.className = "bloc-carte-actions";
+  const btnRegen = document.createElement("button");
+  btnRegen.type = "button";
+  btnRegen.textContent = "Regénérer ce bloc";
+  btnRegen.onclick = () => actionBloc(b.id, "regenerer", btnRegen);
+  const btnDiv = document.createElement("button");
+  btnDiv.type = "button";
+  btnDiv.textContent = "Diviser ce bloc";
+  btnDiv.onclick = () => actionBloc(b.id, "diviser", btnDiv);
+  const btnSuppr = document.createElement("button");
+  btnSuppr.type = "button";
+  btnSuppr.textContent = "✕ Retirer";
+  btnSuppr.onclick = () => actionSupprimerBloc(b.id, btnSuppr);
+  actions.append(btnRegen, btnDiv, btnSuppr);
+
+  carte.append(tete, audio, texte, actions);
+  attacherDndCarte(carte);
+  return carte;
+}
+
 // Une carte par bloc : audio + texte + infos + boutons.
 function remplirListeBlocs() {
   const box = $("liste-blocs");
   box.innerHTML = "";
+  blocEnCoursId = null;
   if (!montageBlocs.length) {
     box.innerHTML = '<p class="liste-vide">Aucun bloc (génère d\u2019abord un montage).</p>';
+    dessinerTimeline();
     return;
   }
   montageBlocs.forEach((b, i) => {
-    const carte = document.createElement("article");
-    carte.className = "bloc-carte";
-    carte.dataset.id = b.id;
-
-    const tete = document.createElement("div");
-    tete.className = "bloc-carte-tete";
-    const titre = document.createElement("strong");
-    titre.textContent = `${i + 1}. ${b.personnage}`;
-    const dur = document.createElement("span");
-    dur.className = "bloc-carte-duree";
-    dur.textContent = `${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
-    tete.append(titre, dur);
-
-    const audio = document.createElement("audio");
-    audio.controls = true;
-    audio.preload = "none";
-    audio.src = `/api/generer/${montageId}/bloc/${b.id}/wav`;
-
-    const texte = document.createElement("p");
-    texte.className = "bloc-carte-texte";
-    texte.textContent = b.texte || "—";
-
-    const actions = document.createElement("div");
-    actions.className = "bloc-carte-actions";
-    const btnRegen = document.createElement("button");
-    btnRegen.textContent = "Regénérer ce bloc";
-    btnRegen.onclick = () => actionBloc(b.id, "regenerer", btnRegen);
-    const btnDiv = document.createElement("button");
-    btnDiv.textContent = "Diviser ce bloc";
-    btnDiv.onclick = () => actionBloc(b.id, "diviser", btnDiv);
-    actions.append(btnRegen, btnDiv);
-
-    carte.append(tete, audio, texte, actions);
-    box.appendChild(carte);
+    box.appendChild(construireCarteBloc(b, i + 1));
   });
+  dessinerTimeline();
 }
 
 // ---------------------------------------------------------------- écoute temps réel : ajoute un bloc au fur et à mesure
@@ -1032,46 +1234,44 @@ function ajouterBlocTempsReel(b) {
   // éviter les doublons si l'événement arrive deux fois
   if (box.querySelector(`[data-id="${b.id}"]`)) return;
 
-  const i = (montageBlocs.length) + 1;
-  const carte = document.createElement("article");
-  carte.className = "bloc-carte";
-  carte.dataset.id = b.id;
-
-  const tete = document.createElement("div");
-  tete.className = "bloc-carte-tete";
-  const titre = document.createElement("strong");
-  titre.textContent = `${i}. ${b.personnage}`;
-  const dur = document.createElement("span");
-  dur.className = "bloc-carte-duree";
-  dur.textContent = `${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
-  tete.append(titre, dur);
-
-  const audio = document.createElement("audio");
-  audio.controls = true;
-  audio.preload = "none";
-  audio.src = b.wav
-    ? `/api/generer/${montageId}/bloc/${b.id}/wav`
-    : "";
-
-  const texte = document.createElement("p");
-  texte.className = "bloc-carte-texte";
-  texte.textContent = b.texte || "—";
-
-  const actions = document.createElement("div");
-  actions.className = "bloc-carte-actions";
-  const btnRegen = document.createElement("button");
-  btnRegen.textContent = "Regénérer ce bloc";
-  btnRegen.onclick = () => actionBloc(b.id, "regenerer", btnRegen);
-  const btnDiv = document.createElement("button");
-  btnDiv.textContent = "Diviser ce bloc";
-  btnDiv.onclick = () => actionBloc(b.id, "diviser", btnDiv);
-  actions.append(btnRegen, btnDiv);
-
-  carte.append(tete, audio, texte, actions);
+  const carte = construireCarteBloc(b, montageBlocs.length + 1);
   box.appendChild(carte);
 
   // mémoriser pour le futur rechargement / concaténation
   montageBlocs.push(b);
+  dessinerTimeline();
+}
+
+async function actionSupprimerBloc(bid, btn) {
+  if (!btn.dataset.arm) {
+    btn.dataset.arm = "1";
+    btn.textContent = "Confirmer ?";
+    btn.classList.add("dangereux");
+    setTimeout(() => {
+      if (btn.dataset.arm) {
+        delete btn.dataset.arm;
+        btn.textContent = "✕ Retirer";
+        btn.classList.remove("dangereux");
+      }
+    }, 3500);
+    return;
+  }
+  delete btn.dataset.arm;
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/generer/${montageId}/bloc/${bid}/supprimer`, { method: "POST" });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const d = await r.json();
+    montageBlocs = d.blocs || [];
+    remplirListeBlocs();
+    const duree = d.vide ? "0" : `${d.duree}`;
+    $("montage-info").textContent = d.vide
+      ? "Durée totale : 0 s · 0 bloc"
+      : `Durée totale : ${duree} s · ${montageBlocs.length} bloc(s)`;
+    rechargerMontage();
+    notifier("Bloc retiré du montage.", "ok");
+  } catch { notifier("Suppression échouée.", "err"); }
+  finally { btn.disabled = false; btn.textContent = "✕ Retirer"; }
 }
 
 async function actionBloc(bid, action, btn) {
@@ -1092,8 +1292,8 @@ $("btn-concat").addEventListener("click", async () => {
     const r = await fetch(`/api/generer/${montageId}/concatener`, { method: "POST" });
     if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
     const d = await r.json();
-    $("montage").src = `/api/generer/${montageId}/result`;
     $("montage-info").textContent = `Durée totale : ${d.duree} s · ${montageBlocs.length} bloc(s)`;
+    rechargerMontage();
     notifier("Montage re-créé.", "ok");
   } catch { notifier("Concatenation échouée.", "err"); }
   finally { $("btn-concat").disabled = false; }

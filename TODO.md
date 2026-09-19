@@ -224,9 +224,15 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         Tests (`tests/test_e2e_minimal.py`, 21 tests) : parsing, regroupement,
         découpage adaptatif, chargement voix, `multi.generate()` avec moteur
         mocké, callback progress, personnages→voix, bloc_dir, synth_bloc.
-- [ ] **M12 — Espace de montage**
-  - [ ] Développer l'**espace de montage** (lecture de l'ensemble, navigation par
-        bloc).
+- [x] **M12 — Espace de montage** (2026-09-19)
+  - [x] Développer l'**espace de montage** (lecture de l'ensemble, navigation par
+        bloc) : offsets `start` par bloc (pause uniquement au changement de
+        locuteur) dans `/blocs` + événements SSE, timeline cliquable (segments
+        par bloc + curseur + chrono), clic carte/segment → lecture à partir du
+        bloc, surlignage + défilement auto du bloc en cours, réordonnancement
+        par glisser-déposer (`POST …/blocs/reordonner`), suppression en 2 clics
+        (`POST …/bloc/{id}/supprimer`), re-concaténation serveur alignée sur la
+        règle de pause de la génération.
 - [x] **M13 — Onglet « Voix »**
   - [x] **Extraction d'une piste son depuis une vidéo** (nouvel onglet « Voix »).
   - [x] **Conversion de la piste au bon format `.wav`** (après upload).
