@@ -19,7 +19,7 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from . import config, cosyvoice_engine, multi, verifier
-from .voix import Voices
+from .voix import Voices, base_nom, grouper_candidats
 
 # Paragraphe FR de référence (validé) : nombres, date, dialogue, 1 émotion.
 PARAGRAPHE_REF = (
@@ -29,20 +29,6 @@ PARAGRAPHE_REF = (
     "gagné la troisième place avec 97,5 points ! La foule applaudit pendant "
     "près de deux minutes."
 )
-
-
-def base_nom(nom: str) -> str:
-    """Base d'un nom de voix (``Thepromisedneverland_2`` → ``Thepromisedneverland``)."""
-    base = re.sub(r"_clean$", "", nom, flags=re.IGNORECASE)
-    return re.sub(r"_\d+$", "", base)
-
-
-def grouper_candidats(noms: List[str]) -> Dict[str, List[str]]:
-    """Regroupe les voix par personnage (ordre de ``voix.txt`` préservé)."""
-    groupes: Dict[str, List[str]] = {}
-    for n in noms:
-        groupes.setdefault(base_nom(n), []).append(n)
-    return groupes
 
 
 def slug(nom: str) -> str:

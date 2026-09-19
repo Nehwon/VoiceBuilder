@@ -243,6 +243,7 @@ class GenererIn(BaseModel):
     load_vllm: bool = False
     load_trt: bool = False
     document: str | None = None  # fichier projet (cache M16) ; None = fichier local, pas de cache
+    multi_prompt: bool = False  # M17.4 : chaque bloc avec 2 prompts, meilleur gardé (×2 GPU)
 
 
 class ReordonnerIn(BaseModel):
@@ -486,7 +487,7 @@ def api_generer(payload: GenererIn):
            "pause": payload.pause, "vitesse": payload.vitesse,
            "max_chars": payload.max_chars, "verify": payload.verify,
            "device": payload.device, "personnages": payload.personnages,
-           "document": document,
+           "document": document, "multi_prompt": payload.multi_prompt,
            "stop_event": threading.Event(), "stopped": False,
            "file_regen": queue.Queue()}
     _jobs[jid] = job
@@ -514,6 +515,7 @@ def api_generer(payload: GenererIn):
                 stop_event=job["stop_event"],
                 load_vllm=payload.load_vllm, load_trt=payload.load_trt,
                 file_regen=job["file_regen"],
+                multi_prompt=job.get("multi_prompt", False),
             )
             job["result"] = res
             job["blocs"] = res.get("blocs", [])
@@ -697,6 +699,7 @@ def _cache_ecrire(job: dict) -> None:
             "pause": job.get("pause"), "vitesse": job.get("vitesse"),
             "max_chars": job.get("max_chars"), "verify": job.get("verify"),
             "device": job.get("device"), "personnages": job.get("personnages"),
+            "multi_prompt": bool(job.get("multi_prompt")),
             "out": str(job["out"]),
             "bloc_dir": str(job.get("bloc_dir") or ""),
             "blocs": job.get("blocs", []),

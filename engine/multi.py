@@ -7,9 +7,9 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from . import adaptive, config, cosyvoice_engine
+from . import adaptive, config, cosyvoice_engine, verifier
 from .tagging import parse_texte, regrouper
-from .voix import Voices
+from .voix import Voices, base_nom, grouper_candidats
 
 
 def _read_text(path: str) -> str:
@@ -64,6 +64,8 @@ def generate(
     load_vllm: bool = False,
     load_trt: bool = False,
     file_regen=None,
+    multi_prompt: bool = False,
+    max_prompts: int = 2,
 ) -> dict:
     """Génère l'audio complet pour un texte taggé et une liste de voix.
 
@@ -90,6 +92,13 @@ def generate(
     paramètres) et **remplace** l'audio précédent dans le montage. Un id pas
     encore généré est ignoré (il sera synthétisé frais par la boucle). Si
     ``stop_event`` est levé, le reste de la file est abandonné.
+
+    ``multi_prompt`` : si True, chaque bloc est synthétisé avec jusqu'à
+    ``max_prompts`` segments candidats de la voix (variantes ``_2``/``_3``,
+    ``_clean`` partageant la même base, M17.4) et le meilleur est gardé
+    (``coverage`` Whisper maximal, égalité → voix de référence). Repli sur
+    le prompt unique si 1 seul candidat. Coût ×N GPU — utile sur les voix
+    faibles en attendant un fine-tune.
     """
     if verbose:
         print(f"Voix disponibles : {voices.names()}")
@@ -141,6 +150,37 @@ def generate(
         (vérif et re-splits sautés) puis la boucle abandonne."""
         return stop_event is not None and stop_event.is_set()
 
+    groupes_prompts = grouper_candidats(voices.names()) if multi_prompt else {}
+
+    def _synth_choisir(t, voice, block_chars, block_speed):
+        """Synthétise un bloc, en multi-prompt avec chaque candidat si activé.
+
+        Renvoie ``(audio, prompt_gagnant | None, couverture | None)``.
+        """
+        if not multi_prompt:
+            return (_synthesize_for(t, model, sr, voice, block_chars, block_speed,
+                                    verify, arret_demande), None, None)
+        noms = groupes_prompts.get(base_nom(voice.name), [voice.name])
+        noms = [n for n in noms if n in voices][:max(1, max_prompts)]
+        if len(noms) < 2:
+            return (_synthesize_for(t, model, sr, voice, block_chars, block_speed,
+                                    verify, arret_demande), None, None)
+        meilleur, couv_max, gagnant = None, -1.0, noms[0]
+        for nom in noms:
+            cand = voices.get(nom)
+            bc = cand.max_block_chars or block_chars
+            spd = cand.speed if cand.speed is not None else block_speed
+            audio = _synthesize_for(t, model, sr, cand, bc, spd, False,
+                                    arret_demande)
+            couv = verifier.coverage(t, audio, sr)
+            if verbose:
+                print(f"  [prompt {nom}] couverture {couv:.0%}")
+            if couv > couv_max:
+                meilleur, couv_max, gagnant = audio, couv, nom
+        if verbose:
+            print(f"  [prompt gagnant] {gagnant} (couverture {couv_max:.0%})")
+        return meilleur, gagnant, round(couv_max, 4)
+
     def _drain_regen():
         """Re-synthétise aussitôt les blocs mis en file (remplacement en place)."""
         if file_regen is None:
@@ -162,8 +202,15 @@ def generate(
                 # pas encore généré : la boucle le synthétisera frais. Ignoré.
                 continue
             pers, voix_nom, voice, t, block_chars, block_speed = sous_blocs[bid - 1]
-            audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed,
-                                    verify, arret_demande)
+            if multi_prompt:
+                audio, prompt, couv = _synth_choisir(t, voice, block_chars, block_speed)
+                if prompt != voix_nom:
+                    blocs_report[bid - 1]["prompt"] = prompt
+                if couv is not None:
+                    blocs_report[bid - 1]["couverture"] = couv
+            else:
+                audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed,
+                                        verify, arret_demande)
             parts[positions[bid - 1]] = audio
             dur = len(audio) / sr
             blocs_report[bid - 1]["duree"] = round(dur, 2)
@@ -184,13 +231,17 @@ def generate(
         if stop_event is not None and stop_event.is_set():
             stopped = True
             break
-        audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed,
-                                verify, arret_demande)
         # Pause uniquement au changement de personnage : les sous-blocs d'un même
         # locuteur s'enchaînent sans coupure dans le montage final.
         if pers_precedent is not None and pers != pers_precedent:
             parts.append(np.zeros(pause_n, dtype=np.float32))
         positions.append(len(parts))
+        if multi_prompt:
+            audio, prompt, couv = _synth_choisir(t, voice, block_chars, block_speed)
+        else:
+            audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed,
+                                    verify, arret_demande)
+            prompt, couv = None, None
         parts.append(audio)
         pers_precedent = pers
         dur = len(audio) / sr
@@ -198,6 +249,10 @@ def generate(
             "id": i, "personnage": pers, "voix": voix_nom, "texte": t,
             "chars": len(t), "duree": round(dur, 2),
         }
+        if prompt is not None and prompt != voix_nom:
+            info["prompt"] = prompt
+        if couv is not None:
+            info["couverture"] = couv
         if block_dir:
             wav = block_dir / f"bloc_{i}.wav"
             cosyvoice_engine.save(audio, sr, str(wav))
@@ -206,10 +261,15 @@ def generate(
         if verbose:
             print(f"[{i}/{total}] {pers} ({len(t)} chars) -> {dur:.2f} s")
         if progress:
-            progress({"id": i, "index": i, "total": total, "personnage": pers,
-                      "voix": voix_nom, "texte": t,
-                      "chars": len(t), "duree": round(dur, 2),
-                      "wav": info.get("wav")})
+            evt = {"id": i, "index": i, "total": total, "personnage": pers,
+                   "voix": voix_nom, "texte": t,
+                   "chars": len(t), "duree": round(dur, 2),
+                   "wav": info.get("wav")}
+            if prompt is not None and prompt != voix_nom:
+                evt["prompt"] = prompt
+            if couv is not None:
+                evt["couverture"] = couv
+            progress(evt)
         # File de régénération : le bloc en cours est terminé, on traite les
         # demandes empilées avant de continuer la génération globale.
         _drain_regen()

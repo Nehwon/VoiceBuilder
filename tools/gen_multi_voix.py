@@ -29,6 +29,8 @@ def main(argv=None) -> int:
     parser.add_argument("--vitesse", type=float, default=None, help="Vitesse globale")
     parser.add_argument("--max-chars", type=int, default=None, help="Taille max d'un bloc")
     parser.add_argument("--no-verify", action="store_true", help="Désactive la vérif Whisper")
+    parser.add_argument("--multi-prompt", action="store_true",
+                        help="M17.4 : chaque bloc avec jusqu'à 2 prompts candidats, meilleur gardé (coût ×2 GPU)")
     parser.add_argument("--vllm", action="store_true", help="Active vLLM (LLM accéléré)")
     parser.add_argument("--trt", action="store_true", help="Active TensorRT (Flow accéléré)")
     parser.add_argument("--texte-dir", default=str(config.TEXTE_DIR), help="Dossier des textes")
@@ -58,11 +60,13 @@ def main(argv=None) -> int:
         verbose=True,
         load_vllm=args.vllm,
         load_trt=args.trt,
+        multi_prompt=args.multi_prompt,
     )
     print(f"\nDurée totale : {res['duration']} s")
     print(f"Blocs : {len(res['blocs'])}")
     for bloc in res["blocs"]:
-        print(f"  - {bloc['personnage']}: {bloc['chars']} chars, {bloc['duree']} s")
+        prompt = f" (prompt : {bloc['prompt']})" if bloc.get("prompt") else ""
+        print(f"  - {bloc['personnage']}: {bloc['chars']} chars, {bloc['duree']} s{prompt}")
     return 0
 
 

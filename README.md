@@ -249,6 +249,9 @@ réglages / aide / personnages en modales.
   bouton ⏹ aussi sur la page Montage, avec progression ⏳ Bloc i/N ;
   l'arrêt prend effet dès la fin de la synthèse en cours, sans attendre
   la vérification).
+  Option **Multi-prompt (×2 GPU)** dans les Réglages : chaque bloc est généré
+  avec 2 segments candidats de la voix, le meilleur est gardé (utile sur les
+  voix faibles).
   Pendant une génération, le bouton **Regénérer** d'un bloc déjà synthétisé le
   met en file : il est re-synthétisé après le bloc en cours, puis la
   génération globale continue.

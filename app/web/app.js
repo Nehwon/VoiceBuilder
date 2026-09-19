@@ -956,6 +956,7 @@ $("generer").addEventListener("click", async () => {
       vitesse: parseFloat($("vitesse").value),
       max_chars: parseInt($("maxchars").value, 10),
       verify: $("verify").checked,
+      multi_prompt: $("multi-prompt").checked,
       device: $("device").value,
       load_vllm: $("load-vllm").checked,
       load_trt: $("load-trt").checked,
@@ -1007,8 +1008,10 @@ function suivreGeneration(id) {
       actualiserCarteApresRegen(b);
       return;
     }
+    const promptTxt = (b.prompt && b.prompt !== b.personnage) ? ` · prompt ${b.prompt}` : "";
+    const couvTxt = (b.couverture != null) ? ` · couv ${(b.couverture * 100).toFixed(0)}%` : "";
     $("log").textContent +=
-      `[${b.index}/${b.total}] ${b.personnage} (${b.chars} chars) — ${b.duree} s\n`;
+      `[${b.index}/${b.total}] ${b.personnage} (${b.chars} chars) — ${b.duree} s${promptTxt}${couvTxt}\n`;
     majProgression(b.index, b.total, b.personnage, b.duree);
     marquerBlocFileFini(b);
     if (b.wav) {
@@ -1326,6 +1329,12 @@ async function persisterOrdreBlocs() {
   } catch { notifier("Réordonnancement échoué.", "err"); }
 }
 
+// Libellé d'une carte bloc (avec prompt gagnant éventuel, M17.4).
+function libelleCarteBloc(b) {
+  const base = `${fmtTmp(b.start || 0)} · ${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
+  return (b.prompt && b.prompt !== b.voix) ? `${base} · prompt ${b.prompt}` : base;
+}
+
 function construireCarteBloc(b, num) {
   const carte = document.createElement("article");
   carte.className = "bloc-carte";
@@ -1342,7 +1351,7 @@ function construireCarteBloc(b, num) {
   titre.textContent = `${num}. ${b.personnage}`;
   const dur = document.createElement("span");
   dur.className = "bloc-carte-duree";
-  dur.textContent = `${fmtTmp(b.start || 0)} · ${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
+  dur.textContent = libelleCarteBloc(b);
   const ecouter = document.createElement("button");
   ecouter.type = "button";
   ecouter.className = "btn-ecouter";
@@ -1527,7 +1536,7 @@ function actualiserCarteApresRegen(b) {
   if (carte) {
     const deb = (i >= 0 && montageBlocs[i].start) || 0;
     const dur = carte.querySelector(".bloc-carte-duree");
-    if (dur) dur.textContent = `${fmtTmp(deb)} · ${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
+    if (dur) dur.textContent = libelleCarteBloc({ ...(i >= 0 ? montageBlocs[i] : b), start: deb });
     const audio = carte.querySelector("audio");
     if (audio && b.wav) {
       audio.src = `/api/generer/${montageId}/bloc/${b.id}/wav?v=${Date.now()}`;

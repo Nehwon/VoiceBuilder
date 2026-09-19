@@ -8,6 +8,19 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Multi-prompt à la génération M17.4 (Palier 0)
+
+- **Moteur** (`engine/multi.py`) : `generate(..., multi_prompt, max_prompts=2)` —
+  chaque bloc est synthétisé avec jusqu'à 2 segments candidats de la voix
+  (groupement par base dans `voix.grouper_candidats`, déplacé depuis
+  `bench.py`), meilleur gardé (`coverage` Whisper, égalité → référence) ;
+  repli mono si 1 seul candidat ; file-regen cohérente ; prompt gagnant tracé
+  (`prompt`, `couverture`).
+- **CLI / API / GUI** : `--multi-prompt`, `multi_prompt` (+ manifeste M16),
+  case « Multi-prompt (×2 GPU) » dans Réglages ; cartes et log affichent le
+  prompt gagnant.
+- Test stubs vert (OFF mono, ON avec gagnant, `max_prompts=1`, égalité).
+
 ### Correction — Reprise d'une génération après rechargement de page
 
 - **API** (`app/server.py`) : `GET /api/generer/en-cours` expose le job en

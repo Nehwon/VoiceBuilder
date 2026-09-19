@@ -334,12 +334,16 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         (`PROJET_FINE.md` §2 point 2). `--promouvoir` opt-in, `--forcer`,
         idempotent. Run réel : 8 clean / 6 originaux (mot perdu détecté
         sur Gmilgram).
-- [ ] **M17.4 — Multi-prompt à la génération**
-  - [ ] Permettre **N prompts candidats par voix** (réutiliser les variantes
-        `_2`/`_3`/`_clean` existantes comme candidats, sans casser le format
-        `voix.txt`) : chaque bloc est généré avec chacun, le meilleur est gardé
-        (`coverage` Whisper puis écoute) ; repli sur le prompt unique si 1 seul
-        candidat (`PROJET_FINE.md` §2 point 4).
+- [x] **M17.4 — Multi-prompt à la génération** (2026-09-19)
+  - [x] Permettre **N prompts candidats par voix** (variantes `_2`/`_3`/`_clean`
+        regroupées par base dans `voix.grouper_candidats`, sans casser le
+        format `voix.txt`) : chaque bloc est généré avec chacun (jusqu'à
+        `max_prompts=2`), le meilleur est gardé (`coverage` Whisper maximal,
+        égalité → référence) ; repli sur le prompt unique si 1 seul candidat
+        (`PROJET_FINE.md` §2 point 4). Opt-in : `--multi-prompt` (CLI),
+        `multi_prompt` (API), case « Multi-prompt (×2 GPU) » (Réglages GUI) ;
+        prompt gagnant tracé (`prompt`, `couverture`) dans blocs, log et
+        cartes.
 
 ---
 

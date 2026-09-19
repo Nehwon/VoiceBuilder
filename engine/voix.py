@@ -23,6 +23,25 @@ def _strip_timestamps(line: str) -> str:
     return re.sub(r"\[\s*\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?\s*\]", "", line).strip()
 
 
+def base_nom(nom: str) -> str:
+    """Base d'un nom de voix (``Thepromisedneverland_2`` → ``Thepromisedneverland``).
+
+    Sert au groupement des segments candidats d'un même personnage
+    (variantes ``_2``/``_3``, versions ``_clean``) pour le banc A/B (M17.2)
+    et le multi-prompt (M17.4).
+    """
+    base = re.sub(r"_clean$", "", nom, flags=re.IGNORECASE)
+    return re.sub(r"_\d+$", "", base)
+
+
+def grouper_candidats(noms: List[str]) -> Dict[str, List[str]]:
+    """Regroupe les voix par personnage (ordre de ``voix.txt`` préservé)."""
+    groupes: Dict[str, List[str]] = {}
+    for n in noms:
+        groupes.setdefault(base_nom(n), []).append(n)
+    return groupes
+
+
 @dataclass
 class Voice:
     name: str
