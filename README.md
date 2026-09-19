@@ -257,6 +257,8 @@ réglages / aide / personnages en modales.
   l'ouverture — pas besoin de régénérer à chaque session ; bouton
   **🗑 Supprimer la génération** (avec confirmation `yes` + case à cocher)
   pour l'effacer.
+  Un rechargement de page pendant une génération se rattache automatiquement
+  au job en cours (éditeur, montage et progression restaurés).
 - **Onglet Projets** : tableau de gestion des documents (taille, date, .map) avec
   actions **Ouvrir / Renommer / Dupliquer / Archiver / Supprimer**, section **📦 Archives**
   (Restaurer), zone **🎙️ Voix** (pré-écoute, suppression, 📥 Importer un couple

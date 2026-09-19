@@ -581,6 +581,33 @@ def api_stream(jid: int):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+@app.get("/api/generer/en-cours")
+def api_generer_en_cours():
+    """Génération en cours (reprise après rechargement de page).
+
+    Renvoie l'id du job, son document, le texte soumis, le mapping
+    personnages et les ids en file de régénération — de quoi se rattacher.
+    """
+    for jid, job in _jobs.items():
+        if job.get("status") == "running":
+            texte = None
+            try:
+                if job.get("tmp") and Path(job["tmp"]).exists():
+                    texte = Path(job["tmp"]).read_text(encoding="utf-8")
+            except Exception:  # noqa: BLE001
+                pass
+            fq = job.get("file_regen")
+            try:
+                en_file = list(fq.queue) if fq is not None else []
+            except Exception:  # noqa: BLE001
+                en_file = []
+            return {"id": jid, "document": job.get("document"),
+                    "texte": texte, "personnages": job.get("personnages", {}),
+                    "en_file": en_file,
+                    "blocs": len(job.get("blocs", []))}
+    return {"id": None}
+
+
 @app.post("/api/generer/{jid}/arret")
 def api_generer_arret(jid: int):
     """Demande l'arrêt propre : le bloc en cours se termine, le reste est abandonné.

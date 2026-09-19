@@ -8,6 +8,17 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Correction — Reprise d'une génération après rechargement de page
+
+- **API** (`app/server.py`) : `GET /api/generer/en-cours` expose le job en
+  cours (id, document, texte soumis, mapping personnages, file de
+  régénération) pour s'y rattacher.
+- **GUI** : au chargement, le front restaure l'éditeur + mapping + état de
+  suivi et rouvre le flux SSE (les blocs déjà synthétisés rejouent,
+  dédupliqués ; file de régénération restaurée). Le suivi SSE est factorisé
+  en `suivreGeneration(id)`.
+- Test `TestClient` vert (rien / en cours / terminé / tmp manquant).
+
 ### Correction — Arrêt de génération réactif + contrôles page Montage
 
 - **Moteur** (`engine/adaptive.py`, `engine/multi.py`) : l'arrêt demandé est

@@ -973,7 +973,11 @@ $("generer").addEventListener("click", async () => {
   }
   const { id } = await r.json();
   montageId = id;
+  suivreGeneration(id);
+});
 
+// ---------------------------------------------------------------- suivi d'une génération (lancement ou rattachement après rechargement)
+function suivreGeneration(id) {
   const ev = new EventSource(`/api/generer/${id}/stream`);
   let fini = false;
   const fin = (erreur = false) => {
@@ -1054,7 +1058,55 @@ $("generer").addEventListener("click", async () => {
     fin(true);
   });
   ev.addEventListener("end", fin);
-});
+}
+
+// Rattachement après rechargement de page : le job tourne encore côté
+// serveur (texte + document fournis par /api/generer/en-cours). On restaure
+// l'éditeur, l'état de suivi et on rejoue le flux SSE (les events en file
+// rejouent les blocs déjà synthétisés, dédupliqués par data-id).
+async function rattacherGenerationEnCours() {
+  let info;
+  try {
+    const r = await fetch("/api/generer/en-cours");
+    if (!r.ok) return;
+    info = await r.json();
+  } catch { return; }
+  if (!info || !info.id) return;
+  if (info.document) {
+    docCourant = { fichier: info.document, brouillon: null };
+    try { await chargerPersonnagesDoc(info.document); } catch { /* mapping optionnel */ }
+    selectDoc(info.document);
+    $("doc-statut").textContent = `reprise : ${info.document}`;
+  } else {
+    docCourant = null;
+    $("doc-statut").textContent = "reprise : fichier local";
+  }
+  if (info.texte != null) cm.setValue(info.texte);
+  personnages = info.personnages || {};
+  try {
+    const r = await fetch("/api/voix");
+    if (r.ok) {
+      const noms = await r.json();
+      voixDispo = noms.map((v) => v.nom);
+    }
+  } catch { /* voix optionnelles ici */ }
+  majBoutonsPerso();
+  contenuGenere = info.texte != null ? info.texte : cm.getValue();
+  montageId = info.id;
+  montageBlocs = [];
+  if (Array.isArray(info.en_file)) {
+    for (const bid of info.en_file) blocsEnFile.add(bid);
+  }
+  generationActive = true;
+  arretEnCours = false;
+  majBoutonGenerer();
+  $("log").textContent = `Reprise de la génération en cours (job ${info.id})…\n`;
+  initialiserFileCreation();
+  $("montage").src = "";
+  demarrerProgression();
+  notifier("Génération en cours reconnectée.", "ok");
+  suivreGeneration(info.id);
+}
 
 async function demanderArret() {
   if (!generationActive || arretEnCours || !montageId) return;
@@ -1361,6 +1413,16 @@ function ajouterBlocTempsReel(b) {
 
   const carte = construireCarteBloc(b, montageBlocs.length + 1);
   box.appendChild(carte);
+  if (blocsEnFile.has(b.id)) {
+    // rattachement : ce bloc était déjà en file de régénération.
+    carte.querySelectorAll(".bloc-carte-actions button").forEach((x) => {
+      if (x.textContent === "Regénérer ce bloc") {
+        x.textContent = "En file…";
+        x.disabled = true;
+      }
+    });
+    marquerFileRegen(b.id);
+  }
 
   // mémoriser pour le futur rechargement / concaténation
   montageBlocs.push(b);
@@ -2530,4 +2592,5 @@ $("btn-voix-enregistrer").addEventListener("click", async () => {
   await chargerEtat();
   await chargerVoix();
   await chargerModele();
+  await rattacherGenerationEnCours();  // job encore en cours après rechargement ?
 })();
