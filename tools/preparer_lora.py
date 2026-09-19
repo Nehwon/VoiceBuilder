@@ -31,6 +31,7 @@ DUREE_MIN, DUREE_MAX = 5.0, 12.0  # segments courts : pic VRAM réduit (M18.2)
 SEUIL_15MIN = 15 * 60             # en deçà : gain marginal vs zéro-shot
 RATIO_DEV = 0.05
 SR_CIBLE = 16000                  # convention datasets CosyVoice (fbank 16 kHz)
+INSTRUCT_DEFAUT = "You are a helpful assistant.<|endofprompt|>"  # recette officielle
 
 
 def slug(nom: str) -> str:
@@ -151,7 +152,8 @@ def lire_texte_kaldi(path: Path) -> dict[str, str]:
 
 
 def ecrire_kaldi(dossier: Path, segs: list[dict], spk: str) -> None:
-    """Écrit `wav.scp`, `text`, `utt2spk` (triés par utt)."""
+    """Écrit `wav.scp`, `text`, `utt2spk` (+ `instruct` par défaut, requis par
+    le forward CosyVoice3) — triés par utt."""
     dossier.mkdir(parents=True, exist_ok=True)
     segs = sorted(segs, key=lambda s: s["utt"])
     (dossier / "wav.scp").write_text(
@@ -160,6 +162,8 @@ def ecrire_kaldi(dossier: Path, segs: list[dict], spk: str) -> None:
         "".join(f"{s['utt']} {s['text']}\n" for s in segs), encoding="utf-8")
     (dossier / "utt2spk").write_text(
         "".join(f"{s['utt']} {spk}\n" for s in segs), encoding="utf-8")
+    (dossier / "instruct").write_text(
+        "".join(f"{s['utt']} {INSTRUCT_DEFAUT}\n" for s in segs), encoding="utf-8")
 
 
 def charger_audio(path: Path) -> tuple[np.ndarray, int]:

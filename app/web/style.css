@@ -220,6 +220,10 @@ h1 .logo { height: 1.7em; width: 1.7em; vertical-align: -0.35em; margin-right: 2
   color: var(--txt); font-size: 13px; line-height: 1.45;
   margin: 8px 0 10px; white-space: pre-wrap;
 }
+.bloc-carte-texte[contenteditable="true"] { cursor: text; border-radius: 4px; padding: 2px 4px; margin-left: -4px; }
+.bloc-carte-texte[contenteditable="true"]:hover { background: color-mix(in srgb, var(--acc) 8%, transparent); }
+.bloc-carte-texte[contenteditable="true"]:focus { outline: 2px solid var(--acc); background: var(--panel); }
+.liste-blocs.desync .bloc-carte { opacity: 0.72; }
 .bloc-carte-actions { display: flex; gap: 8px; }
 .bloc-carte-actions button { margin: 0; }
 
@@ -235,9 +239,13 @@ h1 .logo { height: 1.7em; width: 1.7em; vertical-align: -0.35em; margin-right: 2
   color: var(--acc); cursor: pointer;
 }
 .bloc-carte.bloc-en-cours {
-  border-color: var(--acc);
-  box-shadow: 0 0 0 2px var(--acc);
-  background: color-mix(in srgb, var(--acc) 8%, var(--panel2));
+  border-color: var(--coul-perso, var(--acc));
+  box-shadow: 0 0 0 2px var(--coul-perso, var(--acc));
+  background: color-mix(in srgb, var(--coul-perso, var(--acc)) 10%, var(--panel2));
+}
+.pastille-perso {
+  flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--coul-perso, var(--dim));
 }
 .bloc-carte.en-drag { opacity: 0.5; border-style: dashed; }
 .bloc-carte.cible-montage { border-color: var(--acc); outline: 2px dashed var(--acc); }
@@ -251,10 +259,14 @@ h1 .logo { height: 1.7em; width: 1.7em; vertical-align: -0.35em; margin-right: 2
 }
 .tim-seg {
   position: absolute; top: 5px; bottom: 5px; min-width: 2px;
-  background: color-mix(in srgb, var(--acc) 62%, transparent);
+  background: color-mix(in srgb, var(--coul-seg, var(--acc)) 62%, transparent);
   border: none; border-radius: 3px; cursor: pointer; padding: 0; margin: 0;
 }
-.tim-seg:hover { background: var(--acc); }
+.tim-seg:hover { background: var(--coul-seg, var(--acc)); }
+.tim-seg.tim-en-cours {
+  background: var(--coul-seg, var(--acc));
+  outline: 2px solid var(--txt); outline-offset: -2px; z-index: 1;
+}
 .tim-curseur {
   position: absolute; top: 0; bottom: 0; width: 2px; background: var(--txt);
   pointer-events: none; z-index: 2;

@@ -8,6 +8,38 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Correction — Timeline lisible + couleurs par personnage
+
+- **GUI** (`app/web/`) : layout timeline anti-chevauchement (offset réel,
+  jamais avant la fin du précédent, clic rejoue le bloc) ; couleur stable
+  par personnage (hash → teinte) synchronisée timeline (`--coul-seg`,
+  segment courant détouré) et cartes (`--coul-perso` : pastille,
+  surlignage).
+
+### Ajout — Phrases modifiables dans « Blocs générés » (synchro bidirectionnelle)
+
+- **API** (`app/server.py`) : `POST …/bloc/{id}/texte` (400 si vide,
+  404 si inconnu, 409 si en cours ; job + manifest M16 mis à jour, audio
+  inchangé jusqu'au « Régénérer »).
+- **GUI** : texte des cartes éditable (Entrée = valider, Échap = annuler) ;
+  carte → éditeur (1re occurrence) ; éditeur → cartes (spans alignés par
+  personnage, auto-POST, état `desync` + toast sinon).
+
+### Ajout — Entraînement LoRA petit GPU M18.2 (Palier 1)
+
+- **`engine/lora/`** : presets VRAM 12/16/24 (rang, qLoRA-4bit NF4 via API
+  transformers, checkpointing, micro-batch + accumulation, optim
+  AdamW/8-bit/pagé, ZeRO-2 en filet) ; base LLM CosyVoice3 + PEFT (décodeur
+  entraînable, reste gelé) ; boucle (AMP bf16, clip, warmup linéaire, eval,
+  checkpoints `dernier.pt`/`meilleur.pt`, CSV + PNG) ; registre par voix
+  (poids, config, étage OOM, scores).
+- **`tools/entrainer_lora.py`** (`--dataset`, `--vram`, `--steps/--epochs`,
+  `--dry-run`, `--etage`, `--zero`, `--sans-decodeur`).
+- Validé : unit presets/registre/listes + dry-run manifest réel + smoke
+  2 steps CPU (checkpoint, courbe, registre). Contraintes : pas de
+  cohabitation entraînement/inférence sur 12 Go ; `bitsandbytes`/`peft`
+  requis (`pip install`) ; `instruct` requis (M18.1 l'écrit).
+
 ### Ajout — Kit dataset LoRA M18.1 (Palier 1)
 
 - **`tools/preparer_lora.py`** (`--voix`, `--audio`, `--text`, `--out`,

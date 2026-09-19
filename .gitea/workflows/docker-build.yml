@@ -165,6 +165,20 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"tag":"${{ needs.prepare.outputs.new }}"}' || echo "Deploy webhook failed (non-fatal)"
 
+      - name: Mirror to GitHub Container Registry
+        # Miroir sans calcul côté GitHub : l'image déjà buildée/poussée est
+        # simplement retaggée vers ghcr.io (secret GHCR_TOKEN, scope packages:write).
+        # Seule l'image finale est miroirée (base/vb restent sur Gitea).
+        if: steps.skip.outputs.build == 'yes' && github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u Nehwon --password-stdin
+          for tag in main latest "v${{ needs.prepare.outputs.new }}" "${{ needs.prepare.outputs.new }}"; do
+            docker pull "${{ env.IMAGE_NAME }}:$tag"
+            docker tag "${{ env.IMAGE_NAME }}:$tag" "ghcr.io/nehwon/voicebuilder:$tag"
+            docker push "ghcr.io/nehwon/voicebuilder:$tag"
+          done
+
   release:
     name: Create Gitea Release
     needs: [prepare, build]

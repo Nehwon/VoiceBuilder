@@ -195,6 +195,18 @@ ou `--text` corrigé), dédup, split train/dev, kaldi + `manifest.json` ;
 `--tokens` produit parquet + speech tokens (format CosyVoice). Refuse
 < 15 min effectives.
 
+### Entraînement LoRA petit GPU (Palier 1)
+
+```bash
+python tools/entrainer_lora.py --dataset dataset/lora/<voix>/manifest.json --vram 12 --steps 300
+```
+
+Presets 12/16/24 Go (qLoRA, checkpointing, accumulation, optim 8-bit,
+ZeRO-2 en filet) ; n'entraîne que le LLM ; reprise auto, courbe de perte,
+registre par voix. D'abord 1 voix test (quelques centaines de steps).
+Nécessite `peft` (+ `bitsandbytes` pour qLoRA/8-bit) ; ne pas entraîner
+pendant que le serveur infère (12 Go).
+
 ---
 
 ## Personnages & voix (mapping par document)

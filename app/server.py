@@ -250,6 +250,10 @@ class ReordonnerIn(BaseModel):
     ids: list[int]
 
 
+class BlocTexteIn(BaseModel):
+    texte: str
+
+
 class BenchLancerIn(BaseModel):
     personnage: str
     device: str = "cuda:0"
@@ -948,6 +952,23 @@ def api_bloc_supprimer(jid: int, bid: int):
     ofs = _offsets_blocs(job["blocs"], float(job.get("pause", 0.0)))
     out_blocs = [dict(b, start=o) for b, o in zip(job["blocs"], ofs)]
     return {"blocs": out_blocs, "duree": duree, "vide": not restants}
+
+
+@app.post("/api/generer/{jid}/bloc/{bid}/texte")
+def api_bloc_texte(jid: int, bid: int, payload: BlocTexteIn):
+    """Met à jour le texte d'un bloc (édition depuis la carte) : pris en
+    compte par « Régénérer » (l'audio existant est inchangé)."""
+    job = _job_pret(jid)
+    bloc = next((b for b in job.get("blocs", []) if b["id"] == bid), None)
+    if not bloc:
+        raise HTTPException(404, "Bloc inconnu.")
+    texte = (payload.texte or "").strip()
+    if not texte:
+        raise HTTPException(400, "Texte de bloc vide.")
+    bloc["texte"] = texte
+    bloc["chars"] = len(texte)
+    _cache_ecrire(job)  # M16 : le cache suit les retouches
+    return {"bloc": bloc}
 
 
 @app.post("/api/generer/{jid}/bloc/{bid}/regenerer-file")

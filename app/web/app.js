@@ -173,7 +173,7 @@ function initEditeur() {
       "Alt-9": () => insererTokenEncadrant("<|Laughter|>", "<|/Laughter|>"),
     },
   });
-  cm.on("change", () => { autoEnregistrer(); majMontage(); majBoutonGenerer(); });
+  cm.on("change", () => { autoEnregistrer(); majMontage(); majBoutonGenerer(); planifierSynchroEditeur(); });
 }
 
 // ---------------------------------------------------------------- autocomplétion (Tab)
@@ -1158,6 +1158,13 @@ function montageTotal() {
 }
 
 // ---------------------------------------------------------------- timeline cliquable (M12)
+// Couleur stable par personnage (timeline + cartes synchronisées).
+function couleurPerso(nom) {
+  let h = 0;
+  const s = String(nom || "?");
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+  return `hsl(${h} 70% 55%)`;
+}
 function dessinerTimeline() {
   const tl = $("timeline");
   tl.querySelectorAll(".tim-seg").forEach((el) => el.remove());
@@ -1168,18 +1175,27 @@ function dessinerTimeline() {
     $("timeline-total").textContent = "00:00";
     return;
   }
+  // Layout anti-chevauchement : chaque segment commence au plus tôt à son
+  // offset réel, jamais avant la fin du précédent ; le clic rejoue le bloc.
+  let fin = 0;
   montageBlocs.forEach((b) => {
-    const deb = b.start || 0;
+    const debReel = b.start || 0;
     const dur = b.duree || 0;
     if (dur <= 0) return;
+    const deb = Math.max((debReel / total) * 100, fin);
+    const larg = Math.max(((dur / total) * 100), 0.8);
     const seg = document.createElement("button");
     seg.type = "button";
     seg.className = "tim-seg";
-    seg.title = `${b.personnage} — ${fmtTmp(deb)} → ${fmtTmp(deb + dur)}`;
-    seg.style.left = `${(deb / total) * 100}%`;
-    seg.style.width = `${Math.max(1.5, (dur / total) * 100)}%`;
-    seg.addEventListener("click", () => ecouterDepuis(deb));
+    seg.dataset.id = b.id;
+    seg.title = `${b.personnage} — ${fmtTmp(debReel)} → ${fmtTmp(debReel + dur)}`;
+    seg.style.left = `${Math.min(deb, 100)}%`;
+    seg.style.width = `${larg}%`;
+    seg.style.setProperty("--coul-seg", couleurPerso(b.personnage));
+    if (b.id === blocEnCoursId) seg.classList.add("tim-en-cours");
+    seg.addEventListener("click", () => ecouterDepuis(debReel));
     tl.appendChild(seg);
+    fin = deb + larg;
   });
   $("timeline-total").textContent = fmtTmp(total);
   miseAJourCurseur();
@@ -1218,6 +1234,8 @@ function surlignerBlocEnCours() {
   blocEnCoursId = id;
   document.querySelectorAll(".bloc-carte").forEach((c) =>
     c.classList.toggle("bloc-en-cours", Number(c.dataset.id) === id));
+  document.querySelectorAll("#timeline .tim-seg").forEach((s) =>
+    s.classList.toggle("tim-en-cours", Number(s.dataset.id) === id));
   if (b) {
     const c = document.querySelector(`.bloc-carte[data-id="${id}"]`);
     if (c) c.scrollIntoView({ block: "nearest" });
@@ -1339,6 +1357,7 @@ function construireCarteBloc(b, num) {
   const carte = document.createElement("article");
   carte.className = "bloc-carte";
   carte.dataset.id = b.id;
+  carte.style.setProperty("--coul-perso", couleurPerso(b.personnage));
 
   const tete = document.createElement("div");
   tete.className = "bloc-carte-tete";
@@ -1347,6 +1366,9 @@ function construireCarteBloc(b, num) {
   grip.className = "grip-bloc";
   grip.textContent = "⠿";
   grip.title = "Glisser pour réordonner le bloc";
+  const pastille = document.createElement("span");
+  pastille.className = "pastille-perso";
+  pastille.title = b.personnage || "";
   const titre = document.createElement("strong");
   titre.textContent = `${num}. ${b.personnage}`;
   const dur = document.createElement("span");
@@ -1357,7 +1379,7 @@ function construireCarteBloc(b, num) {
   ecouter.className = "btn-ecouter";
   ecouter.textContent = "▶";
   ecouter.title = "Écouter à partir de ce bloc";
-  tete.append(grip, titre, dur, ecouter);
+  tete.append(grip, pastille, titre, dur, ecouter);
   tete.addEventListener("click", (e) => {
     if (e.target.closest("button")) return;
     ecouterDepuis(b.start || 0);
@@ -1372,6 +1394,7 @@ function construireCarteBloc(b, num) {
   const texte = document.createElement("p");
   texte.className = "bloc-carte-texte";
   texte.textContent = b.texte || "—";
+  rendreTexteEditable(texte, b);
 
   const actions = document.createElement("div");
   actions.className = "bloc-carte-actions";
@@ -1394,6 +1417,143 @@ function construireCarteBloc(b, num) {
   return carte;
 }
 
+// ---------------------------------------------------------------- phrases éditables + synchro bidirectionnelle
+function rendreTexteEditable(texteEl, b) {
+  texteEl.contentEditable = "true";
+  texteEl.spellcheck = false;
+  texteEl.title = "Cliquer pour modifier la phrase (synchronisée avec l'éditeur)";
+  texteEl.addEventListener("focus", () => {
+    texteEl.dataset.texteOrigine = texteEl.textContent;
+  });
+  texteEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); texteEl.blur(); }
+    else if (e.key === "Escape") {
+      texteEl.textContent = texteEl.dataset.texteOrigine || "";
+      texteEl.blur();
+    }
+  });
+  texteEl.addEventListener("blur", () => validerTexteCarte(b.id, texteEl));
+}
+
+function rafraichirCarteTexte(bid) {
+  const carte = document.querySelector(`.bloc-carte[data-id="${bid}"]`);
+  const bloc = montageBlocs.find((x) => x.id === bid);
+  if (!carte || !bloc) return;
+  const txt = carte.querySelector(".bloc-carte-texte");
+  if (txt && document.activeElement !== txt) txt.textContent = bloc.texte;
+  const dur = carte.querySelector(".bloc-carte-duree");
+  if (dur) dur.textContent = libelleCarteBloc(bloc);
+}
+
+async function validerTexteCarte(bid, texteEl) {
+  const bloc = montageBlocs.find((x) => x.id === bid);
+  const ancien = bloc ? bloc.texte : texteEl.dataset.texteOrigine;
+  const nouveau = (texteEl.textContent || "").trim();
+  if (!bloc || nouveau === (ancien || "").trim()) {
+    texteEl.textContent = ancien || "";
+    return;
+  }
+  if (generationActive || !montageId) {
+    texteEl.textContent = ancien || "";
+    notifier("Attends la fin de la génération pour modifier.", "err");
+    return;
+  }
+  if (!nouveau) {
+    texteEl.textContent = ancien || "";
+    notifier("Texte de bloc vide : modification annulée.", "err");
+    return;
+  }
+  try {
+    const r = await fetch(`/api/generer/${montageId}/bloc/${bid}/texte`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texte: nouveau }),
+    });
+    if (!r.ok) {
+      texteEl.textContent = ancien || "";
+      notifier((await r.json()).detail || "Modification refusée.", "err");
+      return;
+    }
+    const d = await r.json();
+    Object.assign(bloc, { texte: d.bloc.texte, chars: d.bloc.chars });
+    rafraichirCarteTexte(bid);
+    // synchro carte → éditeur : remplace la 1re occurrence de l'ancien texte.
+    const contenu = cm.getValue();
+    const idx = contenu.indexOf(ancien);
+    if (idx >= 0) {
+      cm.setValue(contenu.slice(0, idx) + nouveau + contenu.slice(idx + ancien.length));
+      notifier("Phrase mise à jour (carte + éditeur).", "ok");
+    } else {
+      notifier("Phrase mise à jour (introuvable dans l'éditeur).", "ok");
+    }
+    verifierSynchroEditeur();
+  } catch {
+    texteEl.textContent = ancien || "";
+    notifier("Modification échouée.", "err");
+  }
+}
+
+// Découpe l'éditeur en spans {personnage, texte} (miroir de tagging/regrouper).
+function decouperEditeur() {
+  const spans = [];
+  let cur = null;
+  for (const raw of cm.getValue().split("\n")) {
+    const ligne = raw.trim();
+    if (!ligne) continue;
+    const m = ligne.match(/^\[([^\]]+)\]\s*:?\s*(.*)$/);
+    if (m) {
+      cur = { personnage: m[1].trim(), texte: m[2].trim() };
+      spans.push(cur);
+    } else if (cur) {
+      cur.texte = `${cur.texte} ${ligne}`.trim();
+    } else {
+      cur = { personnage: null, texte: ligne };
+      spans.push(cur);
+    }
+  }
+  return spans.filter((s) => s.texte);
+}
+
+let synchroTimer = null;
+let synchroEtat = true;  // false = cartes désynchronisées de l'éditeur
+function planifierSynchroEditeur() {
+  clearTimeout(synchroTimer);
+  synchroTimer = setTimeout(() => verifierSynchroEditeur(), 1200);
+}
+
+async function verifierSynchroEditeur() {
+  if (!montageId || !montageBlocs.length || generationActive) return;
+  const box = $("liste-blocs");
+  const spans = decouperEditeur();
+  const formeOk = spans.length === montageBlocs.length &&
+    spans.every((s, i) => s.personnage === montageBlocs[i].personnage);
+  if (!formeOk) {
+    if (synchroEtat) {
+      synchroEtat = false;
+      box.classList.add("desync");
+      notifier("Blocs désynchronisés de l'éditeur — régénérez pour réaligner.", "err");
+    }
+    return;
+  }
+  let change = false;
+  for (let i = 0; i < montageBlocs.length; i++) {
+    if (spans[i].texte === montageBlocs[i].texte) continue;
+    const bid = montageBlocs[i].id;
+    try {
+      const r = await fetch(`/api/generer/${montageId}/bloc/${bid}/texte`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texte: spans[i].texte }),
+      });
+      if (!r.ok) continue;
+      const d = await r.json();
+      Object.assign(montageBlocs[i], { texte: d.bloc.texte, chars: d.bloc.chars });
+      rafraichirCarteTexte(bid);
+      change = true;
+    } catch { /* on réessaiera à la prochaine frappe */ }
+  }
+  if (!synchroEtat) { synchroEtat = true; box.classList.remove("desync"); }
+  if (change) notifier("Phrases synchronisées depuis l'éditeur.", "ok");
+}
+
 // Une carte par bloc : audio + texte + infos + boutons.
 function remplirListeBlocs() {
   const box = $("liste-blocs");
@@ -1408,6 +1568,7 @@ function remplirListeBlocs() {
     box.appendChild(construireCarteBloc(b, i + 1));
   });
   dessinerTimeline();
+  planifierSynchroEditeur();
 }
 
 // ---------------------------------------------------------------- écoute temps réel : ajoute un bloc au fur et à mesure

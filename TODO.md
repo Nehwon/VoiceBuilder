@@ -365,13 +365,20 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [x] Validé en conteneur (voix synthétique, 18,7 min sources) : 115
         segments, split 108/7, parquet + tokens complets ( gate 15 min
         vérifié : 11,8 min refusées).
-- [ ] **M18.2 — Entraînement LoRA « petit GPU » (`tools/entrainer_lora.py`)**
-  - [ ] Presets `--vram 12/16/24` appliquant l'échelle anti-OOM
+- [x] **M18.2 — Entraînement LoRA « petit GPU » (`tools/entrainer_lora.py`)**
+      (2026-09-19)
+  - [x] Presets `--vram 12/16/24` appliquant l'échelle anti-OOM
         (`PROJET_FINE.md` §3.3) : rang, qLoRA 4-bit, gradient checkpointing,
-        micro-batch 1 + accumulation, optim 8-bit/paged, freeze Flow, ZeRO-2 /
-        offload CPU en filet ; reprise sur checkpoint, logs + courbe de perte.
-  - [ ] D'abord 1 voix test (15–30 min, quelques centaines de steps) avant le
-        full ; documenter l'étage OOM retenu par voix.
+        micro-batch 1 + accumulation, optim 8-bit/paged, freeze Flow (LLM
+        seul, recette officielle), ZeRO-2/offload CPU en filet ; reprise sur
+        checkpoint (`dernier.pt`), logs CSV + courbe PNG, registre par voix
+        (poids, config, étage OOM, scores).
+  - [x] 1 voix test avant le full : smoke 2 steps CPU vert (PEFT + forward
+        CosyVoice, checkpoint, courbe, registre) ; documenter l'étage OOM
+        retenu par voix (`etage`, `--etage` pour forcer).
+  - [x] Contraintes validées : entraînement et inférence serveur ne
+        cohabitent pas sur 12 Go (OOM à double instance) ; `instruct`
+        requis dans les datasets (écrit par M18.1).
 - [ ] **M18.3 — Validation + registre des LoRA**
   - [ ] Protocole `PROJET_FINE.md` §3.4 (paragraphe FR de référence,
         `coverage` ≥ 0.85, RTF, écoute aveugle à 2+ auditeurs) ; ne garder que
@@ -468,6 +475,26 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ## Backlog / Idées
 
+### Correctifs GUI / UX (bugs remontés)
+
+- [x] **Miroir des images Gitea → GitHub sans GitHub Actions** (2026-09-19) :
+      aucun calcul côté GitHub, seul du stockage paquets (`ghcr.io`).
+      Étape « Mirror to GitHub Container Registry » dans
+      `.gitea/workflows/docker-build.yml` (après build : `docker pull` →
+      retag `ghcr.io/nehwon/voicebuilder` → `docker push`, secret
+      `GHCR_TOKEN` scope `packages:write`) ; seule l'image finale est
+      miroirée (base/vb restent sur Gitea).
+- [x] **Timeline « Montage généré » illisible (blocs superposés)** (2026-09-19) :
+      layout anti-chevauchement (offset réel, jamais avant la fin du
+      précédent, clic rejoue le bloc) + **couleur stable par personnage**
+      (hash → teinte) synchronisée timeline (`--coul-seg`, segment courant
+      détouré) et cartes (`--coul-perso` : pastille, surlignage).
+- [x] **Phrases modifiables dans « Blocs générés »** (2026-09-19), avec
+      **synchronisation bidirectionnelle** : texte des cartes éditable
+      (`contenteditable`, `POST …/bloc/{id}/texte` → job + manifest, audio
+      inchangé jusqu'au « Régénérer ») ; carte → éditeur (1re occurrence
+      remplacée) ; éditeur → cartes (parse en spans, alignement positionnel
+      par personnage, mise à jour auto, état `desync` + toast sinon)
 - [ ] Vérification différée : transcrire le montage final en entier et signaler les pertes par segment.
 - [ ] Pré-cache des prompts `wav+txt` par voix.
 - [ ] Détection automatique des limites de segment (VAD) pour `create_voix`.
