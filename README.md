@@ -157,6 +157,20 @@ diff mot à mot vs `.txt`**. Verdict : `OK` / `à recurer` (txt) /
 `à ré-extraire` (wav) / `à nettoyer` (bruit → bouton 🧹 ci-dessus).
 `--sans-whisper` = mode rapide sans retranscription.
 
+### Banc A/B de prompts (comparer les segments candidats)
+
+```bash
+python tools/bench_prompts.py [--personnage NOM] [--promouvoir]
+```
+
+Le paragraphe FR de référence (nombres, date, dialogue, 1 émotion
+`<|HAPPY|>`) est synthétisé avec chaque segment candidat du personnage
+(variantes `_2`/`_3`, versions `_clean`) : `coverage` Whisper + RTF + WAV
+d'écoute dans `output/bench/<personnage>/`. `--promouvoir` fait du gagnant
+la référence dans `voix.txt` (sauvegarde `voix.txt.bak`). Même banc dans
+l'onglet **🎙️ Voix** (section « Banc A/B », écoute comparative + bouton
+de promotion).
+
 ---
 
 ## Personnages & voix (mapping par document)

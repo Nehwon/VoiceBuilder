@@ -32,6 +32,19 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
   `à ré-extraire` / `à nettoyer` (→ M13.0), sortie console.
 - Audit réel des 14 voix : 11 OK, 1 à recurer, 2 à ré-extraire (silence ≥ 60 %).
 
+### Ajout — Banc A/B de prompts M17.2 (Palier 0)
+
+- **`engine/bench.py`** : paragraphe FR de référence (nombres, date, dialogue,
+  `<|HAPPY|>`), groupement des candidats par personnage (variantes `_2`/`_3`,
+  `_clean`), bench (`coverage` Whisper + RTF + WAV d'écoute), promotion du
+  gagnant dans `voix.txt` (backup `voix.txt.bak`).
+- **`tools/bench_prompts.py`** : CLI (`--personnage`, `--promouvoir`, `--device`,
+  WAV dans `output/bench/<personnage>/`).
+- **API + GUI** : job bench en tâche de fond (`candidats`/`lancer`/`{jid}`/
+  `/wav`/`promouvoir`), section « Banc A/B » dans l'onglet 🎙️ Voix (sélecteur,
+  tableau résultats, écoute comparative, bouton de promotion).
+- Bench réel Thepromisedneverland : couv 96/91/87 %, gagnant = base.
+
 ### Ajout — Onglet Voix : extraction audio, waveform, transcription (M13)
 
 - **`engine/audio_extract.py`** : module backend pour l'extraction audio depuis

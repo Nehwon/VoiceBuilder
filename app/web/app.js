@@ -40,7 +40,7 @@ function mountVue(nom) {
   if (nom === "edit" && cm) cm.refresh();
   if (nom === "montage" && montageId) chargerBlocs();
   if (nom === "projets") chargerDetailsProjets();
-  if (nom === "voix") chargerVoixListe();
+  if (nom === "voix") { chargerVoixListe(); chargerBenchCandidats(); }
 }
 $("tab-edit").addEventListener("click", () => mountVue("edit"));
 $("tab-montage").addEventListener("click", () => mountVue("montage"));
@@ -1637,6 +1637,135 @@ function renderVoix(list) {
   }
 }
 $("btn-voix-rafraichir").addEventListener("click", async () => { await chargerVoix(); await chargerVoixListe(); });
+
+// ---------------------------------------------------------------- banc A/B de prompts (M17.2)
+let benchGroupes = [];
+let benchPollTimer = null;
+
+async function chargerBenchCandidats() {
+  const sel = $("bench-personnage");
+  try {
+    const r = await fetch("/api/bench/candidats");
+    if (!r.ok) { sel.innerHTML = ""; return; }
+    benchGroupes = (await r.json()).groupes || [];
+    sel.innerHTML = "";
+    for (const g of benchGroupes) {
+      const o = document.createElement("option");
+      o.value = g.base;
+      o.textContent = g.candidats.length > 1
+        ? `${g.base} (${g.candidats.length} candidats)`
+        : `${g.base} (1 candidat — rien à comparer)`;
+      o.disabled = g.candidats.length < 2;
+      sel.appendChild(o);
+    }
+    const premier = benchGroupes.find((g) => g.candidats.length > 1);
+    if (premier) sel.value = premier.base;
+  } catch { /* voix indisponibles : select vide */ }
+}
+
+function benchStatut(msg) {
+  $("bench-statut").textContent = msg || "";
+}
+
+$("btn-bench-lancer").addEventListener("click", async () => {
+  const base = $("bench-personnage").value;
+  if (!base) { notifier("Choisis un personnage à bencher.", "err"); return; }
+  $("btn-bench-lancer").disabled = true;
+  $("bench-resultats").innerHTML = "";
+  try {
+    const r = await fetch("/api/bench/lancer", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personnage: base }),
+    });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const { id } = await r.json();
+    benchStatut("Bench en cours… (synthèse + Whisper par candidat)");
+    clearInterval(benchPollTimer);
+    benchPollTimer = setInterval(() => suivreBench(id, base), 2000);
+  } catch { notifier("Lancement du bench échoué.", "err"); }
+  finally { $("btn-bench-lancer").disabled = false; }
+});
+
+async function suivreBench(jid, base) {
+  try {
+    const r = await fetch(`/api/bench/${jid}`);
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    const faits = (d.avancement || []).map((a) => a.candidat).join(", ");
+    if (d.status === "running") {
+      benchStatut(`Bench en cours… ${faits ? "(" + faits + " terminé(s))" : ""}`);
+      return;
+    }
+    clearInterval(benchPollTimer);
+    if (d.status === "error" || d.error) {
+      benchStatut("");
+      notifier(d.error || "Bench échoué.", "err");
+      return;
+    }
+    benchStatut(`Terminé : gagnant ${d.gagnant}.`);
+    rendreBench(base, jid, d);
+  } catch { clearInterval(benchPollTimer); benchStatut(""); notifier("Suivi du bench échoué.", "err"); }
+}
+
+function rendreBench(base, jid, d) {
+  const box = $("bench-resultats");
+  box.innerHTML = "";
+  const table = document.createElement("table");
+  table.className = "bench-table";
+  const ent = document.createElement("tr");
+  ["Candidat", "Coverage", "RTF", "Durée", "Écoute", ""].forEach((h) => {
+    const th = document.createElement("th");
+    th.textContent = h;
+    ent.appendChild(th);
+  });
+  table.appendChild(ent);
+  for (const l of d.lignes || []) {
+    const tr = document.createElement("tr");
+    if (l.candidat === d.gagnant) tr.className = "bench-gagnant";
+    const tdNom = document.createElement("td");
+    tdNom.textContent = (l.candidat === d.gagnant ? "★ " : "") + l.candidat;
+    const tdCov = document.createElement("td");
+    tdCov.textContent = `${(l.coverage * 100).toFixed(0)} %`;
+    const tdRtf = document.createElement("td");
+    tdRtf.textContent = l.rtf.toFixed(2);
+    const tdDur = document.createElement("td");
+    tdDur.textContent = `${l.duree} s`;
+    const tdAudio = document.createElement("td");
+    const audio = document.createElement("audio");
+    audio.controls = true;
+    audio.preload = "none";
+    audio.src = `/api/bench/${jid}/wav?candidat=${encodeURIComponent(l.candidat)}`;
+    tdAudio.appendChild(audio);
+    const tdAct = document.createElement("td");
+    if (l.candidat === d.gagnant) {
+      const b = document.createElement("button");
+      b.className = "primaire";
+      b.textContent = "Promouvoir comme référence";
+      b.onclick = () => promouvoirBench(base, l.candidat);
+      tdAct.appendChild(b);
+    }
+    tr.append(tdNom, tdCov, tdRtf, tdDur, tdAudio, tdAct);
+    table.appendChild(tr);
+  }
+  box.appendChild(table);
+}
+
+async function promouvoirBench(base, candidat) {
+  const ok = await demanderConfirmation("Promouvoir le gagnant",
+    `Faire de « ${candidat} » la référence de « ${base} » dans voix.txt ? (sauvegarde voix.txt.bak)`);
+  if (!ok) return;
+  try {
+    const r = await fetch("/api/bench/promouvoir", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personnage: base, candidat }),
+    });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const d = await r.json();
+    notifier(`Référence promue : ${d.ligne}`, "ok");
+    await chargerVoixListe();
+    await chargerBenchCandidats();
+  } catch { notifier("Promotion échouée.", "err"); }
+}
 
 // import voix : modal + fichiers
 const modalVoixImport = $("modal-voix-import");

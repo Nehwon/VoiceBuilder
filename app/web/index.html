@@ -234,6 +234,24 @@
         </div>
       </section>
     </div>
+    <!-- Banc A/B de prompts (M17.2) : même paragraphe de référence par candidat -->
+    <section class="voix-section voix-bench">
+      <h2>⚖️ Banc A/B de prompts</h2>
+      <p class="modal-sub">Le paragraphe FR de référence (nombres, date, dialogue,
+        1 émotion) est synthétisé avec chaque segment candidat du personnage
+        (variantes <code>_2</code>/<code>_3</code>, versions <code>_clean</code>) :
+        <code>coverage</code> Whisper + RTF + écoute comparative. Le gagnant peut
+        devenir la référence dans <code>voix.txt</code> (sauvegarde
+        <code>voix.txt.bak</code>).</p>
+      <div class="bench-controles">
+        <label>Personnage
+          <select id="bench-personnage" class="voix-nom-input"></select>
+        </label>
+        <button id="btn-bench-lancer" class="primaire">▶ Lancer le bench</button>
+        <span id="bench-statut" class="voix-upload-info"></span>
+      </div>
+      <div id="bench-resultats" class="bench-resultats"></div>
+    </section>
   </main>
 
   <main id="vue-projets" class="vue projets-vue" hidden>

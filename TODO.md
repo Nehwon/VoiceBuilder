@@ -316,14 +316,16 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         `à nettoyer` (bruit/musique → M13.0) ; sortie console uniquement.
         Audit réel des 14 voix : 11 OK, 1 à recurer (Thepromisedneverland_3),
         2 à ré-extraire (Gachiakuta, Thepromisedneverland — silence ≥ 60 %).
-- [ ] **M17.2 — Banc A/B de prompts par personnage**
-  - [ ] Générer le **même paragraphe FR de référence** (nombres, dates,
-        dialogue, 1 émotion — cf. `PROJET_FINE.md` §3.4) avec **2–3 segments
-        candidats** par personnage (ex. variantes `_2`/`_3`, versions
-        `_clean`) : `coverage` Whisper + RTF + écoute comparative
-        (`PROJET_FINE.md` §2 point 1).
-  - [ ] CLI (`tools/bench_prompts.py`) d'abord, puis section GUI (onglet Voix
-        ou Montage) ; le gagnant devient la référence dans `voix.txt`.
+- [x] **M17.2 — Banc A/B de prompts par personnage** (2026-09-19)
+  - [x] Générer le **même paragraphe FR de référence** (nombres, date,
+        dialogue, 1 émotion `<|HAPPY|>`, `PROJET_FINE.md` §3.4) avec les
+        segments candidats (variantes `_2`/`_3`, `_clean`) : `coverage`
+        Whisper + RTF + écoute comparative (`engine/bench.py`,
+        `tools/bench_prompts.py`).
+  - [x] Section GUI (onglet 🎙️ Voix) : sélecteur, lancement, tableau
+        résultats, écoute comparative ; le gagnant devient la référence dans
+        `voix.txt` (`--promouvoir` / bouton, backup `voix.txt.bak`).
+        Bench réel : Thepromisedneverland 96/91/87 %, API + promotion testées.
 - [ ] **M17.3 — Nettoyage en lot des 14 voix**
   - [ ] Appliquer le pipeline M13.0 (Demucs + DeepFilterNet) à toutes les voix
         en une commande (`tools/nettoyer_voix.py --tout`), produire les

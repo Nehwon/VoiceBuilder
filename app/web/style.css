@@ -461,6 +461,20 @@ button.secondaire { border-color: var(--bor); }
 
 .voix-section { margin-bottom: 0; min-width: 0; overflow: hidden; }
 
+/* ---------------------------------------------------------------- banc A/B de prompts (M17.2) */
+.voix-bench { margin-top: 24px; }
+.voix-bench h2 { margin: 0 0 4px; }
+.bench-controles { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin: 10px 0; }
+.bench-controles label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.bench-controles button { margin: 0; }
+.bench-resultats { margin-top: 8px; }
+.bench-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bench-table th, .bench-table td { border: 1px solid var(--bor); padding: 6px 8px; text-align: left; }
+.bench-table th { background: var(--panel2); }
+.bench-table audio { max-width: 220px; height: 32px; }
+.bench-gagnant td { background: color-mix(in srgb, var(--acc) 10%, transparent); font-weight: 600; }
+.bench-table button { margin: 0; }
+
 .voix-bibliotheque .projets-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .voix-bibliotheque h2 { margin: 0; }
 .voix-bibliotheque { min-width: 0; overflow: hidden; }

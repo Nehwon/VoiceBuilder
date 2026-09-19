@@ -37,6 +37,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from engine import bench
 from engine import config, cosyvoice_engine, modeles, multi, voix
 from engine.voix import load_voix
 from engine import audio_extract
@@ -228,6 +229,16 @@ class GenererIn(BaseModel):
 
 class ReordonnerIn(BaseModel):
     ids: list[int]
+
+
+class BenchLancerIn(BaseModel):
+    personnage: str
+    device: str = "cuda:0"
+
+
+class BenchPromouvoirIn(BaseModel):
+    personnage: str
+    candidat: str
 
 
 class PersonnagesSaveIn(BaseModel):
@@ -776,6 +787,115 @@ def api_bloc_supprimer(jid: int, bid: int):
     ofs = _offsets_blocs(job["blocs"], float(job.get("pause", 0.0)))
     out_blocs = [dict(b, start=o) for b, o in zip(job["blocs"], ofs)]
     return {"blocs": out_blocs, "duree": duree, "vide": not restants}
+
+
+# ---------------------------------------------------------------------------
+# Banc A/B de prompts (M17.2) : même paragraphe de référence synthétisé avec
+# chaque segment candidat d'un personnage (coverage Whisper + RTF + écoute).
+# ---------------------------------------------------------------------------
+
+_bench_jobs: dict[int, dict] = {}
+_bench_id = itertools.count()
+
+
+@app.get("/api/bench/candidats")
+def api_bench_candidats():
+    """Personnages et leurs segments candidats (variantes _2/_3, _clean)."""
+    try:
+        voix = _voix()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Aucune voix chargée : {exc}")
+    groupes = bench.grouper_candidats(voix.names())
+    return {"groupes": [{"base": b, "candidats": c} for b, c in groupes.items()]}
+
+
+@app.post("/api/bench/lancer")
+def api_bench_lancer(payload: BenchLancerIn):
+    """Lance le bench d'un personnage en tâche de fond (résultat par polling)."""
+    base = (payload.personnage or "").strip()
+    if not base:
+        raise HTTPException(400, "Personnage vide.")
+    if any(j["status"] == "running" for j in _bench_jobs.values()):
+        raise HTTPException(409, "Un bench est déjà en cours.")
+    try:
+        voix = _voix()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Aucune voix chargée : {exc}")
+    groupes = bench.grouper_candidats(voix.names())
+    if base not in groupes:
+        raise HTTPException(404, f"Personnage inconnu : {base}")
+    candidats = groupes[base]
+    if len(candidats) < 2:
+        raise HTTPException(400, "Un seul candidat : rien à comparer.")
+    jid = next(_bench_id)
+    q: "queue.Queue[tuple]" = queue.Queue()
+    job = {"status": "running", "queue": q, "result": None, "error": None,
+           "personnage": base, "out_dir": str(config.OUTPUT_DIR / "bench" / bench.slug(base))}
+
+    def _run():
+        def progress(d):
+            q.put(("candidat", d))
+        try:
+            model, sr = multi.load(device=payload.device, fp16=False)
+            res = bench.bench_personnage(base, candidats, voix, model, sr,
+                                         job["out_dir"], progress=progress)
+            job["result"] = res
+            job["status"] = "done"
+            q.put(("fin", None))
+        except Exception as exc:  # noqa: BLE001
+            job["error"] = str(exc)
+            job["status"] = "error"
+            q.put(("fin", None))
+
+    _bench_jobs[jid] = job
+    threading.Thread(target=_run, daemon=True).start()
+    return {"id": jid, "personnage": base, "candidats": candidats}
+
+
+@app.get("/api/bench/{jid}")
+def api_bench_etat(jid: int):
+    """État d'un bench (polling) : running + avancement, done + résultat."""
+    job = _bench_jobs.get(jid)
+    if not job:
+        raise HTTPException(404, "Bench inconnu.")
+    avancement = []
+    while True:
+        try:
+            kind, data = job["queue"].get_nowait()
+        except queue.Empty:
+            break
+        if kind == "candidat":
+            avancement.append(data)
+    lignes = (job.get("result") or {}).get("lignes", []) if job.get("result") else []
+    return {"status": job["status"], "personnage": job["personnage"],
+            "avancement": avancement, "lignes": lignes,
+            "gagnant": (job.get("result") or {}).get("gagnant"),
+            "error": job.get("error")}
+
+
+@app.get("/api/bench/{jid}/wav")
+def api_bench_wav(jid: int, candidat: str):
+    """WAV d'écoute comparative d'un candidat (résultat du bench)."""
+    job = _bench_jobs.get(jid)
+    if not job or not job.get("result"):
+        raise HTTPException(404, "Bench indisponible.")
+    for l in job["result"].get("lignes", []):
+        if l["candidat"] == candidat and Path(l["wav"]).exists():
+            return FileResponse(l["wav"], media_type="audio/wav")
+    raise HTTPException(404, f"WAV introuvable pour : {candidat}")
+
+
+@app.post("/api/bench/promouvoir")
+def api_bench_promouvoir(payload: BenchPromouvoirIn):
+    """Le gagnant devient la référence du personnage dans voix.txt (backup .bak)."""
+    try:
+        res = bench.promouvoir(config.VOIX_FILE, payload.personnage.strip(),
+                                payload.candidat.strip())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"Promotion échouée : {exc}")
+    return res
 
 
 # ---------------------------------------------------------------------------

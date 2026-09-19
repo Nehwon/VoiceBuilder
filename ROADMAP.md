@@ -154,6 +154,21 @@ sortie console (+ section README).
 **Statut** : ✔ Terminé (2026-09-19) — audit réel des 14 voix en conteneur :
 11 OK, 1 à recurer, 2 à ré-extraire (silence ≥ 60 %).
 
+### M17.2 — Banc A/B de prompts par personnage
+**Objectif** : comparer les segments candidats d'un personnage (variantes
+`_2`/`_3`, versions `_clean`) sur le même paragraphe FR de référence
+(nombres, date, dialogue, 1 émotion `<|HAPPY|>` — `PROJET_FINE.md` §3.4) :
+`coverage` Whisper + RTF + écoute comparative ; le gagnant devient la
+référence dans `voix.txt`.
+**Livrables** : `engine/bench.py` (paragraphe, groupement, bench, promotion
+avec backup `voix.txt.bak`), `tools/bench_prompts.py` (`--personnage`,
+`--promouvoir`, `--device`), API bench (candidats/lancer/poll/wav/promouvoir,
+job fond), section « Banc A/B » onglet 🎙️ Voix (sélecteur, résultats,
+écoute, promotion).
+**Statut** : ✔ Terminé (2026-09-19) — bench réel Thepromisedneverland (3
+candidats, couv 96/91/87 %, gagnant = base), API + promotion + restauration
+testées en conteneur.
+
 ### M14/M15 — Packaging & infra (sous-module CosyVoice + Docker GPU)
 **Objectif** : intégrer **CosyVoice comme sous-module git du projet** (`vendor/CosyVoice`,
 fini le clone voisin dans `~/Projets/CosyVoice`) et fournir un **conteneur Docker avec
