@@ -8,6 +8,16 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Kit dataset LoRA M18.1 (Palier 1)
+
+- **`tools/preparer_lora.py`** (`--voix`, `--audio`, `--text`, `--out`,
+  `--tokens`) : transcription Whisper horodatée → segments 5–12 s, filtre
+  silence, dédup, split train/dev, kaldi + `manifest.json` ; `--tokens`
+  enchaîne `extract_speech_token` + `make_parquet_list` ; refuse < 15 min.
+- Testé : unit (fusion/découpe, silence, dedup, split, kaldi) + E2E conteneur
+  (115 segments, 108/7, parquet + tokens complets, gate vérifié).
+- Pied de page : « VibeCode with OpenCode ».
+
 ### Ajout — Multi-prompt à la génération M17.4 (Palier 0)
 
 - **Moteur** (`engine/multi.py`) : `generate(..., multi_prompt, max_prompts=2)` —

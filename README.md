@@ -184,6 +184,17 @@ avant/après (`coverage` Whisper + SNR, écoute des deux WAV côte à côte) ;
 avec `--promouvoir`, les gagnants (contenu conservé + SNR non dégradée)
 deviennent les références (backup `voix.txt.bak`).
 
+### Kit dataset LoRA (Palier 1)
+
+```bash
+python tools/preparer_lora.py --voix NOM --audio long1.wav [long2.wav ...] [--tokens]
+```
+
+Depuis de longs enregistrements : segments 5–12 s, transcriptions (Whisper
+ou `--text` corrigé), dédup, split train/dev, kaldi + `manifest.json` ;
+`--tokens` produit parquet + speech tokens (format CosyVoice). Refuse
+< 15 min effectives.
+
 ---
 
 ## Personnages & voix (mapping par document)

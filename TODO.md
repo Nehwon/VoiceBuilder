@@ -354,12 +354,17 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 > freeze partiel, échelle anti-OOM), puis validation aveugle et intégration
 > à l'inférence.
 
-- [ ] **M18.1 — Kit dataset LoRA (`tools/preparer_lora.py`)**
-  - [ ] Depuis les segments curés du Palier 0 (M17.1–M17.3) : 15–60 min/voix,
-        segments 5–12 s (pic VRAM réduit), transcriptions exactes, dédup, split
-        val ; sortie au format attendu par `vendor/CosyVoice/tools/` (parquet
-        list + tokens) ; refuser < 15 min effectives (gain marginal vs
-        zéro-shot, cf. `PROJET_FINE.md` §3.2).
+- [x] **M18.1 — Kit dataset LoRA (`tools/preparer_lora.py`)** (2026-09-19)
+  - [x] Depuis de longs enregistrements (+ Whisper horodaté, ou `--text`
+        corrigé au format kaldi) : segments 5–12 s (pic VRAM réduit),
+        transcriptions exactes, filtre silence, dédup, split train/dev ~5 %
+        (seed fixe) ; kaldi (`wav.scp`, `text`, `utt2spk`) + `manifest.json` ;
+        `--tokens` enchaîne `extract_speech_token` + `make_parquet_list`
+        (parquet + tokens, format `vendor/CosyVoice/tools/`) ; refuse
+        < 15 min effectives (`PROJET_FINE.md` §3.2).
+  - [x] Validé en conteneur (voix synthétique, 18,7 min sources) : 115
+        segments, split 108/7, parquet + tokens complets ( gate 15 min
+        vérifié : 11,8 min refusées).
 - [ ] **M18.2 — Entraînement LoRA « petit GPU » (`tools/entrainer_lora.py`)**
   - [ ] Presets `--vram 12/16/24` appliquant l'échelle anti-OOM
         (`PROJET_FINE.md` §3.3) : rang, qLoRA 4-bit, gradient checkpointing,
