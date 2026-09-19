@@ -275,6 +275,8 @@ réglages / aide / personnages en modales.
   Option **Multi-prompt (×2 GPU)** dans les Réglages : chaque bloc est généré
   avec 2 segments candidats de la voix, le meilleur est gardé (utile sur les
   voix faibles).
+  Bouton **✓ Vérifier** : transcription Whisper du montage final + pertes
+  signalées par segment (badges couleur sur les cartes).
   Pendant une génération, le bouton **Regénérer** d'un bloc déjà synthétisé le
   met en file : il est re-synthétisé après le bloc en cours, puis la
   génération globale continue.

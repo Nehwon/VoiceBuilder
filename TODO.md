@@ -495,7 +495,11 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       inchangé jusqu'au « Régénérer ») ; carte → éditeur (1re occurrence
       remplacée) ; éditeur → cartes (parse en spans, alignement positionnel
       par personnage, mise à jour auto, état `desync` + toast sinon)
-- [ ] Vérification différée : transcrire le montage final en entier et signaler les pertes par segment.
+- [x] Vérification différée (2026-09-19) : `verifier.transcribe_segments`
+      + `couverture_bloc` (fenêtre du bloc ± marge), job fond
+      `POST …/verifier` + poll `GET …/verification` (409 si déjà en cours),
+      bouton « ✓ Vérifier » + badges couverture par carte (seuils 85/60),
+      effacés à chaque retouche du montage.
 - [ ] Pré-cache des prompts `wav+txt` par voix.
 - [ ] Détection automatique des limites de segment (VAD) pour `create_voix`.
 - [ ] Prévoir un warmup au démarrage du docker pour éviter une trop grande latence lors de la première inférence.

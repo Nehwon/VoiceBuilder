@@ -48,15 +48,43 @@ def transcribe_timestamped(
 
     Le format horodaté reste ignoré au parsing de ``voix.py`` (``_strip_timestamps``).
     """
-    y = librosa.resample(audio, orig_sr=sample_rate, target_sr=16000).astype(np.float32)
-    model = _load_model()
-    res = model.transcribe(y, language=lang or config.WHISPER_LANG, fp16=False)
     lignes = []
-    for seg in res["segments"]:
+    for seg in transcribe_segments(audio, sample_rate, lang):
         lignes.append(
             f"[{_estamp(seg['start'])} - {_estamp(seg['end'])}] {seg['text'].strip()}"
         )
     return "\n".join(lignes)
+
+
+def transcribe_segments(
+    audio: np.ndarray, sample_rate: int, lang: str | None = None
+) -> list[dict]:
+    """Transcription horodatée structurée : ``[{start, end, text}]`` (secondes)."""
+    y = librosa.resample(audio, orig_sr=sample_rate, target_sr=16000).astype(np.float32)
+    model = _load_model()
+    res = model.transcribe(y, language=lang or config.WHISPER_LANG, fp16=False)
+    return [{"start": float(s["start"]), "end": float(s["end"]),
+             "text": s["text"].strip()}
+            for s in res.get("segments", []) if s["text"].strip()]
+
+
+def couverture_bloc(texte_bloc: str, segments: list[dict],
+                    debut: float, fin: float, marge: float = 1.0) -> dict:
+    """Couverture d'un bloc dans la transcription du montage complet.
+
+    On ne retient que les segments Whisper chevauchant la fenêtre du bloc
+    (marges incluses : les frontières Whisper sont approximatives), puis
+    fraction des mots uniques du bloc retrouvés + mots manquants.
+    """
+    fenetre = " ".join(
+        s["text"] for s in segments
+        if s["end"] >= debut - marge and s["start"] <= fin + marge)
+    tn = normalize(fenetre)
+    mots = list(dict.fromkeys(normalize(texte_bloc).split()))
+    manquants = [w for w in mots if w not in tn]
+    couverture = (len(mots) - len(manquants)) / len(mots) if mots else 0.0
+    return {"couverture": round(couverture, 4), "manquants": manquants,
+            "nb_mots": len(mots)}
 
 
 def coverage(text: str, audio: np.ndarray, sample_rate: int) -> float:

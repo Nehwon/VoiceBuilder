@@ -971,6 +971,61 @@ def api_bloc_texte(jid: int, bid: int, payload: BlocTexteIn):
     return {"bloc": bloc}
 
 
+@app.post("/api/generer/{jid}/verifier")
+def api_verifier_lancer(jid: int):
+    """Vérification différée : transcrit le montage final en entier (Whisper)
+    et signale les pertes par segment (tâche de fond, suivi par polling)."""
+    from engine import verifier
+    job = _job_pret(jid)
+    if not job.get("blocs"):
+        raise HTTPException(400, "Aucun bloc à vérifier.")
+    if not Path(job["out"]).exists():
+        raise HTTPException(404, "Montage introuvable.")
+    if job.get("verification_running"):
+        raise HTTPException(409, "Vérification déjà en cours.")
+    job["verification_running"] = True
+    job["verification"] = {"status": "running", "lignes": []}
+
+    def _run():
+        try:
+            import soundfile as _sf
+            sr = _sr_blocs(job)
+            audio, _ = _sf.read(str(job["out"]), dtype="float32")
+            segments = verifier.transcribe_segments(audio, sr)
+            pause = float(job.get("pause", 0.0))
+            ofs = _offsets_blocs(job["blocs"], pause)
+            lignes = []
+            for b, start in zip(job["blocs"], ofs):
+                fin = start + b.get("duree", 0.0)
+                cov = verifier.couverture_bloc(b.get("texte", ""), segments,
+                                               start, fin)
+                lignes.append({"id": b["id"], "personnage": b.get("personnage"),
+                               **cov})
+            couv = [l["couverture"] for l in lignes]
+            job["verification"] = {
+                "status": "done", "lignes": lignes,
+                "couverture_moyenne": round(sum(couv) / len(couv), 4) if couv else 0.0,
+                "blocs_sous_seuil": sum(
+                    1 for l in lignes
+                    if l["couverture"] < config.VERIFY_THRESHOLD),
+            }
+        except Exception as exc:  # noqa: BLE001
+            job["verification"] = {"status": "error", "lignes": [],
+                                   "error": str(exc)}
+        finally:
+            job["verification_running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"lance": True}
+
+
+@app.get("/api/generer/{jid}/verification")
+def api_verification_etat(jid: int):
+    """État de la vérification différée (polling) + résultats par segment."""
+    job = _job_live(jid)
+    return job.get("verification") or {"status": "aucune", "lignes": []}
+
+
 @app.post("/api/generer/{jid}/bloc/{bid}/regenerer-file")
 def api_bloc_regenerer_file(jid: int, bid: int):
     """Met un bloc en file de régénération : la génération en cours termine

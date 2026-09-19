@@ -247,6 +247,13 @@ h1 .logo { height: 1.7em; width: 1.7em; vertical-align: -0.35em; margin-right: 2
   flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%;
   background: var(--coul-perso, var(--dim));
 }
+.badge-couv {
+  flex: 0 0 auto; font-size: 11px; font-weight: 700; border-radius: 10px;
+  padding: 1px 8px; font-variant-numeric: tabular-nums;
+}
+.badge-couv.couv-ok { background: #1a7f37; color: #fff; }
+.badge-couv.couv-moy { background: #9a6700; color: #fff; }
+.badge-couv.couv-ko { background: #b3261e; color: #fff; }
 .bloc-carte.en-drag { opacity: 0.5; border-style: dashed; }
 .bloc-carte.cible-montage { border-color: var(--acc); outline: 2px dashed var(--acc); }
 .bloc-carte-actions button.dangereux { background: #b3261e; color: #fff; border-color: #b3261e; }

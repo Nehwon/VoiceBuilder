@@ -337,6 +337,7 @@ async function restaurerCacheDoc() {
     if (!r.ok) return;  // pas de cache : rien à restaurer
     const d = await r.json();
     montageId = d.id;
+    effacerBadgesVerif();  // autre job : ancienne vérification périmée
     $("montage").src = `/api/generer/${d.id}/result`;
     majMontage();
     await chargerBlocs();
@@ -373,6 +374,7 @@ $("btn-cache-ok").addEventListener("click", async () => {
     montageId = null;
     contenuGenere = null;
     montageBlocs = [];
+    effacerBadgesVerif();
     $("montage").removeAttribute("src");
     $("montage").load();
     majMontage();
@@ -918,6 +920,7 @@ $("generer").addEventListener("click", async () => {
   majBoutonGenerer();
   $("log").textContent = "Lancement…\n";
   initialiserFileCreation();
+  effacerBadgesVerif();  // nouvelle génération : ancienne vérif périmée
   $("montage").src = "";
   demarrerProgression();
   const terminer = () => {
@@ -1097,6 +1100,7 @@ async function rattacherGenerationEnCours() {
   contenuGenere = info.texte != null ? info.texte : cm.getValue();
   montageId = info.id;
   montageBlocs = [];
+  effacerBadgesVerif();
   if (Array.isArray(info.en_file)) {
     for (const bid of info.en_file) blocsEnFile.add(bid);
   }
@@ -1342,6 +1346,7 @@ async function persisterOrdreBlocs() {
     const d = await r.json();
     montageBlocs = d.blocs || [];
     remplirListeBlocs();
+    effacerBadgesVerif();  // offsets changés : vérification périmée
     rechargerMontage();
     notifier("Ordre des blocs mis à jour.", "ok");
   } catch { notifier("Réordonnancement échoué.", "err"); }
@@ -1476,6 +1481,7 @@ async function validerTexteCarte(bid, texteEl) {
     const d = await r.json();
     Object.assign(bloc, { texte: d.bloc.texte, chars: d.bloc.chars });
     rafraichirCarteTexte(bid);
+    effacerBadgesVerif();  // texte changé : vérification périmée
     // synchro carte → éditeur : remplace la 1re occurrence de l'ancien texte.
     const contenu = cm.getValue();
     const idx = contenu.indexOf(ancien);
@@ -1568,6 +1574,7 @@ function remplirListeBlocs() {
     box.appendChild(construireCarteBloc(b, i + 1));
   });
   dessinerTimeline();
+  appliquerBadgesVerif();
   planifierSynchroEditeur();
 }
 
@@ -1597,6 +1604,7 @@ function ajouterBlocTempsReel(b) {
   // mémoriser pour le futur rechargement / concaténation
   montageBlocs.push(b);
   dessinerTimeline();
+  appliquerBadgesVerif();
 }
 
 async function actionSupprimerBloc(bid, btn) {
@@ -1621,6 +1629,7 @@ async function actionSupprimerBloc(bid, btn) {
     const d = await r.json();
     montageBlocs = d.blocs || [];
     remplirListeBlocs();
+    effacerBadgesVerif();  // le montage a changé : vérification périmée
     const duree = d.vide ? "0" : `${d.duree}`;
     $("montage-info").textContent = d.vide
       ? "Durée totale : 0 s · 0 bloc"
@@ -1644,6 +1653,7 @@ async function actionBloc(bid, action, btn) {
     const r = await fetch(`/api/generer/${montageId}/bloc/${bid}/${action}`, { method: "POST" });
     if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
     await chargerBlocs();
+    effacerBadgesVerif();  // l'audio a changé : vérification périmée
     notifier(msg, "ok");
   } catch { notifier("Action bloc échouée.", "err"); }
   finally { if (btn) btn.disabled = false; }
@@ -1709,6 +1719,7 @@ function actualiserCarteApresRegen(b) {
       }
     });
   }
+  effacerBadgesVerif();  // audio régénéré : vérification périmée
   dessinerTimeline();
 }
 
@@ -1813,6 +1824,77 @@ $("btn-concat").addEventListener("click", async () => {
   } catch { notifier("Concatenation échouée.", "err"); }
   finally { $("btn-concat").disabled = false; }
 });
+
+// ---------------------------------------------------------------- vérification différée (pertes par segment)
+let verifResultats = {};   // bid -> {couverture, manquants, nb_mots}
+let verifPollTimer = null;
+
+function classeCouverture(c) {
+  return c >= 0.85 ? "couv-ok" : (c >= 0.6 ? "couv-moy" : "couv-ko");
+}
+
+function appliquerBadgesVerif() {
+  document.querySelectorAll(".bloc-carte").forEach((carte) => {
+    const bid = Number(carte.dataset.id);
+    const tete = carte.querySelector(".bloc-carte-tete");
+    let badge = carte.querySelector(".badge-couv");
+    const ligne = verifResultats[bid];
+    if (!ligne) { if (badge) badge.remove(); return; }
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "badge-couv";
+      tete.appendChild(badge);
+    }
+    badge.className = `badge-couv ${classeCouverture(ligne.couverture)}`;
+    badge.textContent = `${Math.round(ligne.couverture * 100)} %`;
+    badge.title = ligne.manquants.length
+      ? `Mots manquants : ${ligne.manquants.slice(0, 8).join(", ")}`
+      : "Contenu intégralement retrouvé";
+  });
+}
+
+function effacerBadgesVerif() {
+  verifResultats = {};
+  document.querySelectorAll(".badge-couv").forEach((b) => b.remove());
+}
+
+$("btn-verifier").addEventListener("click", async () => {
+  if (!montageId || !montageBlocs.length) {
+    notifier("Génère d'abord un montage.", "err");
+    return;
+  }
+  $("btn-verifier").disabled = true;
+  try {
+    const r = await fetch(`/api/generer/${montageId}/verifier`, { method: "POST" });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    $("montage-progress").hidden = false;
+    $("montage-progress").textContent = "⏳ Vérification du montage (Whisper)…";
+    clearInterval(verifPollTimer);
+    verifPollTimer = setInterval(suivreVerification, 2000);
+  } catch { notifier("Lancement de la vérification échoué.", "err"); }
+  finally { $("btn-verifier").disabled = false; }
+});
+
+async function suivreVerification() {
+  try {
+    const r = await fetch(`/api/generer/${montageId}/verification`);
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    if (d.status === "running") return;
+    clearInterval(verifPollTimer);
+    $("montage-progress").hidden = true;
+    if (d.status === "error" || d.error) {
+      notifier(d.error || "Vérification échouée.", "err");
+      return;
+    }
+    verifResultats = {};
+    for (const l of d.lignes || []) verifResultats[l.id] = l;
+    appliquerBadgesVerif();
+    const sousSeuil = d.blocs_sous_seuil || 0;
+    notifier(`Vérification : couverture moyenne ${(d.couverture_moyenne * 100).toFixed(0)} %, ` +
+      (sousSeuil ? `${sousSeuil} bloc(s) sous 85 %.` : "tous les blocs OK."), "ok");
+  } catch { clearInterval(verifPollTimer); $("montage-progress").hidden = true; }
+}
 
 // ---------------------------------------------------------------- modèle CosyVoice3
 let modelePresent = null;          // true | false | null (inconnu)

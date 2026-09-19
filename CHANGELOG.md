@@ -8,6 +8,18 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Vérification différée du montage final
+
+- **Moteur** (`engine/verifier.py`) : `transcribe_segments` (structuré) +
+  `couverture_bloc` (mots du bloc retrouvés dans les segments Whisper de sa
+  fenêtre ± marge, mots manquants).
+- **API** (`app/server.py`) : `POST …/verifier` (tâche de fond, 409 si déjà
+  en cours) + `GET …/verification` (polling : running/done/error, lignes par
+  segment, moyenne, nb sous seuil 85 %).
+- **GUI** : bouton « ✓ Vérifier », badges couverture par carte (vert ≥ 85 %,
+  orange ≥ 60 %, rouge sinon, manquants en infobulle), effacés à chaque
+  retouche du montage.
+
 ### Correction — Timeline lisible + couleurs par personnage
 
 - **GUI** (`app/web/`) : layout timeline anti-chevauchement (offset réel,
