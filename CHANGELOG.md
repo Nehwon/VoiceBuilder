@@ -8,6 +8,15 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — VAD : limites de segment automatiques (`create_voix`, onglet Voix)
+
+- **Moteur** (`engine/vad.py`, numpy seul) : détection de parole par énergie
+  (10e percentile + repli crête pour parole dense, hangover, fusion,
+  durée min) + `ajuster_segment` (recalage vers l'intérieur, tolérance 1 s).
+- **CLI** : `create_voix --vad` recale `[start, stop]` avant extraction.
+- **API + GUI** : `POST /api/voix/ajuster-vad` + bouton « 🧲 Ajuster »
+  (inputs + région waveform synchronisés).
+
 ### Ajout — Pré-cache des prompts par voix
 
 - **Moteur** (`engine/cosyvoice_engine.py`) : tenseurs dérivés du prompt

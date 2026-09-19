@@ -1823,6 +1823,27 @@ def api_voix_decouper(payload: VoixDecouperIn):
     return result
 
 
+@app.post("/api/voix/ajuster-vad")
+def api_voix_ajuster_vad(payload: VoixDecouperIn):
+    """Recale [start, stop] sur la parole (VAD énergie) : début avancé au
+    premier span, fin reculée au dernier (vers l'intérieur, tolérance 1 s)."""
+    from engine import vad as _vad
+    path = Path(payload.fichier)
+    if not path.is_file():
+        raise HTTPException(404, "Fichier introuvable")
+    if payload.stop <= payload.start:
+        raise HTTPException(400, "Segment [start, stop] invalide.")
+    try:
+        import soundfile as _sf
+        y, sr = _sf.read(str(path), dtype="float32", always_2d=True)
+        spans = _vad.detecter_parole(y.mean(axis=1).astype("float32"), sr)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"Détection échouée : {exc}")
+    res = _vad.ajuster_segment(spans, payload.start, payload.stop)
+    res["segments"] = [[round(s, 2), round(e, 2)] for s, e in spans]
+    return res
+
+
 @app.post("/api/voix/transcrire-segment")
 def api_voix_transcrire_segment(payload: VoixTranscrireIn):
     """Transcrit un segment audio (ou la totalité) via Whisper."""

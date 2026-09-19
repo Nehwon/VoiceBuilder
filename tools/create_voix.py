@@ -51,6 +51,9 @@ def main(argv=None) -> int:
                         help="Sortie horodatée `[0000.00 - 0005.28] texte` par segment")
     parser.add_argument("--max-sec", type=float, default=30.0,
                         help="Avertit si le segment dépasse cette durée (défaut 30 s)")
+    parser.add_argument("--vad", action="store_true",
+                        help="Recale [start, stop] sur la parole (VAD énergie, tolérance 1 s)")
+    args = parser.parse_args(argv)
     args = parser.parse_args(argv)
 
     config.ensure_dirs()
@@ -60,6 +63,19 @@ def main(argv=None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Extraction [{args.start}..{args.stop}] s de {args.source}")
+    if args.vad:
+        from engine import vad as _vad
+        import soundfile as _sf
+        y_full, sr_full = _sf.read(args.source, dtype="float32", always_2d=True)
+        y_full = y_full.mean(axis=1).astype("float32")
+        spans = _vad.detecter_parole(y_full, sr_full)
+        aj = _vad.ajuster_segment(spans, args.start, args.stop)
+        if aj["ajuste_debut"] or aj["ajuste_fin"]:
+            print(f"  VAD : [{args.start}..{args.stop}] s → "
+                  f"[{aj['start']}..{aj['stop']}] s (parole)")
+            args.start, args.stop = aj["start"], aj["stop"]
+        else:
+            print("  VAD : bornes inchangées (pas de parole proche)")
     audio, sr = extract_segment(args.source, args.start, args.stop)
     duree = len(audio) / sr
     print(f"  segment : {duree:.2f} s @ {sr} Hz")

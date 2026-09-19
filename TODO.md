@@ -506,7 +506,11 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       `frontend.spk2info`, réutilisés à chaque bloc ; clé (wav, mtime, texte,
       sr) avec re-calcul auto si voix réécrite, repli sans cache en cas
       d'échec, borne mémoire. Mesuré : ~0,22 s/bloc économisées.
-- [ ] Détection automatique des limites de segment (VAD) pour `create_voix`.
+- [x] Détection automatique des limites de segment (VAD) pour `create_voix`
+      (2026-09-19) : `engine/vad.py` (énergie, numpy seul : 10e percentile +
+      repli crête, hangover, durées min) ; `create_voix --vad` recale
+      `[start, stop]` ; `POST /api/voix/ajuster-vad` + bouton « 🧲 Ajuster »
+      dans l'éditeur voix (inputs + région WaveSurfer mis à jour).
 - [ ] Prévoir un warmup au démarrage du docker pour éviter une trop grande latence lors de la première inférence.
 - [ ] Appliquer l'accent de la langue cité sur la voix utilisée (Ex. accent Anglais lorsque la voix prononce de l'anglais y compris quand c'est une voix française.)
 - [ ] Option de traduction LLM d'une langue vers une autre avant génération.

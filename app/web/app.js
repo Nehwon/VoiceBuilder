@@ -2718,6 +2718,34 @@ $("btn-voix-zoom-out").addEventListener("click", () => { if (wsVoix) wsVoix.zoom
 
 $("btn-voix-stop").addEventListener("click", () => { if (wsVoix) { wsVoix.pause(); wsVoix.setTime(0); } });
 
+$("btn-voix-ajuster").addEventListener("click", async () => {
+  if (!voixFichier) return;
+  const start = parseFloat($("voix-start").value) || 0;
+  const stop = parseFloat($("voix-stop").value) || 0;
+  if (stop <= start) { notifier("Sélectionne un segment valide.", "err"); return; }
+  const btn = $("btn-voix-ajuster");
+  btn.disabled = true;
+  try {
+    const r = await fetch("/api/voix/ajuster-vad", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fichier: voixFichier, start, stop }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "Ajustement échoué");
+    $("voix-start").value = d.start.toFixed(1);
+    $("voix-stop").value = d.stop.toFixed(1);
+    $("voix-duree-selection").textContent = `${(d.stop - d.start).toFixed(1)} s`;
+    const regions = wsRegions ? wsRegions.getRegions() : [];
+    if (regions[0]) regions[0].setOptions({ start: d.start, end: d.stop });
+    notifier(d.ajuste_debut || d.ajuste_fin
+      ? `Sélection recalée sur la parole (${d.start.toFixed(1)}–${d.stop.toFixed(1)} s).`
+      : "Bornes inchangées (pas de parole proche).", "ok");
+  } catch (e) {
+    notifier(e.message, "err");
+  } finally { btn.disabled = false; }
+});
+
 $("btn-voix-couper").addEventListener("click", async () => {
   if (!voixFichier) return;
   const regions = wsRegions ? wsRegions.getRegions() : [];

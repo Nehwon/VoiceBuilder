@@ -329,7 +329,8 @@ python -m tools.create_voix SOURCE.wav \
 ```
 
 Extrait le segment, le transcrit avec Whisper, écrit le `.wav`+`.txt` dans `voix/`
-et ajoute l'entrée dans `voix.txt`.
+et ajoute l'entrée dans `voix.txt`. `--vad` recale `[start, stop]` sur la
+parole (bouton « 🧲 Ajuster » équivalent dans l'onglet Voix).
 
 > Les exemples supposent d'utiliser l'interpréteur du venv CosyVoice
 > (`vendor/CosyVoice/venv/bin/python`).
