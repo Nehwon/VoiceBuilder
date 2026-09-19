@@ -50,6 +50,7 @@ header {
   flex-wrap: nowrap;
 }
 h1 { font-size: 18px; margin: 0; white-space: nowrap; }
+h1 .logo { height: 1.7em; width: 1.7em; vertical-align: -0.35em; margin-right: 2px; }
 .sous-titre { color: var(--dim); font-size: 13px; white-space: nowrap; }
 
 .onglets { display: flex; gap: 4px; margin-left: 12px; }
