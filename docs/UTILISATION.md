@@ -159,6 +159,14 @@ Tokens entre crochets, insérés en ligne dans le texte :
 [LePublic]: <|Applause|> <|/Applause|> Encore ! Encore !
 ```
 
+### 4.3b Passages en langue étrangère (accent)
+
+`[en]…[/en]` (bouton EN de la barre d'outils) : le passage est normalisé en
+anglais (nombres épelés en anglais) puis prononcé avec l'accent anglais —
+même par une voix française. `[fr]…[/fr]` force le français explicite.
+Les marqueurs sont retirés avant synthèse (jamais vocalisés) ; un marqueur
+non fermé est conservé tel quel. Ne pas nommer une voix `en` ou `fr`.
+
 ### 4.4 Correspondance avec les tags « OmniVoice »
 
 Les anciens tags de commande (`[confirmation-en]`, `[question-en]`, …) ne sont

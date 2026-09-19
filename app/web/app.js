@@ -521,6 +521,8 @@ function initBarreTokens() {
 
   $("btn-strong").addEventListener("click", () =>
     insererTokenEncadrant(TOKENS_EMPASE.ouvre, TOKENS_EMPASE.ferme));
+  $("btn-en").addEventListener("click", () =>
+    insererTokenEncadrant("[en]", "[/en]"));
 
   const amb = $("amb-boutons");
   for (const a of TOKENS_AMBIANCE) {
@@ -533,7 +535,7 @@ function initBarreTokens() {
 // Chaque groupe est un bloc déplaçable (drag-n-drop natif), repliable et masquable ;
 // l'ordre et l'état sont persistés côté client et restaurés à l'ouverture.
 const CLE_GROUPES = "vb-toolbar-groupes";
-const ORDRE_DEFAUT = ["personnages", "emotions", "sons", "emphase", "ambiances"];
+const ORDRE_DEFAUT = ["personnages", "emotions", "sons", "emphase", "langue", "ambiances"];
 let groupeDrag = null;
 
 function rendreGroupesModulables() {

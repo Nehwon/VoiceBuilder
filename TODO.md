@@ -516,7 +516,12 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       (modèle + micro-synthèse + Whisper, thread daemon, best effort),
       opt-in `VOICEBUILDER_WARMUP=1` (câblé dans les 2 compose + `.env.gitea`,
       défaut 0), serveur répond aussitôt.
-- [ ] Appliquer l'accent de la langue cité sur la voix utilisée (Ex. accent Anglais lorsque la voix prononce de l'anglais y compris quand c'est une voix française.)
+- [x] Appliquer l'accent de la langue citée sur la voix utilisée (2026-09-19) :
+      marqueurs inline `[en]…[/en]` / `[fr]…[/fr]` (`text_fr.normalize_multilangue`,
+      sans marqueur = `normalize()` inchangé) ; nombres épelés dans la langue
+      du passage (inflect local, sans dépendance vendor) ; marqueurs retirés
+      avant synthèse ; bouton EN (groupe « Langue ») + aide + `docs/UTILISATION.md`
+      §4.3b. Ne pas nommer une voix `en`/`fr`.
 - [ ] Option de traduction LLM d'une langue vers une autre avant génération.
 - [ ] **Générateur de jingles musicaux** : produire des lits musicaux
       (intro/outro/interlude) utilisables comme lits BGM (`musique/`),

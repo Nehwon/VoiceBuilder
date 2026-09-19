@@ -127,8 +127,9 @@ def synthesize(
 
     # CosyVoice lit les chiffres en anglais (inflect) : on normalise les
     # nombres en français avant la synthèse (cf. engine/text_fr.py).
-    text = text_fr.normalize(text)
-    prompt_text = text_fr.normalize(prompt_text)
+    # Routage multilingue : les passages [en]…[/en] gardent l'accent anglais.
+    text = text_fr.normalize_multilangue(text)
+    prompt_text = text_fr.normalize_multilangue(prompt_text)
 
     # Prompt pré-calculé une fois par voix (sinon tokens/embedding refaits
     # à chaque bloc). "" = repli historique.

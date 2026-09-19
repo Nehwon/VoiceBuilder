@@ -359,6 +359,63 @@ def _normalize_punctuation(text: str) -> str:
 # Pipeline principal
 # ---------------------------------------------------------------------------
 
+# Marqueurs de langue inline : ``[en]…[/en]`` (anglais), ``[fr]…[/fr]``
+# (français explicite). Sans marqueur : français (comportement historique).
+# Les marqueurs sont TOUJOURS retirés avant synthèse (sinon vocalisés).
+# Note : ne pas nommer une voix ``en``/``fr`` (conflit avec le parseur).
+LANGUES_INLINE = ("en", "fr")
+SPAN_LANG_RE = re.compile(r"\[(en|fr)\](.*?)\[/\1\]", re.IGNORECASE | re.DOTALL)
+
+
+def normalize_en(text: str) -> str:
+    """Normalise un passage anglais (nombres épelés en anglais via inflect,
+    comme le frontend vendor) pour que CosyVoice le prononce avec l'accent
+    anglais.
+
+    Repli silencieux (texte inchangé) si ``inflect`` manque. Implémentation
+    locale (pas d'import vendor : évite la dépendance ``regex``).
+    """
+    try:
+        import inflect
+    except ImportError:
+        return text
+    moteur = inflect.engine()
+
+    def _mots_en(m: re.Match) -> str:
+        try:
+            return moteur.number_to_words(m.group(0).replace(",", ""))
+        except Exception:  # noqa: BLE001
+            return m.group(0)
+
+    return re.sub(r"  +", " ",
+                  re.sub(r"\d[\d,]*", _mots_en, text)).strip()
+
+
+def normalize_multilangue(text: str) -> str:
+    """Normalise en routant chaque passage vers sa langue (``[en]``/``[fr]``).
+
+    Sans marqueur : strictement identique à ``normalize()``.
+    """
+    if not SPAN_LANG_RE.search(text):
+        return normalize(text)
+    morceaux = []
+    pos = 0
+    for m in SPAN_LANG_RE.finditer(text):
+        avant = text[pos:m.start()].strip()
+        if avant:
+            morceaux.append(normalize(avant))
+        langue = m.group(1).lower()
+        contenu = m.group(2).strip()
+        if contenu:
+            morceaux.append(normalize_en(contenu) if langue == "en"
+                            else normalize(contenu))
+        pos = m.end()
+    apres = text[pos:].strip()
+    if apres:
+        morceaux.append(normalize(apres))
+    return re.sub(r"  +", " ", " ".join(morceaux)).strip()
+
+
 def normalize(text: str) -> str:
     """Normalise le texte français pour la synthèse TTS.
 

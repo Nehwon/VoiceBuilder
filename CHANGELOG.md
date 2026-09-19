@@ -8,6 +8,16 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Accent de la langue citée (`[en]`/`[fr]`)
+
+- **Moteur** (`engine/text_fr.py`, `cosyvoice_engine.py`) : passages
+  `[en]…[/en]` normalisés en anglais (nombres via inflect local) pour un
+  accent anglais même avec une voix française ; `[fr]` explicite ;
+  marqueurs toujours retirés avant synthèse ; sans marqueur = inchangé
+  (60/60 tests FR identiques, 2 échecs préexistants).
+- **GUI** : groupe « Langue » + bouton EN (entoure la sélection), aide,
+  `docs/UTILISATION.md` §4.3b.
+
 ### Ajout — Warmup au démarrage (opt-in)
 
 - **Moteur** (`engine/warmup.py`) : précharge CosyVoice3 + micro-synthèse +
