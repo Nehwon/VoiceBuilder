@@ -8,6 +8,25 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Régénération empilée pendant la génération (file-regen)
+
+- **Moteur** (`engine/multi.py`) : `generate()` accepte `file_regen` (file
+  d'ids de blocs). Après chaque bloc (et après le dernier), la file est
+  dépilée : chaque bloc déjà généré est re-synthétisé aussitôt et **remplace**
+  l'audio précédent dans le montage (event `progress` avec `regen: True`,
+  même `id`) ; ids futurs ignorés, file abandonnée si arrêt demandé.
+- **API** (`app/server.py`) : `POST /api/generer/{jid}/bloc/{bid}/regenerer-file`
+  (409 si pas en cours, 400 si bloc pas encore généré, déduplication) ;
+  `progress` met à jour en place, le stream SSE transmet l'event sans
+  décaler les offsets.
+- **GUI** (`app/web/`) : le bouton « Regénérer » d'une carte live met le bloc
+  en file (« En file… », log 🔁 à la régénération) ; carte, durée, timeline
+  et offsets recalculés sans reconstruire la liste. La zone « Log de
+  génération » devient une **file de création visuelle** (pastilles par bloc :
+  en attente → en cours (pulsation) → terminé, 🔁 si régénération demandée,
+  flash à la régénération, barré si abandonné ; journal texte replié en
+  dessous).
+
 ### Ajout — Espace de montage M12 (timeline, navigation, réordre/suppression)
 
 - **API** (`app/server.py`) : offsets `start` par bloc (pause uniquement au

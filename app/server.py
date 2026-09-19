@@ -461,13 +461,20 @@ def api_generer(payload: GenererIn):
            "pause": payload.pause, "vitesse": payload.vitesse,
            "max_chars": payload.max_chars, "verify": payload.verify,
            "device": payload.device, "personnages": payload.personnages,
-           "stop_event": threading.Event(), "stopped": False}
+           "stop_event": threading.Event(), "stopped": False,
+           "file_regen": queue.Queue()}
     _jobs[jid] = job
 
     def _run():
         job["blocs"] = []
         def progress_wrapper(b):
-            if "wav" in b:
+            if b.get("regen"):
+                # régénération en cours de route : mise à jour en place (même id).
+                for ex in job["blocs"]:
+                    if ex.get("id") == b.get("id"):
+                        ex.update({k: b[k] for k in ("duree", "chars", "texte") if k in b})
+                        break
+            elif "wav" in b:
                 job["blocs"].append(b)
             q.put(("bloc", b))
         try:
@@ -480,6 +487,7 @@ def api_generer(payload: GenererIn):
                 progress=progress_wrapper,
                 stop_event=job["stop_event"],
                 load_vllm=payload.load_vllm, load_trt=payload.load_trt,
+                file_regen=job["file_regen"],
             )
             job["result"] = res
             job["blocs"] = res.get("blocs", [])
@@ -515,12 +523,16 @@ def api_stream(jid: int):
                 continue
             if kind == "bloc":
                 if "index" in data:
-                    if pers_prec is not None and data.get("personnage") != pers_prec:
-                        start_cur += pause
-                    data = dict(data, start=round(start_cur, 3))
-                    start_cur += data.get("duree", 0.0)
-                    pers_prec = data.get("personnage")
-                    yield f"event: bloc\ndata: {json.dumps(data)}\n\n"
+                    if data.get("regen"):
+                        # régénération en file : mêmes offsets, pas de décalage.
+                        yield f"event: bloc\ndata: {json.dumps(data)}\n\n"
+                    else:
+                        if pers_prec is not None and data.get("personnage") != pers_prec:
+                            start_cur += pause
+                        data = dict(data, start=round(start_cur, 3))
+                        start_cur += data.get("duree", 0.0)
+                        pers_prec = data.get("personnage")
+                        yield f"event: bloc\ndata: {json.dumps(data)}\n\n"
             elif kind == "done":
                 break
         if job["error"]:
@@ -787,6 +799,27 @@ def api_bloc_supprimer(jid: int, bid: int):
     ofs = _offsets_blocs(job["blocs"], float(job.get("pause", 0.0)))
     out_blocs = [dict(b, start=o) for b, o in zip(job["blocs"], ofs)]
     return {"blocs": out_blocs, "duree": duree, "vide": not restants}
+
+
+@app.post("/api/generer/{jid}/bloc/{bid}/regenerer-file")
+def api_bloc_regenerer_file(jid: int, bid: int):
+    """Met un bloc en file de régénération : la génération en cours termine
+    son bloc, re-synthétise celui-ci aussitôt (remplacement en place), puis
+    continue la génération globale."""
+    job = _job_live(jid)
+    if job.get("status") != "running":
+        raise HTTPException(409, "Aucune génération en cours.")
+    termines = len(job.get("blocs", []))
+    if bid < 1 or bid > termines:
+        raise HTTPException(400, "Bloc pas encore généré — réessaie après sa synthèse.")
+    file_regen = job.get("file_regen")
+    if file_regen is None:
+        raise HTTPException(409, "File de régénération indisponible.")
+    if bid in list(file_regen.queue):
+        return {"file": True, "message": f"Bloc {bid} déjà en file de régénération."}
+    file_regen.put(bid)
+    return {"file": True,
+            "message": f"Bloc {bid} régénéré après le bloc en cours."}
 
 
 # ---------------------------------------------------------------------------

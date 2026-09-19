@@ -819,6 +819,7 @@ $("generer").addEventListener("click", async () => {
   contenuGenere = null;
   majBoutonGenerer();
   $("log").textContent = "Lancement…\n";
+  initialiserFileCreation();
   $("montage").src = "";
   demarrerProgression();
   const terminer = () => {
@@ -885,12 +886,28 @@ $("generer").addEventListener("click", async () => {
     arretEnCours = false;
     majBoutonGenerer();
     terminerProgression();
+    blocsEnFile.clear();
+    // la file est abandonnée : restaurer les boutons restés « En file… ».
+    document.querySelectorAll(".bloc-carte-actions button").forEach((x) => {
+      if (x.textContent === "En file…") {
+        x.textContent = "Regénérer ce bloc";
+        x.disabled = false;
+      }
+    });
   };
   ev.addEventListener("bloc", (e) => {
     const b = JSON.parse(e.data);
+    if (b.regen) {
+      $("log").textContent +=
+        `🔁 bloc ${b.index} régénéré (${b.personnage}) — ${b.duree} s\n`;
+      marquerFileRegeneree(b);
+      actualiserCarteApresRegen(b);
+      return;
+    }
     $("log").textContent +=
       `[${b.index}/${b.total}] ${b.personnage} (${b.chars} chars) — ${b.duree} s\n`;
     majProgression(b.index, b.total, b.personnage, b.duree);
+    marquerBlocFileFini(b);
     if (b.wav) {
       ajouterBlocTempsReel(b);
     }
@@ -902,6 +919,7 @@ $("generer").addEventListener("click", async () => {
     $("log").textContent += n > 0
       ? `\n⏹ Génération arrêtée : ${n} bloc(s) conservé(s).\n`
       : "\n⏹ Génération arrêtée avant le premier bloc.\n";
+    marquerFileAbandonnee();
     notifier("Génération arrêtée.", "ok");
     if (n > 0) {
       $("montage").src = `/api/generer/${id}/result`;
@@ -933,6 +951,7 @@ $("generer").addEventListener("click", async () => {
       $("log").textContent += `\n❌ ${m}\n`;
       notifier(m, "err");
     }
+    marquerFileErreur();
     fin(true);
   });
   ev.addEventListener("end", fin);
@@ -962,8 +981,10 @@ $("generer-stop").addEventListener("click", async () => {
 
 // ---------------------------------------------------------------- montage : blocs
 let montageBlocs = [];
+let montagePause = null;    // pause inter-locuteurs du job (pour recalculer les starts)
 let blocEnCoursId = null;   // id du bloc en cours dans le lecteur global
 let blocDrag = null;        // carte en cours de déplacement (drag-n-drop)
+let blocsEnFile = new Set(); // ids en file de régénération (génération en cours)
 
 function fmtTmp(t) {
   if (!isFinite(t) || t < 0) t = 0;
@@ -1063,6 +1084,7 @@ async function chargerBlocs() {
     if (!r.ok) { notifier("Impossible de charger les blocs.", "err"); return; }
     const d = await r.json();
     montageBlocs = d.blocs || [];
+    if (d.pause != null) montagePause = d.pause;
     const duree = d.duree != null ? `${d.duree} s` : "…";
     $("montage-info").textContent = `Durée totale : ${duree} · ${montageBlocs.length} bloc(s)`;
     remplirListeBlocs();
@@ -1275,6 +1297,12 @@ async function actionSupprimerBloc(bid, btn) {
 }
 
 async function actionBloc(bid, action, btn) {
+  // Régénération empilée : la génération en cours termine son bloc puis
+  // re-synthétise celui-ci avant de continuer.
+  if (action === "regenerer" && generationActive && montageId) {
+    mettreBlocEnFile(bid, btn);
+    return;
+  }
   if (btn) btn.disabled = true;
   const msg = action === "regenerer" ? "Bloc régénéré." : "Bloc divisé en deux.";
   try {
@@ -1284,6 +1312,158 @@ async function actionBloc(bid, action, btn) {
     notifier(msg, "ok");
   } catch { notifier("Action bloc échouée.", "err"); }
   finally { if (btn) btn.disabled = false; }
+}
+
+async function mettreBlocEnFile(bid, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "En file…"; }
+  blocsEnFile.add(bid);
+  try {
+    const r = await fetch(`/api/generer/${montageId}/bloc/${bid}/regenerer-file`, { method: "POST" });
+    let d = {};
+    try { d = await r.json(); } catch { /* corps non JSON */ }
+    if (!r.ok) {
+      notifier(d.detail || "Mise en file échouée.", "err");
+      blocsEnFile.delete(bid);
+      if (btn) { btn.disabled = false; btn.textContent = "Regénérer ce bloc"; }
+      return;
+    }
+    notifier(d.message || `Bloc ${bid} régénéré après le bloc en cours.`, "ok");
+    marquerFileRegen(bid);
+  } catch {
+    notifier("Mise en file échouée.", "err");
+    blocsEnFile.delete(bid);
+    if (btn) { btn.disabled = false; btn.textContent = "Regénérer ce bloc"; }
+  }
+}
+
+// Recalcule les starts (même règle que le serveur : pause au changement
+// de locuteur) après une régénération qui change une durée.
+function recalculerStarts() {
+  if (montagePause == null) return;
+  let start = 0.0;
+  let prec = null;
+  for (const x of montageBlocs) {
+    if (prec !== null && x.personnage !== prec) start += montagePause;
+    x.start = Math.round(start * 1000) / 1000;
+    start += x.duree || 0;
+    prec = x.personnage;
+  }
+}
+
+// Met à jour la carte d'un bloc régénéré en cours de route (event regen).
+function actualiserCarteApresRegen(b) {
+  blocsEnFile.delete(b.id);
+  const i = montageBlocs.findIndex((x) => x.id === b.id);
+  if (i >= 0) {
+    montageBlocs[i] = { ...montageBlocs[i], duree: b.duree, chars: b.chars, texte: b.texte };
+    recalculerStarts();
+  }
+  const carte = document.querySelector(`.bloc-carte[data-id="${b.id}"]`);
+  if (carte) {
+    const deb = (i >= 0 && montageBlocs[i].start) || 0;
+    const dur = carte.querySelector(".bloc-carte-duree");
+    if (dur) dur.textContent = `${fmtTmp(deb)} · ${b.duree} s · ${b.chars} chars · ${b.voix || "—"}`;
+    const audio = carte.querySelector("audio");
+    if (audio && b.wav) {
+      audio.src = `/api/generer/${montageId}/bloc/${b.id}/wav?v=${Date.now()}`;
+    }
+    carte.querySelectorAll(".bloc-carte-actions button").forEach((x) => {
+      if (x.textContent === "En file…") {
+        x.textContent = "Regénérer ce bloc";
+        x.disabled = false;
+      }
+    });
+  }
+  dessinerTimeline();
+}
+
+// ---------------------------------------------------------------- file de création visuelle (remplace le log)
+function initialiserFileCreation() {
+  $("file-creation").innerHTML =
+    '<p class="liste-vide">En attente d\'une génération…</p>';
+}
+
+function assurerFileCreation(total) {
+  const box = $("file-creation");
+  const chips = box.querySelectorAll(".file-bloc");
+  if (chips.length === total) return;
+  box.innerHTML = "";
+  for (let i = 1; i <= total; i++) {
+    const c = document.createElement("span");
+    c.className = "file-bloc";
+    c.dataset.index = i;
+    const num = document.createElement("span");
+    num.className = "fb-num";
+    num.textContent = i;
+    const nom = document.createElement("span");
+    nom.className = "fb-nom";
+    nom.textContent = "…";
+    const dur = document.createElement("span");
+    dur.className = "fb-dur";
+    const file = document.createElement("span");
+    file.className = "fb-file";
+    file.textContent = "🔁";
+    file.title = "Régénération demandée";
+    c.append(num, nom, dur, file);
+    box.appendChild(c);
+  }
+}
+
+function chipFile(index) {
+  return document.querySelector(`#file-creation .file-bloc[data-index="${index}"]`);
+}
+
+function marquerBlocFileFini(b) {
+  assurerFileCreation(b.total);
+  const c = chipFile(b.index);
+  if (c) {
+    c.classList.remove("en-cours");
+    c.classList.add("fini");
+    c.querySelector(".fb-nom").textContent = b.personnage || "…";
+    c.querySelector(".fb-dur").textContent = `${b.duree} s`;
+  }
+  const suivant = chipFile(b.index + 1);
+  if (suivant && !suivant.classList.contains("fini")) suivant.classList.add("en-cours");
+}
+
+function marquerFileRegen(bid) {
+  const box = $("file-creation");
+  if (box.querySelector(".liste-vide")) return;  // pas de génération suivie
+  const c = chipFile(bid);
+  if (c) {
+    c.classList.add("en-file");
+    c.scrollIntoView({ block: "nearest" });
+  }
+}
+
+function retirerFileRegen(bid) {
+  const c = chipFile(bid);
+  if (c) c.classList.remove("en-file");
+}
+
+function marquerFileRegeneree(b) {
+  retirerFileRegen(b.id);
+  const c = chipFile(b.index);
+  if (c) {
+    c.querySelector(".fb-dur").textContent = `${b.duree} s`;
+    c.classList.remove("regenere");
+    void c.offsetWidth;  // relance l'animation flash
+    c.classList.add("regenere");
+  }
+}
+
+function marquerFileAbandonnee() {
+  document.querySelectorAll("#file-creation .file-bloc").forEach((c) => {
+    c.classList.remove("en-cours", "en-file", "regenere");
+    if (!c.classList.contains("fini")) c.classList.add("abandonne");
+  });
+}
+
+function marquerFileErreur() {
+  document.querySelectorAll("#file-creation .file-bloc").forEach((c) => {
+    c.classList.remove("en-cours", "en-file", "regenere");
+    if (!c.classList.contains("fini")) c.classList.add("erreur");
+  });
 }
 
 $("btn-concat").addEventListener("click", async () => {

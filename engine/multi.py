@@ -1,6 +1,7 @@
 """Pipeline multi-voix : parse -> regrouper -> blocs adaptatifs vérifiés -> montage."""
 from __future__ import annotations
 
+import queue
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -62,6 +63,7 @@ def generate(
     stop_event=None,
     load_vllm: bool = False,
     load_trt: bool = False,
+    file_regen=None,
 ) -> dict:
     """Génère l'audio complet pour un texte taggé et une liste de voix.
 
@@ -75,11 +77,19 @@ def generate(
 
     ``progress`` : callback ``progress(dict)`` appelé à la fin de chaque bloc avec
     ``{index, total, personnage, chars, duree}`` puis, une fois concaténé, avec
-    ``{duree: ..., blocs: [...]}`` (utile au GUI serveur).
+    ``{duree: ..., blocs: [...]}`` (utile au GUI serveur). Un bloc régénéré via
+    ``file_regen`` émet le même événement avec ``regen: True`` (même ``id``).
 
     ``stop_event`` : ``threading.Event`` optionnel. S'il est levé, la boucle
     abandonne à la fin du bloc en cours : le résultat (partiel) est rendu avec
     ``stopped: True`` et le WAV (si ``out``) contient les blocs déjà générés.
+
+    ``file_regen`` : ``queue.Queue`` optionnelle d'ids de blocs à régénérer en
+    cours de route. Après chaque bloc (et après le dernier), la file est
+    dépilée : chaque id déjà généré est re-synthétisé aussitôt (mêmes
+    paramètres) et **remplace** l'audio précédent dans le montage. Un id pas
+    encore généré est ignoré (il sera synthétisé frais par la boucle). Si
+    ``stop_event`` est levé, le reste de la file est abandonné.
     """
     if verbose:
         print(f"Voix disponibles : {voices.names()}")
@@ -124,6 +134,45 @@ def generate(
     total = len(sous_blocs)
     pers_precedent = None
     stopped = False
+    positions: List[int] = []  # parts.index de l'audio de chaque bloc (remplacement ciblé)
+
+    def _drain_regen():
+        """Re-synthétise aussitôt les blocs mis en file (remplacement en place)."""
+        if file_regen is None:
+            return
+        if stop_event is not None and stop_event.is_set():
+            # arrêt demandé : la file est abandonnée avec le reste.
+            try:
+                while True:
+                    file_regen.get_nowait()
+            except queue.Empty:
+                pass
+            return
+        while True:
+            try:
+                bid = file_regen.get_nowait()
+            except queue.Empty:
+                return
+            if not 1 <= bid <= len(blocs_report):
+                # pas encore généré : la boucle le synthétisera frais. Ignoré.
+                continue
+            pers, voix_nom, voice, t, block_chars, block_speed = sous_blocs[bid - 1]
+            audio = _synthesize_for(t, model, sr, voice, block_chars, block_speed, verify)
+            parts[positions[bid - 1]] = audio
+            dur = len(audio) / sr
+            blocs_report[bid - 1]["duree"] = round(dur, 2)
+            wav_regen = None
+            if block_dir:
+                wav_regen = str(block_dir / f"bloc_{bid}.wav")
+                cosyvoice_engine.save(audio, sr, wav_regen)
+            if verbose:
+                print(f"[regen {bid}/{total}] {pers} ({len(t)} chars) -> {dur:.2f} s")
+            if progress:
+                progress({"id": bid, "index": bid, "total": total, "personnage": pers,
+                          "voix": voix_nom, "texte": t,
+                          "chars": len(t), "duree": round(dur, 2),
+                          "wav": wav_regen, "regen": True})
+
     for i, (pers, voix_nom, voice, t, block_chars, block_speed) in enumerate(sous_blocs, 1):
         # Arrêt demandé : on laisse le bloc en cours se terminer puis on abandonne.
         if stop_event is not None and stop_event.is_set():
@@ -134,6 +183,7 @@ def generate(
         # locuteur s'enchaînent sans coupure dans le montage final.
         if pers_precedent is not None and pers != pers_precedent:
             parts.append(np.zeros(pause_n, dtype=np.float32))
+        positions.append(len(parts))
         parts.append(audio)
         pers_precedent = pers
         dur = len(audio) / sr
@@ -153,6 +203,12 @@ def generate(
                       "voix": voix_nom, "texte": t,
                       "chars": len(t), "duree": round(dur, 2),
                       "wav": info.get("wav")})
+        # File de régénération : le bloc en cours est terminé, on traite les
+        # demandes empilées avant de continuer la génération globale.
+        _drain_regen()
+
+    # File restante (demande arrivée pendant le dernier bloc).
+    _drain_regen()
 
     final = np.concatenate(parts) if parts else np.zeros(0, dtype=np.float32)
     res = {
