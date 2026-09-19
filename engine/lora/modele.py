@@ -61,11 +61,15 @@ def appliquer_lora(model, cfg: ConfigEntrainement):
     if cfg.qlora or cfg.checkpointing:
         backbone = prepare_model_for_kbit_training(
             backbone, use_gradient_checkpointing=cfg.checkpointing)
-    if cfg.checkpointing and not cfg.qlora:
-        try:
-            backbone.gradient_checkpointing_enable()
-        except Exception:  # noqa: BLE001
-            pass
+    if cfg.checkpointing:
+        # Checkpointing + cache KV = shapes incohérentes
+        # ("key.size(1) == value.size(1)") : on coupe le cache.
+        backbone.config.use_cache = False
+        if not cfg.qlora:
+            try:
+                backbone.gradient_checkpointing_enable()
+            except Exception:  # noqa: BLE001
+                pass
     lora_conf = LoraConfig(r=cfg.rang, lora_alpha=cfg.alpha,
                            lora_dropout=cfg.dropout,
                            target_modules=list(cfg.cibles),

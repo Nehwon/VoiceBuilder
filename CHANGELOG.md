@@ -8,6 +8,13 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Correction — Entraînement LoRA : conflit checkpointing / cache KV
+
+- **Moteur** (`engine/lora/modele.py`) : avec gradient checkpointing, le
+  cache `use_cache` restait actif → `key.size(1) == value.size(1)` à
+  l'entraînement (presets 16/24-checkpoint). Coupé quand checkpointing
+  (test stub vert) ; chemin qLoRA déjà couvert par PEFT.
+
 ### Ajout — Accent de la langue citée (`[en]`/`[fr]`)
 
 - **Moteur** (`engine/text_fr.py`, `cosyvoice_engine.py`) : passages
