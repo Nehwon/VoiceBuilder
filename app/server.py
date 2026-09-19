@@ -90,17 +90,32 @@ def _etat() -> dict:
     config.set_audio_dir(d)
     config.ensure_dirs()
     _BROUILLONS.mkdir(parents=True, exist_ok=True)
+    # lit musical BGM persisté (ignoré s'il n'existe plus)
+    _restaurer_bgm()
+    bgm_etat = {"bgm_lit": Path(config.BGM_LIT).name if config.BGM_LIT else None,
+                "bgm_volume": config.BGM_VOLUME}
     fichier_voix = bool(config.VOIX_FILE.exists())
     if fichier_voix:
         try:
             noms = _voix().names()
         except Exception as exc:  # noqa: BLE001
             return {"audio_dir": d, "voix_file": False, "voix": [],
-                    "erreur": f"{config.VOIX_FILE.name} invalide : {exc}"}
+                    "erreur": f"{config.VOIX_FILE.name} invalide : {exc}",
+                    **bgm_etat}
     else:
         noms = []
     return {"audio_dir": d, "voix_file": fichier_voix, "voix": noms,
-            "erreur": None}
+            "erreur": None, **bgm_etat}
+
+
+def _restaurer_bgm() -> None:
+    """Re-applique le lit musical + volume persistés (démarrage, /api/etat)."""
+    data = _charger_persistance()
+    lit = data.get("bgm_lit")
+    if lit and Path(lit).exists():
+        config.set_bgm(lit, data.get("bgm_volume", config.BGM_VOLUME_DEFAUT))
+    else:
+        config.set_bgm(None, data.get("bgm_volume", config.BGM_VOLUME_DEFAUT))
 
 
 def _bootstrap() -> None:
@@ -205,6 +220,7 @@ def api_torch_install_stream(jid: int):
 
 class ConfigIn(BaseModel):
     audio_dir: str | None = None
+    bgm_volume: float | None = None
 
 
 class ModeleIn(BaseModel):
@@ -315,6 +331,9 @@ def api_config(payload: ConfigIn):
             raise HTTPException(400, f"Dossier introuvable : {chemin}")
         config.set_audio_dir(chemin)
         _sauver_persistance({"audio_dir": str(config.VOIX_AUDIO_DIR)})
+    if payload.bgm_volume is not None:
+        config.set_bgm(config.BGM_LIT, payload.bgm_volume)
+        _sauver_persistance({"bgm_volume": config.BGM_VOLUME})
     config.ensure_dirs()
     voix.generer_voix_txt()          # (re)génère si voix.txt absent
     return _etat()
@@ -1408,6 +1427,45 @@ async def api_voix_importer(
         raise HTTPException(500, f"Import voix échoué : {exc}")
 
     return {"nom": voix_nom, "wav": wav_name, "txt": txt_name}
+
+
+@app.post("/api/musique/importer")
+async def api_musique_importer(fichier: UploadFile = File(...)):
+    """Importe le lit musical BGM (wav/mp3/flac/ogg) : devient le lit actif."""
+    config.ensure_dirs()
+    nom = Path(fichier.filename or "lit.wav").name
+    nom = nom.replace("/", "_").replace("\\", "_")
+    if not nom or nom.startswith("."):
+        raise HTTPException(400, "Nom de fichier invalide.")
+    if not nom.lower().endswith((".wav", ".mp3", ".flac", ".ogg")):
+        nom = Path(nom).stem + ".wav"
+    dest = config.MUSIQUE_DIR / nom
+    if dest.exists():
+        dest = config.MUSIQUE_DIR / f"{dest.stem}_2{dest.suffix}"
+    try:
+        data = await fichier.read()
+        if len(data) > 100 * 1024 * 1024:
+            raise HTTPException(400, "Fichier trop volumineux (max 100 Mo).")
+        if len(data) < 1000:
+            raise HTTPException(400, "Fichier trop petit ou vide.")
+        dest.write_bytes(data)
+    except HTTPException:
+        if dest.exists():
+            try:
+                dest.unlink()
+            except OSError:
+                pass
+        raise
+    except Exception as exc:  # noqa: BLE001
+        if dest.exists():
+            try:
+                dest.unlink()
+            except OSError:
+                pass
+        raise HTTPException(500, f"Import du lit musical échoué : {exc}")
+    config.set_bgm(dest, config.BGM_VOLUME)
+    _sauver_persistance({"bgm_lit": str(dest)})
+    return {"lit": nom, "chemin": str(dest), "volume": config.BGM_VOLUME}
 
 
 @app.post("/api/voix/supprimer")

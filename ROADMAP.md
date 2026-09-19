@@ -169,6 +169,18 @@ job fond), section « Banc A/B » onglet 🎙️ Voix (sélecteur, résultats,
 candidats, couv 96/91/87 %, gagnant = base), API + promotion + restauration
 testées en conteneur.
 
+### M17.3 — Nettoyage en lot des voix
+**Objectif** : appliquer le pipeline M13.0 (Demucs + DeepFilterNet) à toutes
+les voix en une commande, comparer avant/après et promouvoir les gagnants.
+**Livrables** : `tools/nettoyer_voix.py` (`--tout`/`--voix`, `--promouvoir`
+opt-in, `--forcer`, `--mode`) produisant les `<nom>_clean` (wav + txt +
+entrée `voix.txt`, idempotent) ; comparaison `coverage` Whisper + SNR, règle
+de victoire (contenu conservé à 2 pts près + SNR non dégradée), promotion via
+`bench.promouvoir()` ; section README.
+**Statut** : ✔ Terminé (2026-09-19) — `--tout` réel en conteneur : 14 voix,
+8 clean gagnants, 6 originaux conservés (dont Gmilgram : mot perdu au
+nettoyage, détecté) ; 12 personnages multi-candidats pour le banc M17.2.
+
 ### M14/M15 — Packaging & infra (sous-module CosyVoice + Docker GPU)
 **Objectif** : intégrer **CosyVoice comme sous-module git du projet** (`vendor/CosyVoice`,
 fini le clone voisin dans `~/Projets/CosyVoice`) et fournir un **conteneur Docker avec

@@ -25,6 +25,9 @@ voix/*.txt
 !voix/voix.txt
 voix/*.map
 
+# --- Lits musicaux personnels (BGM) : ignorés, seule la config est persistée ---
+musique/*
+
 # --- Fichiers de travail locaux non versionnés ---
 BUILDER.md
 RAPPORT.md

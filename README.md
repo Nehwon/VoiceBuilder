@@ -171,6 +171,19 @@ la référence dans `voix.txt` (sauvegarde `voix.txt.bak`). Même banc dans
 l'onglet **🎙️ Voix** (section « Banc A/B », écoute comparative + bouton
 de promotion).
 
+### Nettoyage en lot (curation Palier 0)
+
+```bash
+python tools/nettoyer_voix.py --tout [--voix NOM] [--promouvoir] [--forcer]
+```
+
+Applique le pipeline de nettoyage (Demucs + DeepFilterNet) à chaque voix :
+produit `<tige>_clean.wav` (+ `.txt` recopié) et l'entrée `[Nom_clean]`
+dans `voix.txt` (idempotent : `--forcer` pour refaire). Comparaison
+avant/après (`coverage` Whisper + SNR, écoute des deux WAV côte à côte) ;
+avec `--promouvoir`, les gagnants (contenu conservé + SNR non dégradée)
+deviennent les références (backup `voix.txt.bak`).
+
 ---
 
 ## Personnages & voix (mapping par document)

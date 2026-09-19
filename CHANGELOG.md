@@ -64,6 +64,16 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
   tableau résultats, écoute comparative, bouton de promotion).
 - Bench réel Thepromisedneverland : couv 96/91/87 %, gagnant = base.
 
+### Ajout — Nettoyage en lot M17.3 (Palier 0)
+
+- **`tools/nettoyer_voix.py`** (`--tout`/`--voix`, `--promouvoir` opt-in,
+  `--forcer`, `--mode`) : pipeline M13.0 par voix → `<nom>_clean` (wav + txt
+  + entrée `voix.txt`, idempotent) ; comparaison avant/après (`coverage`
+  Whisper + SNR via `audit_voix`) ; promotion des gagnants (contenu conservé
+  + SNR non dégradée) via `bench.promouvoir()`.
+- Run réel : 14 voix, 8 clean gagnants, 6 originaux conservés (mot perdu
+  détecté sur Gmilgram) ; 12 personnages multi-candidats pour M17.2.
+
 ### Ajout — Onglet Voix : extraction audio, waveform, transcription (M13)
 
 - **`engine/audio_extract.py`** : module backend pour l'extraction audio depuis

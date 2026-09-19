@@ -9,6 +9,7 @@ from typing import Optional
 import numpy as np
 import soundfile as sf
 
+from . import bgm
 from . import config
 from . import text_fr
 
@@ -73,6 +74,11 @@ def synthesize(
     if model is None or sample_rate is None:
         model, sample_rate = load()
 
+    # Marqueurs BGM : retirés AVANT CosyVoice (sinon vocalisés — le zero-shot
+    # ne génère pas de musique), le lit est mixé après synthèse.
+    text, veut_bgm = bgm.preparer_texte(text)
+    prompt_text = bgm.preparer_texte(prompt_text)[0]
+
     # CosyVoice lit les chiffres en anglais (inflect) : on normalise les
     # nombres en français avant la synthèse (cf. engine/text_fr.py).
     text = text_fr.normalize(text)
@@ -83,7 +89,10 @@ def synthesize(
         text, prompt_text, prompt_wav, stream=stream, speed=speed
     ):
         chunks.append(np.asarray(out["tts_speech"].cpu().numpy(), dtype=np.float32).squeeze())
-    return np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
+    audio = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
+    if veut_bgm:
+        audio = bgm.appliquer(audio, sample_rate)
+    return audio
 
 
 def save(audio: np.ndarray, sample_rate: int, path: str) -> None:

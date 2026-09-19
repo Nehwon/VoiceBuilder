@@ -377,7 +377,7 @@ const TOKENS_EMPASE = { ouvre: "<strong>", ferme: "</strong>", lib: "Gras", titr
 const TOKENS_AMBIANCE = [
   { ouvre: "<|Laughter|>", ferme: "<|/Laughter|>", lib: "Rires",               titre: "Rires en fond (entoure la sélection)", racc: "Alt+9" },
   { ouvre: "<|Applause|>", ferme: "<|/Applause|>", lib: "Applaudissements",     titre: "Applaudissements (entoure la sélection)" },
-  { ouvre: "<|BGM|>",      ferme: "<|/BGM|>",      lib: "Musique de fond",      titre: "Musique d'ambiance (entoure la sélection)" },
+  { ouvre: "<|BGM|>",      ferme: "<|/BGM|>",      lib: "Musique de fond",      titre: "Lit musical mixé sous la sélection (lit réglé dans ⚙️ Réglages ; sans lit : parlé normalement)" },
 ];
 // Insère un token sans fermeture (émotion, son) au curseur.
 function insererTokenSimple(token) {
@@ -768,6 +768,38 @@ $("btn-dir").addEventListener("click", async () => {
 });
 $("btn-save").addEventListener("click", () =>
   notifier("Réglages utilisés côté serveur à la génération.", "ok"));
+
+// ---------------------------------------------------------------- musique de fond (BGM)
+$("bgm-volume").addEventListener("input", () => {
+  $("bgm-volume-val").textContent = Number($("bgm-volume").value).toFixed(2);
+});
+$("btn-bgm-upload").addEventListener("click", () => $("file-bgm").click());
+$("file-bgm").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append("fichier", f);
+  try {
+    const r = await fetch("/api/musique/importer", { method: "POST", body: fd });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const d = await r.json();
+    $("bgm-nom").textContent = d.lit;
+    notifier(`Lit musical importé : ${d.lit}.`, "ok");
+  } catch { notifier("Import du lit musical échoué.", "err"); }
+  finally { e.target.value = ""; }
+});
+$("btn-bgm-save").addEventListener("click", async () => {
+  try {
+    const r = await fetch("/api/config", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bgm_volume: parseFloat($("bgm-volume").value) }),
+    });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const etat = await r.json();
+    $("bgm-volume-val").textContent = Number(etat.bgm_volume).toFixed(2);
+    notifier("Musique de fond enregistrée.", "ok");
+  } catch { notifier("Enregistrement échoué.", "err"); }
+});
 
 // ---------------------------------------------------------------- génération
 async function sauvegarderAvantGeneration() {
@@ -1562,6 +1594,11 @@ async function telechargerModele() {
 async function chargerEtat() {
   const etat = await (await fetch("/api/etat")).json();
   $("audio-dir").value = etat.audio_dir;
+  $("bgm-nom").textContent = etat.bgm_lit || "aucun lit";
+  if (etat.bgm_volume != null) {
+    $("bgm-volume").value = etat.bgm_volume;
+    $("bgm-volume-val").textContent = Number(etat.bgm_volume).toFixed(2);
+  }
   let msg = null;
   if (!etat.voix_file && etat.erreur) msg = { texte: etat.erreur, lien: "→ Régler le dossier des voix" };
   else if (!etat.voix_file) msg = { texte: "Aucun fichier de voix : configure le dossier des voix.", lien: "→ Régler le dossier des voix" };

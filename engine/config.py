@@ -57,6 +57,21 @@ VOIX_AUDIO_DIR = Path(
 #   3) le dossier audio dédié (VOIX_AUDIO_DIR/…)
 VOIX_SEARCH_DIRS = (PROJECT_ROOT, VOIX_DIR, VOIX_AUDIO_DIR)
 
+# --- Musique de fond (BGM, mixée sous les segments <|BGM|>) --------------------------
+# CosyVoice zero-shot ne génère pas de lit musical : on le mixe nous-mêmes.
+MUSIQUE_DIR = PROJECT_ROOT / "musique"
+BGM_VOLUME_DEFAUT = 0.15
+BGM_LIT: Path | None = None      # lit actif (None = pas de musique)
+BGM_VOLUME: float = BGM_VOLUME_DEFAUT
+
+
+def set_bgm(lit: Path | str | None, volume: float | None = None) -> None:
+    """Change au runtime le lit musical et son volume (GUI → persistance)."""
+    global BGM_LIT, BGM_VOLUME
+    BGM_LIT = Path(lit).expanduser() if lit else None
+    if volume is not None:
+        BGM_VOLUME = max(0.0, min(0.5, float(volume)))
+
 
 def set_audio_dir(path) -> None:
     """Change au runtime le dossier des fichiers wav/txt des voix.
@@ -101,5 +116,5 @@ DEFAULT_TRT = False                # TensorRT : accélère le Flow (DiT, 10 pas 
 
 
 def ensure_dirs() -> None:
-    for d in (VOIX_DIR, TEXTE_DIR, OUTPUT_DIR):
+    for d in (VOIX_DIR, TEXTE_DIR, OUTPUT_DIR, MUSIQUE_DIR):
         d.mkdir(parents=True, exist_ok=True)

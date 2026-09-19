@@ -326,12 +326,14 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         résultats, écoute comparative ; le gagnant devient la référence dans
         `voix.txt` (`--promouvoir` / bouton, backup `voix.txt.bak`).
         Bench réel : Thepromisedneverland 96/91/87 %, API + promotion testées.
-- [ ] **M17.3 — Nettoyage en lot des 14 voix**
-  - [ ] Appliquer le pipeline M13.0 (Demucs + DeepFilterNet) à toutes les voix
+- [x] **M17.3 — Nettoyage en lot des 14 voix** (2026-09-19)
+  - [x] Appliquer le pipeline M13.0 (Demucs + DeepFilterNet) à toutes les voix
         en une commande (`tools/nettoyer_voix.py --tout`), produire les
         `<nom>_clean`, comparer avant/après (`coverage` + écoute) et promouvoir
         les gagnants en référence dans `voix.txt`
-        (`PROJET_FINE.md` §2 point 2).
+        (`PROJET_FINE.md` §2 point 2). `--promouvoir` opt-in, `--forcer`,
+        idempotent. Run réel : 8 clean / 6 originaux (mot perdu détecté
+        sur Gmilgram).
 - [ ] **M17.4 — Multi-prompt à la génération**
   - [ ] Permettre **N prompts candidats par voix** (réutiliser les variantes
         `_2`/`_3`/`_clean` existantes comme candidats, sans casser le format
@@ -461,6 +463,11 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 - [ ] Pré-cache des prompts `wav+txt` par voix.
 - [ ] Détection automatique des limites de segment (VAD) pour `create_voix`.
 - [ ] Prévoir un warmup au démarrage du docker pour éviter une trop grande latence lors de la première inférence.
+- [ ] Appliquer l'accent de la langue cité sur la voix utilisée (Ex. accent Anglais lorsque la voix prononce de l'anglais y compris quand c'est une voix française.)
+- [ ] Option de traduction LLM d'une langue vers une autre avant génération.
+- [ ] **Générateur de jingles musicaux** : produire des lits musicaux
+      (intro/outro/interlude) utilisables comme lits BGM (`musique/`),
+      paramétrables (durée, ambiance), en complément de l'import de fichiers.
 
 ### Cache de la dernière génération
 
