@@ -511,7 +511,11 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       repli crête, hangover, durées min) ; `create_voix --vad` recale
       `[start, stop]` ; `POST /api/voix/ajuster-vad` + bouton « 🧲 Ajuster »
       dans l'éditeur voix (inputs + région WaveSurfer mis à jour).
-- [ ] Prévoir un warmup au démarrage du docker pour éviter une trop grande latence lors de la première inférence.
+- [x] Prévoir un warmup au démarrage du docker pour éviter une trop grande
+      latence lors de la première inférence (2026-09-19) : `engine/warmup.py`
+      (modèle + micro-synthèse + Whisper, thread daemon, best effort),
+      opt-in `VOICEBUILDER_WARMUP=1` (câblé dans les 2 compose + `.env.gitea`,
+      défaut 0), serveur répond aussitôt.
 - [ ] Appliquer l'accent de la langue cité sur la voix utilisée (Ex. accent Anglais lorsque la voix prononce de l'anglais y compris quand c'est une voix française.)
 - [ ] Option de traduction LLM d'une langue vers une autre avant génération.
 - [ ] **Générateur de jingles musicaux** : produire des lits musicaux

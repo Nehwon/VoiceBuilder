@@ -2121,6 +2121,11 @@ def main(argv=None) -> int:
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)
     _bootstrap()
+    if os.environ.get("VOICEBUILDER_WARMUP") == "1":
+        # Précharge moteur + Whisper en tâche de fond (première inférence
+        # sans latence) ; le serveur répond aussitôt.
+        from engine import warmup as _warmup
+        _warmup.lancer_warmup()
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0
 

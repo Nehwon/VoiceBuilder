@@ -32,6 +32,8 @@ services:
       - COSYVOICE_MODEL_DIR=/models
       - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
       - VOICEBUILDER_ENHANCE_DIR=/models/enhance_models
+      # Warmup au démarrage (modèle + Whisper préchargés, 1re inférence sans latence) : 1 pour activer.
+      - VOICEBUILDER_WARMUP=${VOICEBUILDER_WARMUP:-0}
     volumes:
       - volume-audio:/data/voice
       - volume-model:/models
@@ -58,6 +60,8 @@ services:
       - COSYVOICE_MODEL_DIR=/models
       - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
       - VOICEBUILDER_ENHANCE_DIR=/models/enhance_models
+      # Warmup au démarrage (modèle + Whisper préchargés, 1re inférence sans latence) : 1 pour activer.
+      - VOICEBUILDER_WARMUP=${VOICEBUILDER_WARMUP:-0}
     volumes:
       - volume-audio:/data/voice
       - volume-model:/models

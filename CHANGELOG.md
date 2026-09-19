@@ -8,6 +8,12 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Warmup au démarrage (opt-in)
+
+- **Moteur** (`engine/warmup.py`) : précharge CosyVoice3 + micro-synthèse +
+  Whisper en thread daemon (best effort, logs) ; câblé dans `app/server.py`
+  via `VOICEBUILDER_WARMUP=1` (2 compose + `.env.gitea`, défaut 0).
+
 ### Ajout — VAD : limites de segment automatiques (`create_voix`, onglet Voix)
 
 - **Moteur** (`engine/vad.py`, numpy seul) : détection de parole par énergie

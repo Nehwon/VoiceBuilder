@@ -357,6 +357,8 @@ docker compose up --build        # serveur sur http://127.0.0.1:8000
   (si le volume contient déjà le modèle, il est détecté et rien n'est
   re-téléchargé).
 - `COSYVOICE_MODEL_SOURCE` : `modelscope` (défaut) ou `huggingface`.
+- `VOICEBUILDER_WARMUP=1` (opt-in) : précharge modèle + Whisper en tâche de
+  fond au démarrage — 1re inférence sans latence (~7 Go VRAM occupés).
 
 > - **GPU** : image CUDA 13 (torch `cu130`, wheels pip) construite dès le build ;
 >   pas de base `nvidia/cuda` (NCCL système incompatible avec torch cu130).
