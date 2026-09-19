@@ -140,7 +140,7 @@ def _bootstrap() -> None:
 import subprocess
 
 _torch_jobs: dict[int, dict] = {}
-_torch_jobid = itertools.count()
+_torch_jobid = itertools.count(1)
 
 
 def _check_torch():
@@ -356,7 +356,7 @@ def api_modeles():
 
 
 _model_jobs: dict[int, dict] = {}
-_model_jobid = itertools.count()
+_model_jobid = itertools.count(1)
 
 
 @app.post("/api/modeles/telecharger")
@@ -458,7 +458,7 @@ def api_wav(nom: str):
 # ---------------------------------------------------------------------------
 
 _jobs: dict[int, dict] = {}
-_jobid = itertools.count()
+_jobid = itertools.count(1)
 
 
 @app.post("/api/generer")
@@ -1081,6 +1081,9 @@ def api_cache_lire(document: str):
 @app.delete("/api/cache/{document}")
 def api_cache_supprimer(document: str):
     """Supprime le cache de génération d'un document (M16, cas 2 de vidage)."""
+    for job in _jobs.values():
+        if job.get("document") == document and job.get("status") == "running":
+            raise HTTPException(409, "Génération en cours : arrête-la avant de supprimer son cache.")
     return _cache_effacer(document)
 
 
@@ -1090,7 +1093,7 @@ def api_cache_supprimer(document: str):
 # ---------------------------------------------------------------------------
 
 _bench_jobs: dict[int, dict] = {}
-_bench_id = itertools.count()
+_bench_id = itertools.count(1)
 
 
 @app.get("/api/bench/candidats")
@@ -1913,7 +1916,7 @@ async def api_voix_enregistrer(nom: str = Form(...),
 # Espace de travail des nettoyages (dans le volume temporaire, sinon /tmp).
 _CLEAN_WORK = config.OUTPUT_DIR / ".clean"
 _clean_jobs: dict[int, dict] = {}
-_clean_jobid = itertools.count()
+_clean_jobid = itertools.count(1)
 
 
 def _clean_dispo() -> dict:

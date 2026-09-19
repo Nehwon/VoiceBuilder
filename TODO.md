@@ -477,6 +477,27 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ### Correctifs GUI / UX (bugs remontés)
 
+- [ ] **Reconnexion de l'interface ne fonctionne pas** : après rechargement
+      de la page pendant une génération en cours, l'éditeur / le montage /
+      la progression restent vides alors que le job tourne encore côté
+      serveur (`GET /api/generer/en-cours` + rattachement SSE à diagnostiquer
+      et corriger).
+      Cause trouvée (2026-09-19) : le 1er job après (re)démarrage serveur a
+      l'id **0**, et tous les tests front (`!montageId`, `!info.id`, …)
+      le prenaient pour « aucun » → rattachement, arrêt, chargement blocs,
+      regen-file : retours silencieux. Corrigé (gardes `=== null` + compteurs
+      serveur dès 1) ; front re-déployé à chaud, serveur au prochain restart.
+- [ ] **Cache de génération précédent (M16) non restauré** : à l'ouverture
+      d'un document, la dernière génération n'est pas rechargée
+      (`GET /api/cache/{doc}` + `restaurerCacheDoc` à diagnostiquer et
+      corriger).
+      Pistes (2026-09-19) : endpoint OK en live ; restauration victime du
+      même bug id-0 (job restauré d'id 0 → `chargerBlocs` muet) — corrigé
+      avec le point précédent ; de plus `DELETE /api/cache` pendant une
+      génération tuait le job en cours (orphelin) → refusé en 409
+      (serveur, au prochain restart). Écriture manifest relue saine + suite
+      stub verte (M16, rattach, file-regen, bloc-texte, verif).
+
 - [x] **Miroir des images Gitea → GitHub sans GitHub Actions** (2026-09-19) :
       aucun calcul côté GitHub, seul du stockage paquets (`ghcr.io`).
       Étape « Mirror to GitHub Container Registry » dans

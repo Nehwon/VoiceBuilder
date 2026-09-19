@@ -38,7 +38,7 @@ function mountVue(nom) {
   $("tab-voix").classList.toggle("actif", nom === "voix");
   $("tab-projets").classList.toggle("actif", nom === "projets");
   if (nom === "edit" && cm) cm.refresh();
-  if (nom === "montage" && montageId) chargerBlocs();
+  if (nom === "montage" && montageId !== null) chargerBlocs();
   if (nom === "projets") chargerDetailsProjets();
   if (nom === "voix") { chargerVoixListe(); chargerBenchCandidats(); }
   majBoutonArret();  // l'état d'arrêt suit l'onglet affiché
@@ -51,7 +51,7 @@ $("btn-gerer").addEventListener("click", () => mountVue("projets"));
 
 // l'onglet Montage est toujours accessible (le contenu dépend du résultat)
 function majMontage() {
-  const actif = !!(montageId && cm && cm.getValue().trim());
+  const actif = !!(montageId !== null && cm && cm.getValue().trim());
   $("tab-montage").classList.toggle("actif", $("vue-montage") && !$("vue-montage").hidden);
 }
 
@@ -1079,7 +1079,7 @@ async function rattacherGenerationEnCours() {
     if (!r.ok) return;
     info = await r.json();
   } catch { return; }
-  if (!info || !info.id) return;
+  if (!info || info.id == null) return;
   if (info.document) {
     docCourant = { fichier: info.document, brouillon: null };
     try { await chargerPersonnagesDoc(info.document); } catch { /* mapping optionnel */ }
@@ -1118,7 +1118,7 @@ async function rattacherGenerationEnCours() {
 }
 
 async function demanderArret() {
-  if (!generationActive || arretEnCours || !montageId) return;
+  if (!generationActive || arretEnCours || montageId === null) return;
   arretEnCours = true;
   majBoutonArret();
   try {
@@ -1260,7 +1260,7 @@ $("montage").addEventListener("ended", () => {
 });
 
 async function chargerBlocs() {
-  if (!montageId) return;
+  if (montageId === null) return;
   try {
     const r = await fetch(`/api/generer/${montageId}/blocs`);
     if (!r.ok) { notifier("Impossible de charger les blocs.", "err"); return; }
@@ -1460,7 +1460,7 @@ async function validerTexteCarte(bid, texteEl) {
     texteEl.textContent = ancien || "";
     return;
   }
-  if (generationActive || !montageId) {
+  if (generationActive || montageId === null) {
     texteEl.textContent = ancien || "";
     notifier("Attends la fin de la génération pour modifier.", "err");
     return;
@@ -1529,7 +1529,7 @@ function planifierSynchroEditeur() {
 }
 
 async function verifierSynchroEditeur() {
-  if (!montageId || !montageBlocs.length || generationActive) return;
+  if (montageId === null || !montageBlocs.length || generationActive) return;
   const box = $("liste-blocs");
   const spans = decouperEditeur();
   const formeOk = spans.length === montageBlocs.length &&
@@ -1645,7 +1645,7 @@ async function actionSupprimerBloc(bid, btn) {
 async function actionBloc(bid, action, btn) {
   // Régénération empilée : la génération en cours termine son bloc puis
   // re-synthétise celui-ci avant de continuer.
-  if (action === "regenerer" && generationActive && montageId) {
+  if (action === "regenerer" && generationActive && montageId !== null) {
     mettreBlocEnFile(bid, btn);
     return;
   }
@@ -1861,7 +1861,7 @@ function effacerBadgesVerif() {
 }
 
 $("btn-verifier").addEventListener("click", async () => {
-  if (!montageId || !montageBlocs.length) {
+  if (montageId === null || !montageBlocs.length) {
     notifier("Génère d'abord un montage.", "err");
     return;
   }
