@@ -128,6 +128,32 @@ adaptive, voix, `multi.generate()`, progress callback, personnages→voix,
 bloc_dir, synth_bloc).
 **Statut** : ✔ Terminé — 83 tests au total (62 text_fr + 21 e2e).
 
+### M12 — Espace de montage (lecture d'ensemble, navigation par bloc)
+**Objectif** : faire de l'onglet « Montage » un vrai espace de montage :
+offsets `start` par bloc (pause uniquement au changement de locuteur) dans
+`GET /api/generer/{jid}/blocs` + événements SSE, **timeline cliquable**
+(segments par bloc + curseur + chrono), clic carte/segment → lecture à partir
+du bloc (surlignage + défilement auto du bloc en cours), réordonnancement par
+glisser-déposer (`POST …/blocs/reordonner`), suppression en 2 clics
+(`POST …/bloc/{id}/supprimer`), re-concaténation serveur alignée sur la règle
+de pause de la génération, **arrêt propre** (`POST …/arret`, bouton ⏹, blocs
+partiels conservés).
+**Livrables** : `app/server.py` (`_offsets_blocs`, `_reconcat`, 2 endpoints),
+`app/web/app.js` + `index.html` + `style.css`, `TODO.md` coché.
+**Statut** : ✔ Terminé (2026-09-19) — test d'intégration `TestClient` vert
+(offsets, réordre, suppression, cas limites).
+
+### M17.1 — Audit qualité des voix (Palier 0, curation)
+**Objectif** : diagnostiquer chaque prompt de `voix.txt` avant clonage :
+durée (alerte hors 5–30 s), niveau/SNR, silences dominants, écrêtage ;
+retranscription Whisper (`small`, FR) + diff mot à mot vs `.txt`
+(horodatages ignorés comme au parsing).
+**Livrables** : `tools/audit_voix.py` (`--voix NOM`, `--sans-whisper`),
+verdicts `OK` / `à recurer` / `à ré-extraire` / `à nettoyer` (→ M13.0),
+sortie console (+ section README).
+**Statut** : ✔ Terminé (2026-09-19) — audit réel des 14 voix en conteneur :
+11 OK, 1 à recurer, 2 à ré-extraire (silence ≥ 60 %).
+
 ### M14/M15 — Packaging & infra (sous-module CosyVoice + Docker GPU)
 **Objectif** : intégrer **CosyVoice comme sous-module git du projet** (`vendor/CosyVoice`,
 fini le clone voisin dans `~/Projets/CosyVoice`) et fournir un **conteneur Docker avec

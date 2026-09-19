@@ -145,6 +145,18 @@ usage** dans `VOICEBUILDER_ENHANCE_DIR` (défaut : `engine/config.py`,
 `volume-model`). Demucs passe automatiquement de `cuda fp16` → `cuda fp32` →
 `cpu` selon la VRAM disponible.
 
+### Auditer les voix (curation Palier 0)
+
+```bash
+python tools/audit_voix.py [--voix NOM] [--sans-whisper]
+```
+
+Pour chaque entrée de `voix.txt` : durée (alerte hors 5–30 s), niveau/SNR,
+silences dominants, écrêtage, plus **retranscription Whisper du prompt +
+diff mot à mot vs `.txt`**. Verdict : `OK` / `à recurer` (txt) /
+`à ré-extraire` (wav) / `à nettoyer` (bruit → bouton 🧹 ci-dessus).
+`--sans-whisper` = mode rapide sans retranscription.
+
 ---
 
 ## Personnages & voix (mapping par document)
@@ -201,8 +213,12 @@ réglages / aide / personnages en modales.
 
 - **Onglet Éditeur** : CodeMirror avec surlignage `[Nom]:`, autocomplétion `Tab`,
   numéros de ligne, brouillon auto-sauvegardé dans `texte/brouillons/`.
-- **Onglet Montage** : montage global (lecteur + log) à gauche, **liste à ascenseur**
-  de lecteurs par bloc à droite (texte + actions Régénérer/Diviser), écoute temps réel.
+- **Onglet Montage** : montage global (lecteur + **timeline cliquable** + log)
+  à gauche, **liste à ascenseur** de lecteurs par bloc à droite (texte + actions
+  Régénérer/Diviser/**✕ Retirer**), écoute temps réel. Clic sur une carte ou un
+  segment → lecture à partir de ce bloc (bloc en cours surligné) ; poignée ⠿
+  pour réordonner les blocs (montage re-créé) ; bouton **⏹ Arrêter** pour
+  interrompre proprement une génération (blocs déjà synthétisés conservés).
 - **Onglet Projets** : tableau de gestion des documents (taille, date, .map) avec
   actions **Ouvrir / Renommer / Dupliquer / Archiver / Supprimer**, section **📦 Archives**
   (Restaurer), zone **🎙️ Voix** (pré-écoute, suppression, 📥 Importer un couple

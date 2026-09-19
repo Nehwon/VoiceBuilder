@@ -307,14 +307,15 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 > d'outils émotions) couvrent déjà une partie ; il manque les outils de
 > **diagnostic**, de **comparaison A/B** et de **traitement en lot**.
 
-- [ ] **M17.1 — Audit qualité des voix (`tools/audit_voix.py`)**
-  - [ ] Pour chaque entrée de `voix/voix.txt` : durée (alerte hors 5–30 s),
+- [x] **M17.1 — Audit qualité des voix (`tools/audit_voix.py`)** (2026-09-19)
+  - [x] Pour chaque entrée de `voix/voix.txt` : durée (alerte hors 5–30 s),
         niveau/SNR, silences dominants, écrêtage ; **retranscription Whisper
-        du `.wav` prompt + diff mot à mot vs `.txt`** (mots divergents ou
-        manquants = transcription à recurer, `PROJET_FINE.md` §2 point 3).
-  - [ ] Rapport par voix : `OK` / `à recurer` (txt) / `à ré-extraire` (wav) /
-        `à nettoyer` (bruit/musique → M13.0) ; sortie console + JSON
-        (exploitable par la GUI plus tard).
+        du `.wav` prompt + diff mot à mot vs `.txt`** (horodatages ignorés
+        comme au parsing voix) ; `--voix NOM`, `--sans-whisper`.
+  - [x] Rapport par voix : `OK` / `à recurer` (txt) / `à ré-extraire` (wav) /
+        `à nettoyer` (bruit/musique → M13.0) ; sortie console uniquement.
+        Audit réel des 14 voix : 11 OK, 1 à recurer (Thepromisedneverland_3),
+        2 à ré-extraire (Gachiakuta, Thepromisedneverland — silence ≥ 60 %).
 - [ ] **M17.2 — Banc A/B de prompts par personnage**
   - [ ] Générer le **même paragraphe FR de référence** (nombres, dates,
         dialogue, 1 émotion — cf. `PROJET_FINE.md` §3.4) avec **2–3 segments

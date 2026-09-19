@@ -8,6 +8,30 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Espace de montage M12 (timeline, navigation, réordre/suppression)
+
+- **API** (`app/server.py`) : offsets `start` par bloc (pause uniquement au
+  changement de locuteur) dans `GET /api/generer/{jid}/blocs` + événements SSE
+  `bloc` ; `_reconcat` factorisé (re-concaténation alignée, sans silence
+  final) ; `POST …/blocs/reordonner` (`{ids}`, 400 si incohérents) et
+  `POST …/bloc/{id}/supprimer` (404 si inconnu).
+- **Arrêt propre** : `POST /api/generer/{jid}/arret` + bouton **⏹ Arrêter** —
+  le bloc en cours se termine, les blocs partiels sont conservés et écoutables.
+- **GUI** (`app/web/`) : **timeline cliquable** (segments par bloc + curseur +
+  chrono), clic carte/segment → lecture à partir du bloc, surlignage +
+  défilement auto du bloc en cours, réordonnancement par glisser-déposer
+  (poignée ⠿), suppression en 2 clics.
+- Test d'intégration `TestClient` vert (offsets, réordre, suppression, 400/404).
+
+### Ajout — Audit qualité des voix M17.1 (Palier 0)
+
+- **`tools/audit_voix.py`** : pour chaque entrée de `voix.txt` — durée (alerte
+  hors 5–30 s), niveau/SNR, silences dominants, écrêtage ; retranscription
+  Whisper (`small`, FR) + diff mot à mot vs `.txt` (horodatages ignorés).
+  Options `--voix NOM`, `--sans-whisper`. Verdicts `OK` / `à recurer` /
+  `à ré-extraire` / `à nettoyer` (→ M13.0), sortie console.
+- Audit réel des 14 voix : 11 OK, 1 à recurer, 2 à ré-extraire (silence ≥ 60 %).
+
 ### Ajout — Onglet Voix : extraction audio, waveform, transcription (M13)
 
 - **`engine/audio_extract.py`** : module backend pour l'extraction audio depuis
