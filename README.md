@@ -249,6 +249,11 @@ réglages / aide / personnages en modales.
   Pendant une génération, le bouton **Regénérer** d'un bloc déjà synthétisé le
   met en file : il est re-synthétisé après le bloc en cours, puis la
   génération globale continue.
+  La **dernière génération** de chaque document est conservée
+  (`output/.cache-<doc>.json` + WAV, volume Docker) et restaurée à
+  l'ouverture — pas besoin de régénérer à chaque session ; bouton
+  **🗑 Supprimer la génération** (avec confirmation `yes` + case à cocher)
+  pour l'effacer.
 - **Onglet Projets** : tableau de gestion des documents (taille, date, .map) avec
   actions **Ouvrir / Renommer / Dupliquer / Archiver / Supprimer**, section **📦 Archives**
   (Restaurer), zone **🎙️ Voix** (pré-écoute, suppression, 📥 Importer un couple

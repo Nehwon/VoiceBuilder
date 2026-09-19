@@ -20,6 +20,7 @@ import itertools
 import json
 import os
 import queue
+import re
 import sys
 import tempfile
 import threading
@@ -241,6 +242,7 @@ class GenererIn(BaseModel):
     device: str = "cuda:0"
     load_vllm: bool = False
     load_trt: bool = False
+    document: str | None = None  # fichier projet (cache M16) ; None = fichier local, pas de cache
 
 
 class ReordonnerIn(BaseModel):
@@ -475,11 +477,16 @@ def api_generer(payload: GenererIn):
     bloc_dir = config.OUTPUT_DIR / f"blocs_{jid}"
     sortie.parent.mkdir(parents=True, exist_ok=True)
     q: "queue.Queue[tuple]" = queue.Queue()
+    document = (payload.document or "").strip() or None
+    if document:
+        # Cas 1 de vidage du cache (M16) : nouvelle génération demandée.
+        _cache_effacer(document)
     job = {"status": "running", "queue": q, "result": None,
            "error": None, "tmp": tmp, "out": sortie, "bloc_dir": str(bloc_dir),
            "pause": payload.pause, "vitesse": payload.vitesse,
            "max_chars": payload.max_chars, "verify": payload.verify,
            "device": payload.device, "personnages": payload.personnages,
+           "document": document,
            "stop_event": threading.Event(), "stopped": False,
            "file_regen": queue.Queue()}
     _jobs[jid] = job
@@ -513,6 +520,7 @@ def api_generer(payload: GenererIn):
             job["sample_rate"] = res.get("sample_rate")
             job["stopped"] = bool(res.get("stopped"))
             job["status"] = "stopped" if job["stopped"] else "done"
+            _cache_ecrire(job)  # M16 : persiste la dernière génération du document
         except Exception as exc:  # noqa: BLE001
             job["error"] = str(exc)
             job["status"] = "error"
@@ -621,6 +629,93 @@ def _job_pret(jid: int) -> dict:
     return job
 
 
+def _cache_chemin(document: str) -> Path:
+    """Manifeste du cache de génération d'un document (M16, dans output/)."""
+    nom = re.sub(r"[/\\]", "_", document).strip() or "document"
+    return config.OUTPUT_DIR / f".cache_{nom}.json"
+
+
+def _cache_lire(document: str) -> dict | None:
+    """Manifeste du cache si présent ET complet (tous les WAV existent)."""
+    chemin = _cache_chemin(document)
+    if not chemin.exists():
+        return None
+    try:
+        data = json.loads(chemin.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    fichiers = [data.get("out")] + [b.get("wav") for b in data.get("blocs", [])]
+    if not data.get("out") or not all(f and Path(f).exists() for f in fichiers):
+        try:
+            chemin.unlink()
+        except OSError:
+            pass
+        return None
+    return data
+
+
+def _cache_ecrire(job: dict) -> None:
+    """Persiste la dernière génération d'un document (M16, à la fin du job)."""
+    document = job.get("document")
+    if not document:
+        return
+    res = job.get("result") or {}
+    try:
+        config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        _cache_chemin(document).write_text(json.dumps({
+            "document": document,
+            "status": job.get("status"),
+            "stopped": bool(job.get("stopped")),
+            "sample_rate": job.get("sample_rate"),
+            "pause": job.get("pause"), "vitesse": job.get("vitesse"),
+            "max_chars": job.get("max_chars"), "verify": job.get("verify"),
+            "device": job.get("device"), "personnages": job.get("personnages"),
+            "out": str(job["out"]),
+            "bloc_dir": str(job.get("bloc_dir") or ""),
+            "blocs": job.get("blocs", []),
+            "duration": res.get("duration"),
+        }, ensure_ascii=False), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass  # le cache ne doit jamais casser une génération
+
+
+def _cache_effacer(document: str) -> dict:
+    """Supprime le cache d'un document : manifeste + WAV + jobs en mémoire."""
+    chemin = _cache_chemin(document)
+    data = None
+    if chemin.exists():
+        try:
+            data = json.loads(chemin.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            data = None
+    fichiers = []
+    if data:
+        fichiers = [data.get("out")] + [b.get("wav") for b in data.get("blocs", [])]
+    for f in fichiers:
+        if f:
+            try:
+                Path(f).unlink(missing_ok=True)
+            except OSError:
+                pass
+    try:
+        chemin.unlink(missing_ok=True)
+    except OSError:
+        pass
+    # bloc_dir résiduel (vide après suppression des WAV de blocs)
+    bloc_dir = (data or {}).get("bloc_dir")
+    try:
+        cand = Path(bloc_dir) if bloc_dir else None
+        if cand and cand.is_dir() and not any(cand.iterdir()):
+            cand.rmdir()
+    except OSError:
+        pass
+    for jid, job in list(_jobs.items()):
+        if job.get("document") == document:
+            _jobs.pop(jid, None)
+    return {"efface": True, "document": document,
+            "fichiers": len([f for f in fichiers if f])}
+
+
 def _offsets_blocs(blocs: list, pause: float) -> list[float]:
     """Début (s) de chaque bloc dans le montage — pause uniquement au changement de locuteur."""
     offsets: list[float] = []
@@ -720,6 +815,7 @@ def api_bloc_regenerer(jid: int, bid: int):
                              speed=job["vitesse"], verify=job["verify"])
     cosyvoice_engine.save(audio, sr, bloc["wav"])
     bloc["duree"] = round(len(audio) / sr, 2)
+    _cache_ecrire(job)  # M16 : le cache suit les retouches
     return {"bloc": bloc}
 
 
@@ -775,6 +871,7 @@ def api_bloc_diviser(jid: int, bid: int):
                         "chars": len(h["texte"]), "duree": round(len(audio) / sr, 2),
                         "wav": wav})
     blocs[idx:idx + 1] = results
+    _cache_ecrire(job)  # M16 : le cache suit les retouches
     return {"blocs": blocs}
 
 
@@ -786,6 +883,7 @@ def api_concatener(jid: int):
     if not blocs:
         raise HTTPException(400, "Aucun bloc à concaténer.")
     duree = _reconcat(job, blocs)
+    _cache_ecrire(job)  # M16 : le cache suit les retouches
     return {"duree": duree, "out": job["out"]}
 
 
@@ -800,6 +898,7 @@ def api_blocs_reordonner(jid: int, payload: ReordonnerIn):
         raise HTTPException(400, "La liste des ids ne correspond pas aux blocs.")
     job["blocs"] = [byid[i] for i in ids]
     duree = _reconcat(job, job["blocs"])
+    _cache_ecrire(job)  # M16 : le cache suit les retouches
     ofs = _offsets_blocs(job["blocs"], float(job.get("pause", 0.0)))
     out_blocs = [dict(b, start=o) for b, o in zip(job["blocs"], ofs)]
     return {"blocs": out_blocs, "duree": duree}
@@ -814,7 +913,8 @@ def api_bloc_supprimer(jid: int, bid: int):
     if len(restants) == len(blocs):
         raise HTTPException(404, "Bloc inconnu.")
     job["blocs"] = restants
-    duree = _reconcat(job, job["blocs"]) if restants else 0.0
+    duree = _reconcat(job, restants)  # vide → montant supprimé, durée 0
+    _cache_ecrire(job)  # M16 : le cache suit les retouches
     ofs = _offsets_blocs(job["blocs"], float(job.get("pause", 0.0)))
     out_blocs = [dict(b, start=o) for b, o in zip(job["blocs"], ofs)]
     return {"blocs": out_blocs, "duree": duree, "vide": not restants}
@@ -839,6 +939,43 @@ def api_bloc_regenerer_file(jid: int, bid: int):
     file_regen.put(bid)
     return {"file": True,
             "message": f"Bloc {bid} régénéré après le bloc en cours."}
+
+
+@app.get("/api/cache/{document}")
+def api_cache_lire(document: str):
+    """Relit la dernière génération d'un document (M16) : la restaure en
+    job mémoire (nouvel id) pour réutiliser tous les endpoints montage."""
+    data = _cache_lire(document)
+    if not data:
+        raise HTTPException(404, "Aucune génération en cache pour ce document.")
+    jid = next(_jobid)
+    job = {"status": data.get("status", "done"),
+           "queue": queue.Queue(), "result": {"duration": data.get("duration"),
+                                              "blocs": data.get("blocs", []),
+                                              "out": data.get("out")},
+           "error": None, "tmp": None, "out": Path(data["out"]),
+           "bloc_dir": data.get("bloc_dir") or "",
+           "pause": data.get("pause", 0.5), "vitesse": data.get("vitesse", 1.0),
+           "max_chars": data.get("max_chars", 600),
+           "verify": data.get("verify", True),
+           "device": data.get("device", "cuda:0"),
+           "personnages": data.get("personnages", {}),
+           "document": data.get("document"),
+           "sample_rate": data.get("sample_rate"),
+           "stopped": bool(data.get("stopped", data.get("status") == "stopped")),
+           "stop_event": threading.Event(),
+           "file_regen": queue.Queue(),
+           "blocs": data.get("blocs", [])}
+    _jobs[jid] = job
+    return {"id": jid, "document": data.get("document"),
+            "status": job["status"], "duree": data.get("duration"),
+            "blocs": len(job["blocs"])}
+
+
+@app.delete("/api/cache/{document}")
+def api_cache_supprimer(document: str):
+    """Supprime le cache de génération d'un document (M16, cas 2 de vidage)."""
+    return _cache_effacer(document)
 
 
 # ---------------------------------------------------------------------------

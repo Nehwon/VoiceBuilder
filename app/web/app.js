@@ -117,6 +117,7 @@ document.addEventListener("keydown", (e) => {
     if (!$("modal-nettoyage").hidden) { fermerModal($("modal-nettoyage")); return; }
     if (!$("modal-confirm").hidden) { fermerModal($("modal-confirm")); if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; } return; }
     if (!$("modal-voix-import").hidden) { fermerModal($("modal-voix-import")); return; }
+    if (!modalCacheSupprimer.hidden) { fermerModal(modalCacheSupprimer); return; }
     [modalReglages, modalAide, modalPerso, modalErreur].forEach((m) => { if (!m.hidden) fermerModal(m); });
   }
 });
@@ -242,6 +243,7 @@ $("btn-ouvrir").addEventListener("click", async () => {
   $("doc-statut").textContent = `brouillon : ${d.brouillon} (source non modifiée)`;
   mountVue("edit");
   notifier(`Document « ${d.fichier} » ouvert.`, "ok");
+  restaurerCacheDoc();
 });
 
 // ---------------------------------------------------------------- ouverture d'un fichier local
@@ -317,6 +319,59 @@ $("btn-sauver").addEventListener("click", async () => {
   $("doc-statut").textContent = `enregistré dans le projet : ${d.fichier}`;
   mountVue("edit");
   notifier(`« ${d.fichier} » enregistré dans le projet.`, "ok");
+});
+
+// ---------------------------------------------------------------- cache de génération par projet (M16)
+async function restaurerCacheDoc() {
+  if (!docCourant || generationActive) return;
+  try {
+    const r = await fetch(`/api/cache/${encodeURIComponent(docCourant.fichier)}`);
+    if (!r.ok) return;  // pas de cache : rien à restaurer
+    const d = await r.json();
+    montageId = d.id;
+    $("montage").src = `/api/generer/${d.id}/result`;
+    majMontage();
+    await chargerBlocs();
+    notifier(`Dernière génération restaurée (${d.blocs} bloc(s)).`, "ok");
+  } catch { /* restauration best effort */ }
+}
+
+const modalCacheSupprimer = $("modal-cache-supprimer");
+function majBoutonCacheSupprimer() {
+  $("btn-cache-ok").disabled = !(
+    $("cache-confirm-input").value.trim() === "yes" &&
+    $("cache-confirm-check").checked);
+}
+$("btn-cache-supprimer").addEventListener("click", () => {
+  if (!docCourant) { notifier("Ouvre d'abord un document du projet.", "err"); return; }
+  $("cache-confirm-input").value = "";
+  $("cache-confirm-check").checked = false;
+  majBoutonCacheSupprimer();
+  ouvrirModal(modalCacheSupprimer);
+  setTimeout(() => $("cache-confirm-input").focus(), 0);
+});
+$("cache-confirm-input").addEventListener("input", majBoutonCacheSupprimer);
+$("cache-confirm-check").addEventListener("change", majBoutonCacheSupprimer);
+$("btn-cache-annuler").addEventListener("click", () => fermerModal(modalCacheSupprimer));
+modalCacheSupprimer.addEventListener("click", (e) => {
+  if (e.target === modalCacheSupprimer) fermerModal(modalCacheSupprimer);
+});
+$("btn-cache-ok").addEventListener("click", async () => {
+  if (!docCourant) return;
+  try {
+    const r = await fetch(`/api/cache/${encodeURIComponent(docCourant.fichier)}`, { method: "DELETE" });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    fermerModal(modalCacheSupprimer);
+    montageId = null;
+    contenuGenere = null;
+    montageBlocs = [];
+    $("montage").removeAttribute("src");
+    $("montage").load();
+    majMontage();
+    majBoutonGenerer();
+    remplirListeBlocs();
+    notifier("Génération en cache supprimée.", "ok");
+  } catch { notifier("Suppression du cache échouée.", "err"); }
 });
 
 // ---------------------------------------------------------------- voix (dispo pour le selecteur)
@@ -893,6 +948,7 @@ $("generer").addEventListener("click", async () => {
       device: $("device").value,
       load_vllm: $("load-vllm").checked,
       load_trt: $("load-trt").checked,
+      document: docCourant ? docCourant.fichier : null,  // M16 : cache par projet
     }),
   });
   if (!r.ok) {

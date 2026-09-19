@@ -8,6 +8,19 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Cache de génération par projet M16
+
+- **Serveur** (`app/server.py`) : dernière génération persistée par document
+  (`output/.cache-<doc>.json` + WAV, volume `volume-output`) à la fin du job
+  et à chaque retouche ; `GET /api/cache/{doc}` restaure un job réutilisable
+  par tous les endpoints montage ; `DELETE /api/cache/{doc}` efface manifeste
+  + fichiers + jobs mémoire. Nouvelle génération → ancien cache effacé.
+- **GUI** : relecture automatique à l'ouverture du document (montage + blocs
+  restaurés) ; bouton **« 🗑 Supprimer la génération »** à droite
+  d'« Enregistrer », modale exigeant de taper `yes` + case à cocher.
+- Test d'intégration `TestClient` vert (persistance, relecture, mutations,
+  2 cas de vidage).
+
 ### Ajout — Régénération empilée pendant la génération (file-regen)
 
 - **Moteur** (`engine/multi.py`) : `generate()` accepte `file_regen` (file

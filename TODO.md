@@ -474,13 +474,18 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 > Le logiciel doit **conserver la dernière génération** pour qu'une reprise de
 > session ne force pas à régénérer tout le projet (mauvaise expérience).
 
-- [ ] **M16 — Cache de génération par projet** : garder la dernière génération
-      disponible, persistée et relue à l'ouverture du projet.
-- [ ] Le cache n'est vidé que dans **deux cas** :
+- [x] **M16 — Cache de génération par projet** (2026-09-19) : dernière
+      génération persistée par document (`output/.cache-<doc>.json` + WAV,
+      volume Docker `volume-output`) et relue à l'ouverture (`GET
+      /api/cache/{doc}` → job restauré, onglet Montage réutilisable) ;
+      réécrit à chaque retouche (réordre, suppression, regen, division,
+      re-concat).
+- [x] Le cache n'est vidé que dans **deux cas** :
   1. l'utilisateur **demande une nouvelle génération** depuis la page d'édition ;
-  2. l'utilisateur **supprime le cache du projet** via un bouton en barre de
-     tâche, à droite d'« Enregistrer » : **« Supprimer la génération »**, avec un
-     **modal de mise en garde** demandant de taper `yes` et de cocher une case
+  2. l'utilisateur **supprime le cache du projet** via le bouton
+     **« 🗑 Supprimer la génération »** en barre de tâche, à droite
+     d'« Enregistrer » (`DELETE /api/cache/{doc}` : manifeste + WAV effacés),
+     avec **modal de mise en garde** demandant de taper `yes` et de cocher
      « Je comprends que je vais tout supprimer ».
 
 ### Docker — volumes persistants

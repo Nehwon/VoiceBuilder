@@ -41,6 +41,7 @@
     <input type="file" id="file-local" accept=".md,.txt,text/*" hidden />
     <input type="file" id="file-import-doc" accept=".md,.txt" hidden />
     <button id="btn-sauver" title="Enregistrer le contenu dans le projet">💾 Enregistrer dans le projet</button>
+    <button id="btn-cache-supprimer" title="Supprimer la génération en cache de ce document">🗑 Supprimer la génération</button>
     <button id="btn-import-doc" title="Importer un document (.md/.txt) dans le projet">📥 Importer…</button>
     <button id="btn-gerer" title="Gérer les projets (supprimer, archiver, renommer…)">🗂️ Gérer</button>
     <span id="doc-statut" class="doc-statut"></span>
@@ -497,6 +498,24 @@
       <div class="modal-actions">
         <button id="btn-confirm-annuler">Annuler</button>
         <button id="btn-confirm-ok" class="primaire">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : suppression du cache de génération (M16) -->
+  <div id="modal-cache-supprimer" class="modal" hidden>
+    <div class="modal-boite modal-erreur">
+      <h2>Supprimer la génération</h2>
+      <p class="modal-sub">La dernière génération de ce document (montage +
+        blocs) sera <strong>définitivement effacée</strong>. Pour confirmer,
+        tape <code>yes</code> ci-dessous et coche la case.</p>
+      <label>Confirmation
+        <input id="cache-confirm-input" type="text" placeholder="yes" autocomplete="off" />
+      </label>
+      <label class="cache-confirm-check"><input id="cache-confirm-check" type="checkbox" /> Je comprends que je vais tout supprimer</label>
+      <div class="modal-actions">
+        <button id="btn-cache-annuler">Annuler</button>
+        <button id="btn-cache-ok" class="primaire" disabled>Supprimer</button>
       </div>
     </div>
   </div>

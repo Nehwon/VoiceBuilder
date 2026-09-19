@@ -309,6 +309,7 @@ h1 .logo { height: 1.7em; width: 1.7em; vertical-align: -0.35em; margin-right: 2
 }
 .log-details { margin: 2px 0 6px; }
 .log-details summary { cursor: pointer; color: var(--dim); font-size: 12px; }
+.cache-confirm-check { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
 
 /* ---------------------------------------------------------------- contenu help (dans modal) */
 .aide h2 { margin-top: 0; }
