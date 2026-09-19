@@ -500,7 +500,12 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
       `POST …/verifier` + poll `GET …/verification` (409 si déjà en cours),
       bouton « ✓ Vérifier » + badges couverture par carte (seuils 85/60),
       effacés à chaque retouche du montage.
-- [ ] Pré-cache des prompts `wav+txt` par voix.
+- [x] Pré-cache des prompts `wav+txt` par voix (2026-09-19) :
+      `cosyvoice_engine` calcule une fois par voix les tenseurs dérivés du
+      prompt (tokens, speech tokens, mel, embedding) via le mécanisme natif
+      `frontend.spk2info`, réutilisés à chaque bloc ; clé (wav, mtime, texte,
+      sr) avec re-calcul auto si voix réécrite, repli sans cache en cas
+      d'échec, borne mémoire. Mesuré : ~0,22 s/bloc économisées.
 - [ ] Détection automatique des limites de segment (VAD) pour `create_voix`.
 - [ ] Prévoir un warmup au démarrage du docker pour éviter une trop grande latence lors de la première inférence.
 - [ ] Appliquer l'accent de la langue cité sur la voix utilisée (Ex. accent Anglais lorsque la voix prononce de l'anglais y compris quand c'est une voix française.)

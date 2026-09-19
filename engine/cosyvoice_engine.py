@@ -27,6 +27,52 @@ _model = None
 _sr = None
 _load_lock = threading.Lock()
 
+# Pré-cache des prompts (M18-backlog) : les tenseurs dérivés du couple
+# (wav + txt) — tokens texte, speech tokens, mel, embedding — sont identiques
+# pour tous les blocs d'une même voix. On les calcule une fois via le
+# mécanisme natif ``frontend.spk2info`` au lieu de les refaire à chaque bloc.
+_CLES_PROMPT = ("prompt_text", "prompt_text_len",
+                "llm_prompt_speech_token", "llm_prompt_speech_token_len",
+                "flow_prompt_speech_token", "flow_prompt_speech_token_len",
+                "prompt_speech_feat", "prompt_speech_feat_len",
+                "llm_embedding", "flow_embedding")
+_CACHE_PROMPTS: dict = {}
+_CACHE_PROMPTS_MAX = 64
+
+
+def vider_cache_prompts() -> None:
+    """Vide le pré-cache des prompts (tests, changement de modèle)."""
+    _CACHE_PROMPTS.clear()
+
+
+def _id_prompt_cache(model, prompt_wav: str, prompt_text: str,
+                     sample_rate: int) -> str:
+    """Id ``spk2info`` du prompt, calculé une fois puis réutilisé.
+
+    Clé = (wav, mtime, texte, sr) : un prompt réécrit (nettoyage, nouvel
+    import) est re-calculé automatiquement. Best effort : en cas d'échec on
+    renvoie "" (comportement historique, sans cache).
+    """
+    try:
+        mtime = Path(prompt_wav).stat().st_mtime_ns
+    except OSError:
+        mtime = 0
+    cle = (str(prompt_wav), mtime, prompt_text, sample_rate)
+    sid = _CACHE_PROMPTS.get(cle)
+    if sid is not None and sid in model.frontend.spk2info:
+        return sid
+    try:
+        d = model.frontend.frontend_zero_shot(
+            "", prompt_text, str(prompt_wav), sample_rate, "")
+    except Exception:  # noqa: BLE001
+        return ""
+    sid = f"vb-prompt-{len(_CACHE_PROMPTS)}"
+    model.frontend.spk2info[sid] = {k: d[k] for k in _CLES_PROMPT}
+    if len(_CACHE_PROMPTS) >= _CACHE_PROMPTS_MAX:
+        _CACHE_PROMPTS.clear()
+    _CACHE_PROMPTS[cle] = sid
+    return sid
+
 
 def load(model_dir=None, device: str = None, fp16: bool = None,
          load_vllm: bool = False, load_trt: bool = False) -> "tuple":
@@ -84,9 +130,14 @@ def synthesize(
     text = text_fr.normalize(text)
     prompt_text = text_fr.normalize(prompt_text)
 
+    # Prompt pré-calculé une fois par voix (sinon tokens/embedding refaits
+    # à chaque bloc). "" = repli historique.
+    sid = _id_prompt_cache(model, prompt_wav, prompt_text, sample_rate)
+
     chunks = []
     for out in model.inference_zero_shot(
-        text, prompt_text, prompt_wav, stream=stream, speed=speed
+        text, prompt_text, prompt_wav, zero_shot_spk_id=sid,
+        stream=stream, speed=speed
     ):
         chunks.append(np.asarray(out["tts_speech"].cpu().numpy(), dtype=np.float32).squeeze())
     audio = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)

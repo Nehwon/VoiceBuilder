@@ -8,6 +8,14 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Pré-cache des prompts par voix
+
+- **Moteur** (`engine/cosyvoice_engine.py`) : tenseurs dérivés du prompt
+  (tokens, speech tokens, mel, embedding) calculés une fois par voix via
+  `frontend.spk2info` au lieu d'être refaits à chaque bloc ; invalidation
+  sur mtime/texte/sr, repli sans cache, borne mémoire. ~0,22 s/bloc
+  économisées, tenseurs strictement identiques.
+
 ### Ajout — Vérification différée du montage final
 
 - **Moteur** (`engine/verifier.py`) : `transcribe_segments` (structuré) +
