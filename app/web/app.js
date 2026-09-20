@@ -822,6 +822,95 @@ $("btn-perso-fermer").addEventListener("click", () => {
   fermerModal(modalPerso);
 });
 
+// ---------------------------------------------------------------- incises (M20)
+const modalIncises = $("modal-incises");
+
+$("btn-incises").addEventListener("click", () => {
+  if (!docCourant) {
+    notifier("Ouvre d'abord un document du projet (pas un fichier local).", "err");
+    return;
+  }
+  $("incises-resultat").value = "";
+  $("incises-lignes").innerHTML = "";
+  $("incises-stats").textContent = "";
+  ouvrirModal(modalIncises);
+  apercuIncises();
+});
+
+async function apercuIncises() {
+  const stats = $("incises-stats");
+  stats.textContent = "Analyse…";
+  try {
+    const r = await fetch("/api/document/incises", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fichier: docCourant.fichier,
+        mode: $("incises-mode").value,
+        keep_action: $("incises-action").value,
+      }),
+    });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); stats.textContent = ""; return; }
+    const d = await r.json();
+    $("incises-resultat").value = d.texte_nettoye || "";
+    const s = d.stats || {};
+    stats.textContent =
+      `${s.incises || 0} incise(s) — ${s.parole_retirees || 0} retirée(s), ` +
+      `${s.actions_narration || 0} vers narration, ` +
+      `${(d.nouveaux_personnages || []).length} nouveau(x) personnage(s).`;
+    const tbody = $("incises-lignes");
+    tbody.innerHTML = "";
+    const prop = d.mapping_propose || {};
+    const nouveaux = d.nouveaux_personnages || [];
+    if (!nouveaux.length) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 2; td.textContent = "Aucun nouveau personnage.";
+      tr.appendChild(td); tbody.appendChild(tr);
+    }
+    for (const nom of nouveaux) {
+      const tr = document.createElement("tr");
+      const tdNom = document.createElement("td");
+      tdNom.textContent = nom;
+      const tdVoix = document.createElement("td");
+      const select = document.createElement("select");
+      select.dataset.personnage = nom;
+      for (const v of voixDispo) {
+        const o = document.createElement("option");
+        o.value = v; o.textContent = v;
+        select.appendChild(o);
+      }
+      select.value = prop[nom] || "";
+      tdVoix.appendChild(select);
+      tr.appendChild(tdNom); tr.appendChild(tdVoix);
+      tbody.appendChild(tr);
+    }
+  } catch { notifier("Aperçu des incises échoué.", "err"); stats.textContent = ""; }
+}
+
+$("btn-incises-apercu").addEventListener("click", apercuIncises);
+$("btn-incises-fermer").addEventListener("click", () => fermerModal(modalIncises));
+$("btn-incises-appliquer").addEventListener("click", async () => {
+  const contenu = $("incises-resultat").value.trim();
+  if (!contenu) { notifier("Résultat vide : rien à appliquer.", "err"); return; }
+  const mapping = {};
+  for (const sel of $("incises-lignes").querySelectorAll("select")) {
+    if (sel.dataset.personnage && sel.value) mapping[sel.dataset.personnage] = sel.value;
+  }
+  try {
+    const r = await fetch("/api/document/incises/appliquer", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fichier: docCourant.fichier, contenu, personnages: mapping }),
+    });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    const d = await r.json();
+    if (cm) cm.setValue(contenu);
+    personnages = d.personnages || personnages;
+    majBoutonsPerso();
+    fermerModal(modalIncises);
+    notifier("Incises nettoyées et personnages mis à jour.", "ok");
+  } catch { notifier("Application des incises échouée.", "err"); }
+});
+
 // ---------------------------------------------------------------- réglages
 $("btn-dir").addEventListener("click", async () => {
   const r = await fetch("/api/config", {

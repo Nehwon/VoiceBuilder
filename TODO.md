@@ -473,6 +473,53 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ---
 
+## Phase 11 — Plugin incises (dialogues romanesques → taggé + nettoyage TTS)
+
+> Décisions validées 2026-09-20 : **les deux modes** (import roman brut → taggé
+> + nettoyage texte déjà taggé), ajout des personnages manquants en **`.map`
+> seul** (mappés sur `Narrateur` à réassigner, pas de `voix.txt` auto),
+> incises d'action **basculées en narration**, intégration **CLI + API + GUI**
+> avec prévisualisation diff (pas de nettoyage silencieux dans `multi.generate`).
+
+- [x] **M20.1 — `engine/incises.py` (pur, sans GPU)**
+  - [ ] `VERBES_PAROLE` (~80 verbes purs à retirer : dire, murmurer, chuchoter,
+        s'exclamer, répondre, demander, répliquer, balbutier, soupirer…) avec
+        formes inversion `dit-il/elle/on`, `-t-il`, `dis-je`, `fit-il`.
+  - [ ] `detecter_incises(texte) -> list[Incise]` : 3 motifs (`— réplique — incise — suite`,
+        `« réplique , incise, suite »`, `— réplique, incise.`).
+  - [ ] `resoudre_locuteur(incise, contexte)` : nom propre (`dit Lambda`) >
+        pronom (`dit-il` → dernier locuteur, `dis-je` → Narrateur / `--narrateur-je`) >
+        repli `Narrateur` + score `confiance: faible` si ambigu.
+  - [ ] `nettoyer(texte, mode)` : `import_roman` (roman brut → `[Nom]: réplique`
+        + `[Narrateur]: incise d'action`) et `nettoyer_tagge` (conserve les tags
+        existants, cf. `engine/tagging.py:23`) ; incise pure sans complément →
+        suppression sans trace ; ordre `incises → text_fr.normalize()` inchangé.
+  - [ ] `synchroniser_map(mapping, nouveaux_noms, voix_defaut="Narrateur")` :
+        ajoute les inconnus au dict `.map` (réutilise `_lire/_ecrire_csv_mapping`,
+        `app/server.py:1277,1300`).
+- [x] **M20.2 — CLI `tools/nettoyer_incises.py`**
+  - [ ] `--mode import|tagge|auto`, `--keep-action narration|garder|supprimer`
+        (défaut `narration`), `--auto-map/--no-auto-map`, `--voix-defaut`,
+        `--narrateur-je`, `--dry-run --diff`, `--in-place`.
+  - [ ] Validation sur `texte/sang-lumiere_chapitre_1.md` + `texte/exemple_demo.md`.
+- [x] **M20.3 — API (`app/server.py`)**
+  - [ ] `POST /api/document/incises` (`{fichier, mode, keep_action, dry_run}`) →
+        `{texte_nettoye, nouveaux_personnages, diff, stats}`.
+  - [ ] `POST /api/document/incises/appliquer` → écrit brouillon (`texte/brouillons/`)
+        + `.map`, sans toucher l'original.
+- [x] **M20.4 — GUI (`app/web/`)**
+  - [ ] Bouton « ✨ Incises » dans l'éditeur → modale diff avant/après + liste
+        des nouveaux personnages (cases cochées → assignation voix).
+  - [ ] Boutons Appliquer/Annuler ; jamais de nettoyage auto à la génération.
+- [x] **M20.5 — Tests + docs**
+  - [ ] `tests/test_incises.py` (~20 cas : `dit-il`, `murmura-t-elle`, `dis-je`,
+        `s'exclama Lambda`, action, guillemets imbriqués, `—` seul).
+  - [ ] § `docs/UTILISATION.md` + exemples `texte/` + entrée `CHANGELOG.md`.
+  - [ ] Critère d'acceptation : aucun `dit-il`/`murmura-t-elle` résiduel vocalisé,
+        tous les nouveaux noms proposés en `.map`, actions en `[Narrateur]`.
+
+---
+
 ## Backlog / Idées
 
 ### Correctifs GUI / UX (bugs remontés)

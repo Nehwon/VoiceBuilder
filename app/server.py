@@ -269,6 +269,20 @@ class PersonnagesSaveIn(BaseModel):
     personnages: dict[str, str]
 
 
+class IncisesIn(BaseModel):
+    fichier: str
+    mode: str = "auto"            # auto | import_roman | nettoyer_tagge
+    keep_action: str = "narration"  # narration | garder | supprimer
+    voix_defaut: str = "Narrateur"
+    narrateur_je: str | None = None
+
+
+class IncisesAppliquerIn(BaseModel):
+    fichier: str
+    contenu: str
+    personnages: dict[str, str] = {}  # nouveaux {personnage: voix} à fusionner au .map
+
+
 class DocumentOuvrirIn(BaseModel):
     fichier: str
 
@@ -1331,6 +1345,80 @@ def api_personnages_save(payload: PersonnagesSaveIn):
     propre = {k: v for k, v in payload.personnages.items() if k.strip() and v}
     _ecrire_csv_mapping(p, propre)
     return {"fichier": payload.fichier, "personnages": propre}
+
+
+# ---------------------------------------------------------------------------
+# Incises de dialogue (M20) : prévisualisation + application (jamais auto)
+# ---------------------------------------------------------------------------
+
+def _contenu_travail(fichier: str) -> str:
+    """Contenu de travail d'un document : brouillon s'il existe, sinon l'original."""
+    p = _chemin_projet(fichier)
+    brouillon = _BROUILLONS / p.name
+    if brouillon.exists():
+        return brouillon.read_text(encoding="utf-8")
+    return p.read_text(encoding="utf-8")
+
+
+@app.post("/api/document/incises")
+def api_incises(payload: IncisesIn):
+    """Prévisualise le nettoyage des incises (M20, dry-run : n'écrit rien)."""
+    from engine.incises import nettoyer, synchroniser_map
+    if payload.mode not in ("auto", "import_roman", "nettoyer_tagge"):
+        raise HTTPException(400, "Mode inconnu : auto | import_roman | nettoyer_tagge")
+    if payload.keep_action not in ("narration", "garder", "supprimer"):
+        raise HTTPException(400, "keep_action inconnu : narration | garder | supprimer")
+    _chemin_projet(payload.fichier)
+    contenu = _contenu_travail(payload.fichier)
+    p = _fichier_personnages(payload.fichier)
+    mapping = {}
+    if p.exists():
+        try:
+            mapping = _lire_csv_mapping(p)
+        except (OSError, csv.Error):
+            mapping = {}
+    try:
+        res = nettoyer(contenu, mode=payload.mode,
+                       keep_action=payload.keep_action, mapping=mapping,
+                       voix_defaut=payload.voix_defaut or "Narrateur",
+                       narrateur_je=(payload.narrateur_je or "").strip() or None)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    propose = synchroniser_map(mapping, res.nouveaux_personnages,
+                               voix_defaut=payload.voix_defaut or "Narrateur")
+    return {"fichier": payload.fichier, "texte_nettoye": res.texte,
+            "nouveaux_personnages": res.nouveaux_personnages,
+            "mapping_propose": propose, "stats": res.stats}
+
+
+@app.post("/api/document/incises/appliquer")
+def api_incises_appliquer(payload: IncisesAppliquerIn):
+    """Applique le nettoyage validé : écrit le brouillon + fusionne le .map."""
+    from engine.incises import synchroniser_map
+    _chemin_projet(payload.fichier)
+    contenu = (payload.contenu or "").strip()
+    if not contenu:
+        raise HTTPException(400, "Contenu nettoyé vide.")
+    _BROUILLONS.mkdir(parents=True, exist_ok=True)
+    brouillon = _BROUILLONS / Path(payload.fichier).name
+    brouillon.write_text(contenu, encoding="utf-8")
+    p = _fichier_personnages(payload.fichier)
+    mapping = {}
+    if p.exists():
+        try:
+            mapping = _lire_csv_mapping(p)
+        except (OSError, csv.Error):
+            mapping = {}
+    propre = {k: v for k, v in (payload.personnages or {}).items()
+              if k.strip() and v}
+    fusion = synchroniser_map(mapping, list(propre.keys()),
+                              voix_defaut="Narrateur")
+    for k, v in propre.items():
+        if v.strip():
+            fusion[k] = v.strip()
+    _ecrire_csv_mapping(p, fusion)
+    return {"fichier": payload.fichier, "brouillon": brouillon.name,
+            "personnages": fusion}
 
 
 # ---------------------------------------------------------------------------

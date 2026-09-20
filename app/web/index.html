@@ -70,6 +70,7 @@
             </span>
             <span class="groupe-corps">
               <button id="btn-personnages" title="Gérer les personnages et leurs voix">Personnages…</button>
+              <button id="btn-incises" title="Détecter les incises (dit-il, murmura-t-elle…), proposer les personnages manquants et nettoyer pour la voix">✨ Incises…</button>
               <span class="sep-v"></span>
               <span id="perso-boutons" class="perso-boutons"></span>
             </span>
@@ -454,6 +455,49 @@
       <div class="modal-actions">
         <button id="btn-perso-fermer">Fermer</button>
         <button id="btn-perso-save" class="primaire">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : incises (M20) -->
+  <div id="modal-incises" class="modal" hidden>
+    <div class="modal-boite modal-large">
+      <h2>✨ Incises de dialogue</h2>
+      <p class="modal-sub">Détecte les incises (<code>dit-il</code>, <code>murmura-t-elle</code>,
+        <code>dit Lambda</code>…), retire celles sans intérêt vocal et bascule les
+        incises d'action en narration. Les personnages manquants sont ajoutés au
+        <code>.map</code> du document (jamais à <code>voix.txt</code>). Rien n'est
+        écrit avant « Appliquer ».</p>
+      <div class="incises-options">
+        <label>Mode
+          <select id="incises-mode">
+            <option value="auto">Auto</option>
+            <option value="import_roman">Roman brut → taggé</option>
+            <option value="nettoyer_tagge">Texte déjà taggé</option>
+          </select>
+        </label>
+        <label>Incises d'action
+          <select id="incises-action">
+            <option value="narration">Basculer en narration</option>
+            <option value="garder">Garder dans la réplique</option>
+            <option value="supprimer">Tout retirer</option>
+          </select>
+        </label>
+        <button id="btn-incises-apercu" class="secondaire">Aperçu</button>
+        <span id="incises-stats" class="modal-sub"></span>
+      </div>
+      <h3>Nouveaux personnages</h3>
+      <table class="table-perso">
+        <thead>
+          <tr><th>Personnage</th><th>Voix</th></tr>
+        </thead>
+        <tbody id="incises-lignes"></tbody>
+      </table>
+      <h3>Résultat (éditable avant application)</h3>
+      <textarea id="incises-resultat" rows="14" style="width:100%"></textarea>
+      <div class="modal-actions">
+        <button id="btn-incises-fermer">Annuler</button>
+        <button id="btn-incises-appliquer" class="primaire">Appliquer</button>
       </div>
     </div>
   </div>

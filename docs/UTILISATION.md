@@ -105,6 +105,28 @@ Règles (`engine/tagging.py`) :
 - Les autres **`[…]`** en cours de ligne — **conservés tels quels** dans l'éditeur
   TTS (voir §4 pour les tokens reconnus).
 
+### 3.1 Incises de dialogue (M20)
+
+Un roman brut (`—`, `«»` + incises `dit-il`, `murmura-t-elle`, `dit Lambda`)
+se convertit en texte taggé via le plugin incises (`engine/incises.py`) :
+
+```bash
+python -m tools.nettoyer_incises texte/chapitre.md --dry-run --diff
+python -m tools.nettoyer_incises texte/chapitre.md --in-place --auto-map
+```
+
+ou le bouton **« ✨ Incises… »** de l'éditeur (modale avec aperçu, personnages
+proposés et résultat éditable avant application).
+
+- **Verbes de parole purs** (`dit-il`, `murmura-t-elle`, `dis-je`…) → retirés
+  (la voix du personnage porte déjà l'attribution).
+- **Incises d'action** (`se leva-t-il`, `sourit-elle`) → basculées en
+  `[Narrateur]:` (options `--keep-action garder|supprimer`).
+- **Personnages manquants** → ajoutés au `.map` du document (mappés sur
+  `Narrateur`, à réassigner ; `voix.txt` jamais touché).
+- Modes `--mode import_roman|nettoyer_tagge|auto` ; `dis-je` attribuable via
+  `--narrateur-je Nom`.
+
 ---
 
 ## 4. Tags non-verbaux / émotions spécifiques à CosyVoice3

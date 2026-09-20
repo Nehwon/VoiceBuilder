@@ -8,6 +8,22 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Plugin incises de dialogue (M20)
+
+- **Moteur** (`engine/incises.py`) : détection des incises (`dit-il`,
+  `murmura-t-elle`, `dis-je`, `dit Lambda`…), verbes de parole purs retirés,
+  incises d'action basculées en `[Narrateur]:` (`narration|garder|supprimer`),
+  résolution pronominale (nom > dernier locuteur > Narrateur, `dis-je` via
+  `--narrateur-je`), modes `import_roman|nettoyer_tagge|auto`,
+  `synchroniser_map` (`.map` seul, jamais `voix.txt`).
+- **CLI** (`tools/nettoyer_incises.py`) : `--dry-run --diff`, `--in-place`,
+  `--auto-map`, `--narrateur-je` ; validé sur roman test + `exemple_demo.md`.
+- **API + GUI** : `POST /api/document/incises` (aperçu) + `/appliquer`
+  (brouillon + fusion `.map`), bouton « ✨ Incises… » + modale (options,
+  nouveaux personnages, résultat éditable).
+- **Tests** (`tests/test_incises.py`) : 24 cas verts (détection, actions,
+  résolution, nettoyage, map). Docs : `UTILISATION.md` §3.1.
+
 ### Correction — Entraînement LoRA : conflit checkpointing / cache KV
 
 - **Moteur** (`engine/lora/modele.py`) : avec gradient checkpointing, le
