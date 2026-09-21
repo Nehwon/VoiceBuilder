@@ -160,10 +160,26 @@ jobs:
       - name: Deploy local
         if: steps.skip.outputs.build == 'yes' && github.event_name == 'push'
         run: |
-          curl -sf -X POST "http://192.168.0.120:63200/deploy/voicebuilder" \
-            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"tag":"${{ needs.prepare.outputs.new }}"}' || echo "Deploy webhook failed (non-fatal)"
+          # Non-fatal : 3 tentatives (le client local peut redémarrer), puis
+          # diagnostic précis (000 = injoignable depuis le runner, 401 = token
+          # DEPLOY_TOKEN invalide, 500 = pull/up échoué côté client, voir
+          # ~/.config/deploy-webhook/deploy.log sur 192.168.0.120).
+          code="000"
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 \
+              -X POST "http://192.168.0.120:63200/deploy/voicebuilder" \
+              -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d '{"tag":"${{ needs.prepare.outputs.new }}"}') || code="000"
+            if [ "$code" = "200" ]; then break; fi
+            echo "Tentative $i : HTTP $code, nouvel essai dans 15 s…"
+            sleep 15
+          done
+          if [ "$code" = "200" ]; then
+            echo "Deploy webhook OK (HTTP 200)."
+          else
+            echo "Deploy webhook FAILED (HTTP $code) — non-fatal."
+          fi
 
       - name: Mirror to GitHub Container Registry
         # Miroir sans calcul côté GitHub : l'image déjà buildée/poussée est

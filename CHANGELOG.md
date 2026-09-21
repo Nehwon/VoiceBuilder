@@ -8,6 +8,19 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Correction — Build image vb : conflit pip vllm/torch/fastapi
+
+- **Dépendances** (`requirements.txt`, `docker/vb/Dockerfile`) : `vllm>=0.9.0`
+  retiré — aucune version ne satisfait `torch==2.13.0` + `fastapi==0.141.1`
+  (`ResolutionImpossible`, image vb non construite). Les imports vllm/tensorrt
+  sont paresseux (vendor) : l'engine tourne en PyTorch pur, flags
+  `--vllm`/`--trt` en repli automatique (à réactiver quand vllm supportera
+  torch 2.13 ; le best-effort `|| echo` est supprimé car pip y downgraderait
+  torch/fastapi en silence). Résolution validée en dry-run.
+- **CD** (`.gitea/workflows/docker-build.yml`, étape `Deploy local`) : 3
+  tentatives espacées + code HTTP explicite (000 = runner injoignable,
+  401 = token, 500 = voir `deploy.log`), toujours non-fatal.
+
 ### Ajout — Plugin incises de dialogue (M20)
 
 - **Moteur** (`engine/incises.py`) : détection des incises (`dit-il`,

@@ -12,5 +12,11 @@ gradio==3.43.2
 fastapi==0.141.1
 uvicorn==0.52.1
 python-multipart==0.0.9
-vllm>=0.9.0
+# vllm RETIRÉ (2026-09-21) : aucune version ne satisfait torch==2.13.0 +
+# fastapi==0.141.1 (vllm épingle torch ≤2.11 et fastapi<0.137) → pip
+# ResolutionImpossible sur l'image vb. Les imports vllm/tensorrt sont
+# paresseux (vendor/cosyvoice/cli/model.py) : l'engine fonctionne en
+# PyTorch pur, flags --vllm/--trt en repli automatique. Réactiver quand
+# vllm supportera torch 2.13 (ne PAS le réinstaller en best-effort : pip
+# downgraderait torch/fastapi en silence pour le satisfaire).
 tensorrt>=10.0.0
