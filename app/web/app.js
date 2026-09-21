@@ -832,6 +832,9 @@ $("btn-incises").addEventListener("click", () => {
   }
   $("incises-resultat").value = "";
   $("incises-lignes").innerHTML = "";
+  $("incises-rejetes").innerHTML = "";
+  $("incises-rejetes-table").hidden = true;
+  $("incises-rejetes-vide").textContent = "Aucun rejet.";
   $("incises-stats").textContent = "";
   ouvrirModal(modalIncises);
   apercuIncises();
@@ -847,16 +850,45 @@ async function apercuIncises() {
         fichier: docCourant.fichier,
         mode: $("incises-mode").value,
         keep_action: $("incises-action").value,
+        moteur: $("incises-moteur").value,
+        min_repliques: parseInt($("incises-min-repliques").value, 10) || 2,
+        preuve_incise: !$("incises-sans-preuve").checked,
+        verif_minuscule: !$("incises-sans-minuscule").checked,
+        accepter_tous: $("incises-accepter-tous").checked,
       }),
     });
     if (!r.ok) { notifier((await r.json()).detail, "err"); stats.textContent = ""; return; }
     const d = await r.json();
     $("incises-resultat").value = d.texte_nettoye || "";
     const s = d.stats || {};
-    stats.textContent =
-      `${s.incises || 0} incise(s) — ${s.parole_retirees || 0} retirée(s), ` +
-      `${s.actions_narration || 0} vers narration, ` +
-      `${(d.nouveaux_personnages || []).length} nouveau(x) personnage(s).`;
+    const moteurTxt = d.moteur ? ` [${d.moteur}]` : "";
+    if (s.segments_dialogue !== undefined) {
+      stats.textContent =
+        `${s.segments_dialogue || 0} dialogue / ${s.segments_narration || 0} narration` +
+        (s.chunks_replis_regex ? ` (${s.chunks_replis_regex} repli(s) regex)` : "") +
+        `, ${(d.nouveaux_personnages || []).length} nouveau(x) personnage(s)${moteurTxt}.`;
+    } else {
+      stats.textContent =
+        `${s.incises || 0} incise(s) — ${s.parole_retirees || 0} retirée(s), ` +
+        `${s.actions_narration || 0} vers narration, ` +
+        `${(d.nouveaux_personnages || []).length} nouveau(x) personnage(s)${moteurTxt}.`;
+    }
+    const rejetes = d.personnages_rejetes || {};
+    const nomsRejetes = Object.keys(rejetes);
+    $("incises-rejetes-vide").textContent =
+      nomsRejetes.length ? `${nomsRejetes.length} nom(s) écarté(s) par les filtres.` : "Aucun rejet.";
+    $("incises-rejetes-table").hidden = !nomsRejetes.length;
+    const tbodyR = $("incises-rejetes");
+    tbodyR.innerHTML = "";
+    for (const nom of nomsRejetes) {
+      const tr = document.createElement("tr");
+      const tdNom = document.createElement("td");
+      tdNom.textContent = nom;
+      const tdMotif = document.createElement("td");
+      tdMotif.textContent = rejetes[nom];
+      tr.appendChild(tdNom); tr.appendChild(tdMotif);
+      tbodyR.appendChild(tr);
+    }
     const tbody = $("incises-lignes");
     tbody.innerHTML = "";
     const prop = d.mapping_propose || {};

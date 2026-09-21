@@ -271,10 +271,16 @@ class PersonnagesSaveIn(BaseModel):
 
 class IncisesIn(BaseModel):
     fichier: str
-    mode: str = "auto"            # auto | import_roman | nettoyer_tagge
-    keep_action: str = "narration"  # narration | garder | supprimer
+    mode: str = "auto"            # auto | import_roman | nettoyer_tagge (regex seul)
+    keep_action: str = "narration"  # narration | garder | supprimer (regex seul)
     voix_defaut: str = "Narrateur"
     narrateur_je: str | None = None
+    moteur: str = "auto"          # auto | llm | regex (auto = LLM si Ollama répond)
+    min_repliques: int = 2        # répliques minimum pour créer un personnage
+    preuve_incise: bool = True    # exige une incise explicite « dit X » en source
+    verif_minuscule: bool = True  # écarte les noms présents en minuscules (noms communs)
+    stop_mots: str = ""           # génériques supplémentaires (séparés par des virgules)
+    accepter_tous: bool = False   # désactive les filtres anti faux positifs
 
 
 class IncisesAppliquerIn(BaseModel):
@@ -1363,11 +1369,18 @@ def _contenu_travail(fichier: str) -> str:
 @app.post("/api/document/incises")
 def api_incises(payload: IncisesIn):
     """Prévisualise le nettoyage des incises (M20, dry-run : n'écrit rien)."""
-    from engine.incises import nettoyer, synchroniser_map
+    from engine.incises import (
+        FiltrePersonnages,
+        nettoyer as nettoyer_regex,
+        synchroniser_map,
+    )
+    from engine.incises_llm import nettoyer_llm, ollama_disponible
     if payload.mode not in ("auto", "import_roman", "nettoyer_tagge"):
         raise HTTPException(400, "Mode inconnu : auto | import_roman | nettoyer_tagge")
     if payload.keep_action not in ("narration", "garder", "supprimer"):
         raise HTTPException(400, "keep_action inconnu : narration | garder | supprimer")
+    if payload.moteur not in ("auto", "llm", "regex"):
+        raise HTTPException(400, "Moteur inconnu : auto | llm | regex")
     _chemin_projet(payload.fichier)
     contenu = _contenu_travail(payload.fichier)
     p = _fichier_personnages(payload.fichier)
@@ -1377,18 +1390,37 @@ def api_incises(payload: IncisesIn):
             mapping = _lire_csv_mapping(p)
         except (OSError, csv.Error):
             mapping = {}
+    moteur = payload.moteur
+    if moteur == "auto":
+        moteur = "llm" if ollama_disponible() else "regex"
+    filtre = None
+    if not payload.accepter_tous:
+        stop_supp = {s.strip().lower()
+                     for s in (payload.stop_mots or "").split(",") if s.strip()}
+        filtre = FiltrePersonnages(min_repliques=max(1, payload.min_repliques),
+                                   preuve_incise=payload.preuve_incise,
+                                   verif_minuscule=payload.verif_minuscule,
+                                   stop_mots=frozenset(stop_supp))
     try:
-        res = nettoyer(contenu, mode=payload.mode,
-                       keep_action=payload.keep_action, mapping=mapping,
-                       voix_defaut=payload.voix_defaut or "Narrateur",
-                       narrateur_je=(payload.narrateur_je or "").strip() or None)
+        if moteur == "llm":
+            res = nettoyer_llm(contenu, mapping=mapping,
+                               voix_defaut=payload.voix_defaut or "Narrateur",
+                               narrateur_je=(payload.narrateur_je or "").strip() or None,
+                               filtre=filtre)
+        else:
+            res = nettoyer_regex(contenu, mode=payload.mode,
+                                 keep_action=payload.keep_action, mapping=mapping,
+                                 voix_defaut=payload.voix_defaut or "Narrateur",
+                                 narrateur_je=(payload.narrateur_je or "").strip() or None,
+                                 filtre=filtre)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     propose = synchroniser_map(mapping, res.nouveaux_personnages,
                                voix_defaut=payload.voix_defaut or "Narrateur")
     return {"fichier": payload.fichier, "texte_nettoye": res.texte,
             "nouveaux_personnages": res.nouveaux_personnages,
-            "mapping_propose": propose, "stats": res.stats}
+            "personnages_rejetes": res.stats.get("personnages_rejetes") or {},
+            "mapping_propose": propose, "stats": res.stats, "moteur": moteur}
 
 
 @app.post("/api/document/incises/appliquer")

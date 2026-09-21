@@ -469,6 +469,13 @@
         <code>.map</code> du document (jamais à <code>voix.txt</code>). Rien n'est
         écrit avant « Appliquer ».</p>
       <div class="incises-options">
+        <label>Moteur
+          <select id="incises-moteur">
+            <option value="auto">Auto (LLM si dispo)</option>
+            <option value="llm">LLM local</option>
+            <option value="regex">Regex (hors-ligne)</option>
+          </select>
+        </label>
         <label>Mode
           <select id="incises-mode">
             <option value="auto">Auto</option>
@@ -483,6 +490,18 @@
             <option value="supprimer">Tout retirer</option>
           </select>
         </label>
+        <label title="Répliques minimum attribuées au nom pour proposer sa création">Min. répliques
+          <input id="incises-min-repliques" type="number" min="1" max="10" value="2" style="width:3.5em" />
+        </label>
+        <label title="N'exige pas d'incise explicite « dit X » dans la source">
+          <input id="incises-sans-preuve" type="checkbox" /> Sans preuve d'incise
+        </label>
+        <label title="Accepte aussi les noms dont la forme minuscule existe dans le texte (noms communs)">
+          <input id="incises-sans-minuscule" type="checkbox" /> Sans vérif. minuscule
+        </label>
+        <label title="Désactive tous les filtres (titres, hapax, preuve d'incise…)">
+          <input id="incises-accepter-tous" type="checkbox" /> Tout accepter
+        </label>
         <button id="btn-incises-apercu" class="secondaire">Aperçu</button>
         <span id="incises-stats" class="modal-sub"></span>
       </div>
@@ -492,6 +511,14 @@
           <tr><th>Personnage</th><th>Voix</th></tr>
         </thead>
         <tbody id="incises-lignes"></tbody>
+      </table>
+      <h3>Rejetés par les filtres</h3>
+      <p class="modal-sub" id="incises-rejetes-vide">Aucun rejet.</p>
+      <table class="table-perso" id="incises-rejetes-table" hidden>
+        <thead>
+          <tr><th>Nom</th><th>Motif</th></tr>
+        </thead>
+        <tbody id="incises-rejetes"></tbody>
       </table>
       <h3>Résultat (éditable avant application)</h3>
       <textarea id="incises-resultat" rows="14" style="width:100%"></textarea>

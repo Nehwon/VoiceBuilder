@@ -278,7 +278,7 @@ def resoudre_locuteur(incise: Incise, locuteur_courant: Optional[str],
     return repli, "faible"
 
 
-_RE_REFL = re.compile(r"(?:se|s'|s’|me|m'|te|t'|nous|vous)\s*$", re.IGNORECASE)
+_RE_REFL = re.compile(r"(?:^|[\s,«»\"'—–\-])(?:se|s'|s’|me|m'|te|t'|nous|vous)\s*$", re.IGNORECASE)
 
 
 def _recoller(replique: str) -> str:
@@ -328,11 +328,191 @@ def synchroniser_map(mapping: Dict[str, str], nouveaux: List[str],
     return out
 
 
+# ---------------------------------------------------------------------------
+# Filtres anti faux positifs sur les nouveaux personnages (M20.7)
+# ---------------------------------------------------------------------------
+# Un nom détecté dans une incise (« dit X ») ou proposé par le LLM n'est pas
+# forcément un personnage à créer : titres/fonctions (« Maître », « Madame »),
+# noms simplement mentionnés dans la narration, coquilles du LLM, hapax…
+# Ces filtres s'appliquent aux DEUX moteurs (regex et LLM), avant tout ajout
+# au ``.map``. Chaque rejet est motivé (stats ``personnages_rejetes``).
+
+def _sans_accents(s: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", s)
+                   if unicodedata.category(c) != "Mn")
+
+
+# Titres, fonctions, liens de parenté, éléments et notions abstraites :
+# jamais des personnages à créer (même capitalisés : « le Maître », « la
+# Terre », « Maman »). Complétés par l'heuristique minuscule ci-dessous.
+STOP_PERSONNAGES = frozenset({
+    "maitre", "maitresse", "madame", "monsieur", "mademoiselle",
+    "docteur", "docteure", "professeur", "professeure", "maitreesse",
+    "capitaine", "lieutenant", "colonel", "general", "generale",
+    "sergent", "officier", "soldat", "garde", "serviteur", "servante",
+    "maman", "papa", "mere", "pere", "fils", "fille", "frere", "soeur",
+    "oncle", "tante", "cousin", "cousine", "neveu", "niece",
+    "ami", "amie", "voisin", "voisine", "patron", "patronne", "chef",
+    "roi", "reine", "prince", "princesse", "dieu", "diable", "demon",
+    "monsieur", "madame", "enfant", "homme", "femme", "vieillard",
+    "inconnu", "inconnue", "voix", "ombre", "silhouette",
+    "pilier", "terre", "eau", "feu", "air", "lumiere", "tenebres",
+    "memoire", "partage", "destin", "silence", "nuit", "jour", "mort",
+    "vie", "monde", "temps", "ciel", "soleil", "lune", "neant", "vide",
+})
+
+_NOM_PROPRE_RE = re.compile(
+    r"^[A-ZÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ][a-zàâäéèêëîïôöùûüçœæ'\-’]*"
+    r"(?:\s+[A-ZÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ][a-zàâäéèêëîïôöùûüçœæ'\-’]*"
+    r"|\s+[a-zàâäéèêëîïôöùûüçœæ'\-’]+){0,3}$"
+)
+
+
+# Le tiret cadratin ouvre un dialogue anonyme : seule une réplique qui en
+# commence par un peut révéler un NOUVEAU personnage (« dit X »). Une ligne
+# déjà taggée ``[Nom]:`` n'en révèle jamais (critère M20.8).
+TIRET_CADRATIN = "—"
+
+
+def _est_replique_cadratin(ligne: str) -> bool:
+    return ligne.strip().startswith(TIRET_CADRATIN)
+
+
+@dataclass
+class FiltrePersonnages:
+    """Seuils de validation d'un candidat personnage.
+
+    - ``min_repliques`` : répliques « dialogue » attribuées au nom dans la
+      sortie (défaut 2 : un hapax ne justifie pas une voix à créer).
+    - ``preuve_incise`` : exige une incise explicite « dit X » portée par une
+      réplique en tiret cadratin dans la source — coupe les hallucinations
+      du LLM et les noms mentionnés.
+    - ``verif_minuscule`` : rejette le candidat si sa forme minuscule existe
+      dans la source (« Terre » vs « terre » = nom commun, pas un locuteur).
+    - ``stop_mots`` : génériques supplémentaires (minuscules, sans accents).
+    """
+    min_repliques: int = 2
+    preuve_incise: bool = True
+    verif_minuscule: bool = True
+    stop_mots: frozenset = frozenset()
+
+
+def _normaliser_nom(nom: str) -> str:
+    """Clé de comparaison floue : « Kaël-An » == « Kael-An » == « kaelan »."""
+    return re.sub(r"[^a-z0-9]", "", _sans_accents(nom.lower()))
+
+
+def noms_incises_source(texte: str) -> set:
+    """Noms propres portés par une incise explicite dans la source.
+
+    Seules comptent les répliques en tiret cadratin : une ligne déjà taggée
+    ``[Nom]:`` ne révèle jamais un nouveau personnage (critère M20.8).
+    """
+    preuves = set()
+    for raw in (texte or "").splitlines():
+        if _TAG_RE.match(raw):
+            continue
+        if not _est_replique_cadratin(raw):
+            continue
+        for inc in detecter_incises(raw.strip()):
+            brut = (inc.locuteur_brut or "").strip()
+            if brut and brut.lower() not in _PRONOMS_INVERSION:
+                preuves.add(brut)
+    return preuves
+
+
+def _forme_minuscule_presente(nom: str, texte_source: str) -> bool:
+    """Vrai si un mot du candidat existe en minuscules dans la source.
+
+    « Pilier » + « pilier » ailleurs = nom commun capitalisé en début de
+    phrase ou par emphase, pas un locuteur. Un vrai prénom n'apparaît
+    jamais en minuscules (hors coquille).
+    """
+    for mot in nom.split():
+        if len(mot) < 3:
+            continue
+        if re.search(r"\b" + re.escape(mot.lower()) + r"\b", texte_source or ""):
+            return True
+    return False
+
+
+def _compter_dialogues(lignes_sortie: List[str]) -> Dict[str, int]:
+    """Nombre de segments attribués à chaque nom dans la sortie taggée."""
+    comptes: Dict[str, int] = {}
+    for ligne in lignes_sortie:
+        m = re.match(r"^\s*\[([^\]]+)\]", ligne)
+        if m:
+            nom = m.group(1).strip()
+            comptes[nom] = comptes.get(nom, 0) + 1
+    return comptes
+
+
+def filtrer_nouveaux_personnages(
+    candidats: List[str],
+    texte_source: str,
+    lignes_sortie: List[str],
+    mapping: Optional[Dict[str, str]] = None,
+    voix_defaut: str = "Narrateur",
+    filtre: Optional[FiltrePersonnages] = None,
+) -> tuple:
+    """Sépare les candidats en ``(acceptes, rejetes)``.
+
+    ``rejetes`` : dict ``{nom: motif}`` pour affichage (CLI, GUI, stats).
+    ``filtre=None`` : comportement historique (aucun filtrage).
+    """
+    if filtre is None:
+        return list(candidats), {}
+    mapping = mapping or {}
+    stop = STOP_PERSONNAGES | {_sans_accents(s.lower()) for s in filtre.stop_mots}
+    connus_norm = {_normaliser_nom(k): k for k in mapping}
+    preuves = noms_incises_source(texte_source) if filtre.preuve_incise else set()
+    dialogues = _compter_dialogues(lignes_sortie)
+    acceptes: List[str] = []
+    rejetes: Dict[str, str] = {}
+    for brut in candidats:
+        nom = (brut or "").strip()
+        if not nom:
+            continue
+        if nom.lower() == (voix_defaut or "").lower():
+            rejetes[nom] = "voix par défaut, pas un personnage"
+            continue
+        deja = connus_norm.get(_normaliser_nom(nom))
+        if deja is not None:
+            rejetes[nom] = f"déjà au .map (référence : {deja})"
+            continue
+        if nom.lower() in _PRONOMS_INVERSION:
+            rejetes[nom] = "pronom, pas un nom"
+            continue
+        if _sans_accents(nom.lower()) in stop:
+            rejetes[nom] = "titre/fonction ou nom générique"
+            continue
+        if len(nom) < 2 or not _NOM_PROPRE_RE.match(nom):
+            rejetes[nom] = "ne ressemble pas à un nom propre"
+            continue
+        if (filtre.verif_minuscule
+                and _forme_minuscule_presente(nom, texte_source)):
+            rejetes[nom] = "nom commun (forme minuscule présente dans le texte)"
+            continue
+        if filtre.preuve_incise and nom not in preuves:
+            rejetes[nom] = "aucune incise « dit X » en réplique cadratin"
+            continue
+        nb = dialogues.get(nom, 0)
+        if nb < filtre.min_repliques:
+            rejetes[nom] = (f"une seule réplique ({nb} < {filtre.min_repliques})"
+                            if nb <= 1 else
+                            f"pas assez de répliques ({nb} < {filtre.min_repliques})")
+            continue
+        acceptes.append(nom)
+    return acceptes, rejetes
+
+
 def nettoyer(texte: str, mode: str = "auto",
              keep_action: str = "narration",
              mapping: Optional[Dict[str, str]] = None,
              voix_defaut: str = "Narrateur",
-             narrateur_je: Optional[str] = None) -> ResultatNettoyage:
+             narrateur_je: Optional[str] = None,
+             filtre: Optional[FiltrePersonnages] = None) -> ResultatNettoyage:
     """Nettoie les incises d'un texte, tous modes.
 
     - ``import_roman`` : roman brut (—/«») → lignes taggées ``[Nom]:`` ;
@@ -341,6 +521,8 @@ def nettoyer(texte: str, mode: str = "auto",
     - ``auto`` : taggé si une ligne ``[Nom]:`` existe, sinon import.
     - ``keep_action`` : ``narration`` (incise d'action → ``[Narrateur]:``),
       ``garder`` (laissée dans la réplique), ``supprimer`` (retirée aussi).
+    - ``filtre`` : ``FiltrePersonnages`` anti faux positifs sur les nouveaux
+      noms (``None`` = comportement historique, aucun filtrage).
     """
     if mode not in ("auto", "import_roman", "nettoyer_tagge"):
         raise ValueError(f"Mode inconnu : {mode}")
@@ -382,8 +564,8 @@ def nettoyer(texte: str, mode: str = "auto",
                 nom, _conf = resoudre_locuteur(inc, loc, dernier, narrateur_je)
                 if inc.locuteur_brut and inc.locuteur_brut.lower() not in _PRONOMS_INVERSION:
                     loc_resolu = nom
-                    if nom not in mapping and nom not in nouveaux:
-                        nouveaux.append(nom)
+            # Ligne déjà taggée [Nom]: → jamais de nouveau personnage
+            # (critère M20.8 : seul un dialogue en tiret cadratin révèle).
             # excise de droite à gauche pour garder les offsets
             replique = corps
             narrations: List[str] = []
@@ -427,11 +609,15 @@ def nettoyer(texte: str, mode: str = "auto",
             incises = detecter_incises(corps)
             loc_courant = dernier
             loc_resolu: Optional[str] = None
+            candidat_cadratin = _est_replique_cadratin(corps)
             for inc in incises:
                 nom, _conf = resoudre_locuteur(inc, loc_courant, dernier, narrateur_je)
                 if inc.locuteur_brut and inc.locuteur_brut.lower() not in _PRONOMS_INVERSION:
                     loc_resolu = nom
-                    if nom not in mapping and nom not in nouveaux:
+                    # Nouveau personnage : seulement sur réplique en tiret
+                    # cadratin (critère M20.8).
+                    if (candidat_cadratin and nom not in mapping
+                            and nom not in nouveaux):
                         nouveaux.append(nom)
                 elif loc_resolu is None:
                     loc_resolu = nom
@@ -462,6 +648,11 @@ def nettoyer(texte: str, mode: str = "auto",
             dernier = loc_resolu
             continue
 
+    if filtre is not None:
+        acceptes, rejetes = filtrer_nouveaux_personnages(
+            nouveaux, texte or "", sortie, mapping, voix_defaut, filtre)
+        nouveaux = acceptes
+        stats["personnages_rejetes"] = rejetes
     stats["personnages_ajoutes"] = len(nouveaux)
     return ResultatNettoyage(texte="\n\n".join(sortie) + ("\n" if sortie else ""),
                              nouveaux_personnages=nouveaux, stats=stats)

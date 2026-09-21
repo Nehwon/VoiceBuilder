@@ -116,9 +116,35 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+  # LLM local (incises M20) — Ollama épinglé sur la RTX 3050 (GPU 1) via
+  # CUDA_VISIBLE_DEVICES ; la 4070 (GPU 0) reste libre pour CosyVoice3.
+  # Modèle : qwen2.5:7b-instruct (~4,7 Go, bon français, tient en 8 Go).
+  #   docker compose up -d ollama
+  #   docker exec voicebuilder-ollama ollama pull qwen2.5:7b-instruct
+  ollama:
+    image: ollama/ollama:latest
+    container_name: voicebuilder-ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - CUDA_VISIBLE_DEVICES=1
+      - OLLAMA_KEEP_ALIVE=30m
+      - OLLAMA_NUM_PARALLEL=1
+    volumes:
+      - volume-ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
 volumes:
   volume-audio: {}
   volume-model: {}
   volume-texte: {}
   volume-output: {}
   volume-tmp: {}
+  volume-ollama: {}

@@ -115,6 +115,19 @@ python -m tools.nettoyer_incises texte/chapitre.md --dry-run --diff
 python -m tools.nettoyer_incises texte/chapitre.md --in-place --auto-map
 ```
 
+**Moteur** : par défaut (`--moteur auto`), le nettoyage passe par le **LLM
+local** (Ollama, `qwen2.5:7b-instruct`, service `ollama` du
+`docker-compose.yml` épinglé sur la 2e GPU) dès qu'il répond, sinon repli
+regex (`--moteur regex` force le mode hors-ligne). Le LLM attribue les
+locuteurs (pronoms résolus par le contexte), supprime les incises de parole
+et bascule les actions en narration ; chaque chunk est validé (rappel
+lexical ≥ 88 %, zéro incise résiduelle revérifiée par regex, 1 recadrage
+puis repli regex ciblé — jamais de trou). Les lignes déjà taggées
+`[Nom]:` gardent leur locuteur (nettoyage ciblé) ; seuls les noms qui
+parlent vraiment sont proposés au `.map`. Prérequis : `docker compose up -d
+ollama` + `docker exec voicebuilder-ollama ollama pull qwen2.5:7b-instruct`
+(1re fois, ~4,7 Go).
+
 ou le bouton **« ✨ Incises… »** de l'éditeur (modale avec aperçu, personnages
 proposés et résultat éditable avant application).
 
@@ -124,6 +137,23 @@ proposés et résultat éditable avant application).
   `[Narrateur]:` (options `--keep-action garder|supprimer`).
 - **Personnages manquants** → ajoutés au `.map` du document (mappés sur
   `Narrateur`, à réassigner ; `voix.txt` jamais touché).
+- **Filtres anti faux positifs** (les deux moteurs, critères M20.8) :
+  - un personnage est un locuteur qui parle **avec une incise** : `dit X`,
+    `murmura Y`… (désactivable : `--sans-preuve-incise`) ;
+  - seule une réplique commençant par un **tiret cadratin `—`** peut révéler
+    un nouveau personnage — une ligne déjà taggée `[Nom]:` et une réplique
+    en `« »` n'en révèlent jamais ;
+  - le nom ne doit pas déjà figurer au `.map`, **même en variante**
+    d'accents/casse (`Kaël-An` = `Kael-An`, comparaison floue avec la
+    référence rappelée dans le motif) ;
+  - ce doit être un vrai nom : ni pronom, ni titre/fonction/élément/notion
+    (`Maître`, `Pilier`, `Terre`, `Eau`, `Mémoire`… — stop-list intégrée,
+    extensible via `--stop-mots gamin,vieux`), ni nom commun (forme
+    minuscule présente dans le texte → écarté ; désactivable :
+    `--sans-verif-minuscule`), avec au moins `--min-repliques` répliques
+    (défaut 2).
+  Chaque rejet est motivé (affiché en CLI, tableau « Rejetés » dans la
+  modale). `--accepter-tous` restaure le comportement historique sans filtre.
 - Modes `--mode import_roman|nettoyer_tagge|auto` ; `dis-je` attribuable via
   `--narrateur-je Nom`.
 

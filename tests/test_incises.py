@@ -9,7 +9,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from engine.incises import (
+    FiltrePersonnages,
     detecter_incises,
+    filtrer_nouveaux_personnages,
     resoudre_locuteur,
     nettoyer,
     synchroniser_map,
@@ -134,6 +136,122 @@ class TestNettoyage:
     def test_auto_detecte_roman(self):
         r = nettoyer("— Bonjour, dit-il.\n", mode="auto")
         assert "[Narrateur]:" in r.texte or "[A]:" in r.texte or "Bonjour" in r.texte
+
+
+class TestFiltres:
+    DEUX = ("— Salut, Michel, dit Lambda.\n\n"
+            "— Te tue pas, ajouta Lambda.\n")
+
+    def test_sans_filtre_historique(self):
+        r = nettoyer("— Salut, Michel, dit Lambda.\n", mode="import_roman")
+        assert "Lambda" in r.nouveaux_personnages  # 1 réplique, pas de filtre
+
+    def test_hapax_rejete(self):
+        r = nettoyer("— Salut, Michel, dit Lambda.\n", mode="import_roman",
+                     filtre=FiltrePersonnages())
+        assert "Lambda" not in r.nouveaux_personnages
+        assert "Lambda" in r.stats["personnages_rejetes"]
+
+    def test_deux_repliques_accepte(self):
+        r = nettoyer(self.DEUX, mode="import_roman", filtre=FiltrePersonnages())
+        assert "Lambda" in r.nouveaux_personnages
+        assert r.stats["personnages_rejetes"] == {}
+
+    def test_titre_rejete(self):
+        src = "— Viens ici, dit Maître.\n\n— Reste là, ajouta Maître.\n"
+        r = nettoyer(src, mode="import_roman", filtre=FiltrePersonnages())
+        assert "Maître" not in r.nouveaux_personnages
+        assert "générique" in r.stats["personnages_rejetes"]["Maître"]
+
+    def test_mention_sans_dialogue_rejetee(self):
+        acc, rej = filtrer_nouveaux_personnages(
+            ["Kaël-An"], "Je pensais à Kaël-An.\n",
+            ["[Narrateur]: Je pensais à Kaël-An."], {},
+            "Narrateur", FiltrePersonnages())
+        assert acc == [] and "Kaël-An" in rej
+
+    def test_pronom_rejete(self):
+        acc, rej = filtrer_nouveaux_personnages(
+            ["il"], "— Viens, dit-il.\n", ["[Narrateur]: Viens."],
+            {}, "Narrateur", FiltrePersonnages())
+        assert acc == [] and "il" in rej
+
+    def test_sans_preuve_rejete(self):
+        acc, rej = filtrer_nouveaux_personnages(
+            ["Lambda"], "— Salut !\n",
+            ["[Lambda]: Salut !", "[Lambda]: Te tue pas !"],
+            {}, "Narrateur", FiltrePersonnages())
+        assert acc == [] and "dit X" in rej["Lambda"]
+
+    def test_sans_preuve_accepte_si_desactive(self):
+        acc, rej = filtrer_nouveaux_personnages(
+            ["Lambda"], "— Salut !\n",
+            ["[Lambda]: Salut !", "[Lambda]: Te tue pas !"],
+            {}, "Narrateur",
+            FiltrePersonnages(preuve_incise=False))
+        assert acc == ["Lambda"] and rej == {}
+
+    def test_stop_mots_supp(self):
+        acc, rej = filtrer_nouveaux_personnages(
+            ["Gamin"], "— Viens, dit Gamin.\n",
+            ["[Gamin]: Viens.", "[Gamin]: Reste."],
+            {}, "Narrateur", FiltrePersonnages(stop_mots=frozenset({"gamin"})))
+        assert acc == [] and "Gamin" in rej
+
+    def test_voix_defaut_et_deja_connu(self):
+        acc, rej = filtrer_nouveaux_personnages(
+            ["Narrateur", "Lambda"], "— Salut, dit Lambda.\n",
+            ["[Lambda]: Salut.", "[Lambda]: Reste."],
+            {"Lambda": "VoixX"}, "Narrateur", FiltrePersonnages())
+        assert acc == []
+        assert "Narrateur" in rej and "Lambda" in rej
+
+    def test_tagge_ne_cree_jamais(self):
+        # Ligne déjà taggée [Nom]: → aucun candidat, avec ou sans filtre.
+        src = "[Michel]: Viens ici, dit Lambda.\n"
+        assert nettoyer(src, mode="nettoyer_tagge").nouveaux_personnages == []
+        r = nettoyer(src, mode="nettoyer_tagge", filtre=FiltrePersonnages())
+        assert r.nouveaux_personnages == []
+
+    def test_guillemet_ne_cree_pas(self):
+        # Pas de tiret cadratin en tête → pas de nouveau personnage.
+        src = "« Viens », dit Lambda.\n\n« Reste », ajouta Lambda.\n"
+        r = nettoyer(src, mode="import_roman", filtre=FiltrePersonnages())
+        assert r.nouveaux_personnages == []
+
+    def test_variante_map_rejetee(self):
+        # « Kaël-An » déjà au .map sous « Kael-An » (accents/casse).
+        src = "— Viens, dit Kaël-An.\n\n— Reste, ajouta Kaël-An.\n"
+        r = nettoyer(src, mode="import_roman", mapping={"Kael-An": "VoixX"},
+                     filtre=FiltrePersonnages())
+        assert r.nouveaux_personnages == []
+        assert "Kaël-An" in r.stats["personnages_rejetes"]
+        assert "Kael-An" in r.stats["personnages_rejetes"]["Kaël-An"]
+
+    def test_nom_commun_minuscule_rejete(self):
+        # « Forêt » n'est pas en stop-list : c'est l'heuristique minuscule
+        # (« forêt » ailleurs dans le texte) qui l'écarte.
+        src = ("— Viens, dit Forêt.\n\n— Reste, ajouta Forêt.\n\n"
+               "La forêt bruissait sous le vent.\n")
+        r = nettoyer(src, mode="import_roman", filtre=FiltrePersonnages())
+        assert r.nouveaux_personnages == []
+        assert "minuscule" in r.stats["personnages_rejetes"]["Forêt"]
+
+    def test_vrai_nom_sans_minuscule_accepte(self):
+        src = "— Salut, dit Lambda.\n\n— Reste, ajouta Lambda.\n"
+        r = nettoyer(src, mode="import_roman", filtre=FiltrePersonnages())
+        assert r.nouveaux_personnages == ["Lambda"]
+
+    def test_verif_minuscule_desactivable(self):
+        src = ("— Viens, dit Terre.\n\n— Reste, ajouta Terre.\n\n"
+               "La terre tremblait.\n")
+        r = nettoyer(src, mode="import_roman",
+                     filtre=FiltrePersonnages(verif_minuscule=False,
+                                             stop_mots=frozenset()))
+        # « terre » reste en stop-list : on vérifie juste que ce n'est plus
+        # le motif minuscule qui rejette.
+        assert "Terre" in r.stats["personnages_rejetes"]
+        assert "minuscule" not in r.stats["personnages_rejetes"]["Terre"]
 
 
 class TestMap:

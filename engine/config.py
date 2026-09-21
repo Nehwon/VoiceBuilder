@@ -114,6 +114,14 @@ VERIFY_ENABLED = True              # active = +rapide (RTF ×2.4) ET meilleure c
 DEFAULT_VLLM = False               # vLLM : accélère le LLM autoregressif (batch)
 DEFAULT_TRT = False                # TensorRT : accélère le Flow (DiT, 10 pas Euler)
 
+# --- LLM local : incises & compréhension (M20.6, Ollama sur GPU 2nd) -----------------
+# Réglables via l'environnement (utile en Docker / multi-machine).
+OLLAMA_URL = os.environ.get("VOICEBUILDER_OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_MODELE_INCISES = os.environ.get("VOICEBUILDER_OLLAMA_MODELE", "qwen2.5:7b-instruct")
+OLLAMA_TIMEOUT = float(os.environ.get("VOICEBUILDER_OLLAMA_TIMEOUT", "300"))
+INCISES_CHUNK_CHARS = int(os.environ.get("VOICEBUILDER_INCISES_CHUNK", "2500"))
+INCISES_RAPPEL_MIN = 0.88          # rappel lexical sortie/entrée sous lequel on retente
+
 
 def ensure_dirs() -> None:
     for d in (VOIX_DIR, TEXTE_DIR, OUTPUT_DIR, MUSIQUE_DIR):

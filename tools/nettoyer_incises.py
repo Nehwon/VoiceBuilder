@@ -22,7 +22,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engine import config
-from engine.incises import nettoyer, synchroniser_map
+from engine.incises import (
+    FiltrePersonnages,
+    nettoyer as nettoyer_regex,
+    synchroniser_map,
+)
+from engine.incises_llm import nettoyer_llm, ollama_disponible
 
 
 def _lire_map(map_path: Path) -> dict:
@@ -60,9 +65,23 @@ def main(argv=None) -> int:
     p.add_argument("-o", "--out", default=None, help="Fichier de sortie (défaut: stdout)")
     p.add_argument("--mode", default="auto",
                    choices=["auto", "import_roman", "nettoyer_tagge"])
+    p.add_argument("--moteur", default="auto", choices=["auto", "llm", "regex"],
+                   help="auto = LLM si Ollama répond, sinon regex (défaut: auto)")
+    p.add_argument("--modele", default=None, help="Modèle Ollama (défaut: config)")
+    p.add_argument("--ollama-url", default=None, help="URL Ollama (défaut: config)")
     p.add_argument("--keep-action", default="narration",
                    choices=["narration", "garder", "supprimer"],
                    help="Sort des incises d'action (défaut: narration)")
+    p.add_argument("--min-repliques", type=int, default=2,
+                   help="Répliques minimum pour créer un personnage (défaut: 2)")
+    p.add_argument("--sans-preuve-incise", action="store_true",
+                   help="N'exige pas d'incise explicite « dit X » dans la source")
+    p.add_argument("--sans-verif-minuscule", action="store_true",
+                   help="N'écarte pas les noms dont la forme minuscule existe dans le texte")
+    p.add_argument("--stop-mots", default="",
+                   help="Génériques supplémentaires à rejeter (séparés par des virgules)")
+    p.add_argument("--accepter-tous", action="store_true",
+                   help="Désactive les filtres anti faux positifs (comportement historique)")
     p.add_argument("--auto-map", action="store_true",
                    help="Ajoute les nouveaux personnages au .map (voix par défaut)")
     p.add_argument("--voix-defaut", default="Narrateur")
@@ -87,20 +106,46 @@ def main(argv=None) -> int:
     map_path = src.with_suffix(".map")
     mapping = _lire_map(map_path)
 
-    res = nettoyer(original, mode=args.mode, keep_action=args.keep_action,
-                   mapping=mapping, voix_defaut=args.voix_defaut,
-                   narrateur_je=args.narrateur_je)
+    moteur = args.moteur
+    if moteur == "auto":
+        moteur = "llm" if ollama_disponible(args.ollama_url) else "regex"
+    filtre = None
+    if not args.accepter_tous:
+        stop_supp = {s.strip().lower() for s in args.stop_mots.split(",") if s.strip()}
+        filtre = FiltrePersonnages(min_repliques=max(1, args.min_repliques),
+                                   preuve_incise=not args.sans_preuve_incise,
+                                   verif_minuscule=not args.sans_verif_minuscule,
+                                   stop_mots=frozenset(stop_supp))
+    if moteur == "llm":
+        res = nettoyer_llm(original, mapping=mapping, voix_defaut=args.voix_defaut,
+                           narrateur_je=args.narrateur_je, modele=args.modele,
+                           url=args.ollama_url, filtre=filtre)
+    else:
+        res = nettoyer_regex(original, mode=args.mode, keep_action=args.keep_action,
+                             mapping=mapping, voix_defaut=args.voix_defaut,
+                             narrateur_je=args.narrateur_je, filtre=filtre)
+    print(f"Moteur : {moteur}")
     fusion = synchroniser_map(mapping, res.nouveaux_personnages,
                               voix_defaut=args.voix_defaut)
 
-    print(f"Incises : {res.stats['incises']} "
-          f"(parole retirées : {res.stats['parole_retirees']}, "
-          f"actions→narration : {res.stats['actions_narration']})")
+    if moteur == "llm":
+        print(f"Segments : {res.stats.get('segments_dialogue', 0)} dialogue / "
+              f"{res.stats.get('segments_narration', 0)} narration "
+              f"({res.stats.get('chunks', 0)} chunks, "
+              f"{res.stats.get('chunks_replis_regex', 0)} replis regex)")
+    else:
+        print(f"Incises : {res.stats['incises']} "
+              f"(parole retirées : {res.stats['parole_retirees']}, "
+              f"actions→narration : {res.stats['actions_narration']})")
     if res.nouveaux_personnages:
         print(f"Nouveaux personnages : {', '.join(res.nouveaux_personnages)}"
               f" → {'ajoutés au .map' if args.auto_map and not args.dry_run else 'proposés (voix ' + args.voix_defaut + ')'}")
     else:
         print("Aucun nouveau personnage.")
+    rejetes = res.stats.get("personnages_rejetes") or {}
+    if rejetes:
+        print(f"Rejetés ({len(rejetes)}) : " +
+              ", ".join(f"{nom} [{motif}]" for nom, motif in rejetes.items()))
     if args.diff or args.dry_run:
         for ligne in difflib.unified_diff(
                 original.splitlines(), res.texte.splitlines(),

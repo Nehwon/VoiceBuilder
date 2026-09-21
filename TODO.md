@@ -512,11 +512,46 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         des nouveaux personnages (cases cochées → assignation voix).
   - [ ] Boutons Appliquer/Annuler ; jamais de nettoyage auto à la génération.
 - [x] **M20.5 — Tests + docs**
+- [x] **M20.6 — LLM local (Ollama `qwen2.5:7b-instruct`, 2e GPU) en moteur
+      par défaut, regex en repli**
+  - [x] Service `ollama` (`docker-compose.yml`, `CUDA_VISIBLE_DEVICES=1`,
+        volume `volume-ollama`) ; modèle tiré (~4,7 Go), smoke test FR OK.
+  - [x] `engine/incises_llm.py` : chunks + contexte, JSON strict, validation
+        (rappel ≥ 88 % hors incises, zéro incise résiduelle), recadrage ×1,
+        repli regex ciblé, tags `[Nom]:` conservés (appel ciblé par réplique),
+        filtre nouveaux non-parleurs / actions parasites.
+  - [x] CLI `--moteur auto|llm|regex`, API `moteur`, GUI (sélecteur + stats),
+        `config.py` (`OLLAMA_URL`, `OLLAMA_MODELE_INCISES`, …).
+  - [x] `tests/test_incises_llm.py` (14 cas mock verts + 1 live optionnel),
+        non-régression `test_incises.py` (24 verts), chapitre réel vérifié.
   - [ ] `tests/test_incises.py` (~20 cas : `dit-il`, `murmura-t-elle`, `dis-je`,
         `s'exclama Lambda`, action, guillemets imbriqués, `—` seul).
   - [ ] § `docs/UTILISATION.md` + exemples `texte/` + entrée `CHANGELOG.md`.
   - [ ] Critère d'acceptation : aucun `dit-il`/`murmura-t-elle` résiduel vocalisé,
         tous les nouveaux noms proposés en `.map`, actions en `[Narrateur]`.
+- [x] **M20.7 — Filtres anti faux positifs sur les nouveaux personnages**
+  - [x] `FiltrePersonnages` + `filtrer_nouveaux_personnages` (`engine/incises.py`) :
+        min. répliques (2), preuve d'incise « dit X », stop-list
+        titres/fonctions/génériques, forme nom propre, pronoms/déjà-connus ;
+        rejets motivés (`stats.personnages_rejetes`).
+  - [x] Branché aux deux moteurs (`nettoyer(..., filtre)`, `nettoyer_llm(...,
+        filtre)`), CLI (`--min-repliques`, `--sans-preuve-incise`,
+        `--stop-mots`, `--accepter-tous`), API (`IncisesIn` + `personnages_rejetes`),
+        GUI (contrôles + tableau « Rejetés ») ; consigne LLM durcie.
+  - [x] 12 tests (10 regex + 2 LLM), 50 cas verts au total ; vérifié en CLI
+        (Lambda accepté, Maître rejeté, hapax rejeté).
+- [x] **M20.8 — Critères stricts de personnage (locuteur + incise, cadratin,
+      fuzzy .map, noms réels)**
+  - [x] Candidature : incise explicite obligatoire, réplique en tiret
+        cadratin `—` uniquement (taggés `[Nom]:` et `« »` exclus, regex + LLM
+        + repli taggé) ; consigne LLM alignée.
+  - [x] Comparaison floue au `.map` (accents/casse/séparateurs : `Kaël-An` =
+        `Kael-An`, référence rappelée) ; stop-list étendue (éléments,
+        abstractions) + heuristique minuscule (`verif_minuscule`,
+        `--sans-verif-minuscule`, API/GUI).
+  - [x] 7 tests dédiés (taggé, guillemet, variante .map, minuscule, vrai nom,
+        flag, nouveau LLM ignoré), 57 cas verts ; vérifié en CLI
+        (Kaël-An→Kael-An, Pilier/Terre/Mémoire écartés).
 
 ---
 

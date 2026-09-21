@@ -23,6 +23,26 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
   nouveaux personnages, résultat éditable).
 - **Tests** (`tests/test_incises.py`) : 24 cas verts (détection, actions,
   résolution, nettoyage, map). Docs : `UTILISATION.md` §3.1.
+- **M20.6 — LLM local** (`engine/incises_llm.py`, Ollama `qwen2.5:7b-instruct`
+  sur 2e GPU, service `ollama` dans `docker-compose.yml`) : moteur par défaut
+  (CLI `--moteur`, API/GUI), regex en repli ; attribution par compréhension,
+  tags `[Nom]:` conservés (nettoyage ciblé), garde-fous (rappel ≥ 88 %,
+  zéro incise résiduelle, filtre nouveaux non-parleurs) ; 14 tests mock verts,
+  validé sur `sang-lumiere_chapitre_1.md`.
+- **M20.7 — Filtres anti faux positifs** (`FiltrePersonnages`,
+  `filtrer_nouveaux_personnages`, appliqués aux deux moteurs) : min. répliques
+  (défaut 2), preuve d'incise explicite « dit X » exigée, stop-list
+  titres/fonctions/génériques, forme nom propre, pronoms et déjà-connus
+  écartés ; rejets motivés (CLI, `stats.personnages_rejetes`, tableau GUI) ;
+  consigne LLM durcie (parcimonie extrême) ; `--accepter-tous` pour contourner.
+- **M20.8 — Critères stricts de personnage** : un personnage = un locuteur qui
+  parle **avec une incise** ; seule une réplique en **tiret cadratin `—`**
+  révèle (lignes `[Nom]:` et `« »` exclues, aux deux moteurs y compris le
+  repli LLM taggé) ; comparaison **floue au `.map** (`Kaël-An` = `Kael-An`,
+  référence rappelée) ; heuristique **minuscule** (forme en minuscules dans
+  le texte = nom commun : `Pilier`, `Terre`, `Eau`, `Mémoire`… écartés) +
+  stop-list étendue (éléments, abstractions) ; `--sans-verif-minuscule`,
+  GUI et API alignés ; 7 tests dédiés (57 cas verts).
 
 ### Correction — Entraînement LoRA : conflit checkpointing / cache KV
 
