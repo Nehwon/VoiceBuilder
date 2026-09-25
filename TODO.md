@@ -379,8 +379,8 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [x] Contraintes validées : entraînement et inférence serveur ne
         cohabitent pas sur 12 Go (OOM à double instance) ; `instruct`
         requis dans les datasets (écrit par M18.1).
-- [ ] **M18.3 — Validation + registre des LoRA**
-  - [ ] Protocole `PROJET_FINE.md` §3.4 (paragraphe FR de référence,
+- [x] **M18.3 — Validation + registre des LoRA**
+  - [x] Protocole `PROJET_FINE.md` §3.4 (paragraphe FR de référence,
         `coverage` ≥ 0.85, RTF, écoute aveugle à 2+ auditeurs) ; ne garder que
         les LoRA gagnants ; registre (poids, config, étage OOM, scores).
 - [ ] **M18.4 — Intégration inférence (switch par personnage)**
@@ -555,9 +555,59 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ---
 
+## Phase 12 — Contrôle fin de la façon de parler (langage clair, utilisateur final)
+
+> Exposer les paramètres expressifs en mots simples, pas en jargon moteur :
+> l'utilisateur choisit un rendu ("Calme", "Dynamique", "Lecture posée"…),
+> le code traduit en valeurs techniques (`temperature`, `speed`, pauses…).
+> Périmètre : `GenererIn` (`app/server.py`), `multi.generate` (`engine/multi.py`),
+> `synthesize` (`engine/cosyvoice_engine.py`), panneau « Réglages » (`app/web/`).
+
+- [ ] **M21.1 — Inventaire + spike moteur**
+  - [ ] Lister ce que `inference_zero_shot` (CosyVoice3, `vendor/CosyVoice`)
+        accepte vraiment (`temperature`/`top_p`/`top_k`/`seed` ?) ; noter ce qui
+        n'existe pas et restera simulé côté montage (pauses, vitesse).
+  - [ ] Lister les réglages actuels (`pause`, `vitesse`, `max_chars`, `verify`,
+        `multi_prompt`) et leurs plages sûres.
+- [ ] **M21.2 — Paramètres langage clair (globaux + par personnage)**
+  - [ ] Vocabulaire utilisateur : **Expressivité** (plat ↔ théâtral,
+        mappe `temperature`/`top_p`), **Vitesse** (lente ↔ rapide, mappe `speed`),
+        **Pauses** : entre paragraphes / au changement de locuteur / après
+        ponctuation (`?…!`, `…`), **Stabilité** (régulier ↔ varié, mappe `seed`/
+        multi-essai si supporté).
+  - [ ] **Presets nommés** : Calme / Lecture posée / Dynamique / Suspense (valeurs
+        par défaut justifiées, modifiables) ; sliders 0–100 + infobulle claire.
+  - [ ] **Surcharge par personnage** (optionnel) : ex. Narrateur posée, dialogues
+        plus vifs ; repli = réglage global.
+- [ ] **M21.3 — Plomberie + persistance**
+  - [ ] `GenererIn` étendu (champs expressivité/vitesse/pauses/stabilité/preset),
+        `multi.generate()` propage par bloc (personnage courant), `synthesize()`
+        applique `temperature`/`speed` si le moteur le supporte.
+  - [ ] Pauses fines au montage : `pause_paragraphe`, `pause_locuteur`,
+        `pause_ponctuation` (non-régression sur la règle actuelle "pause au
+        changement de locuteur").
+  - [ ] Persistance par document (comme `.map`, ex. `.json` côte à côte) + bouton
+        « Écouter un extrait » (10–15 s) avant génération complète.
+- [ ] **M21.4 — Tests + docs**
+  - [ ] Tests : mapping preset→valeurs, propagation par personnage, pauses
+        appliquées, repli si moteur sans `temperature`.
+  - [ ] § `docs/UTILISATION.md` (« Façon de parler » en langage clair) + entrée
+        `CHANGELOG.md`.
+  - [ ] Critère d'acceptation : un non-technicien obtient le rendu voulu sans
+        toucher un paramètre moteur brut.
+
+---
+
 ## Backlog / Idées
 
 ### Correctifs GUI / UX (bugs remontés)
+
+- [ ] **Apostrophes courbes → droites à l'import** : à `POST
+      /api/document/importer` (`app/server.py:1639`), normaliser le texte lu
+      (`’` U+2019, `‘` U+2018, `ʼ` U+02BC, `′` U+2032 → `'` U+0027) avant
+      écriture du document/brouillon ; idem côté import voix si transcription
+      concernée. Test (`tests/test_import_normalize.py`) : aucun `’`/`‘`
+      résiduel après import ; `CHANGELOG.md` mis à jour.
 
 - [ ] **Reconnexion de l'interface ne fonctionne pas** : après rechargement
       de la page pendant une génération en cours, l'éditeur / le montage /
