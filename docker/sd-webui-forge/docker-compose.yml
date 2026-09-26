@@ -1,0 +1,53 @@
+# VoiceBuilder — orchestration Docker pour Stable Diffusion WebUI Forge Neo.
+# Image GPU NVIDIA : PyTorch cu126 + Python 3.13 + fork Neo (branche neo).
+#
+# Les modèles partagés (/home/fabrice/partages/models, structure ComfyUI) sont
+# montés sur models/ ; l'entrypoint crée les liens attendus par Forge Neo vers
+# les dossiers existants. La config et les sorties persistent via volumes.
+#
+# Commandes :
+#   docker compose -f docker/sd-webui-forge/docker-compose.yml build
+#   docker compose -f docker/sd-webui-forge/docker-compose.yml up -d
+#   # GUI sur http://127.0.0.1:7860
+#
+# Deux GPU : on cible explicitement le RTX 4070 (device 0) par défaut ;
+# passer DEVICE_ID=1 pour utiliser le RTX 3050.
+
+name: voicebuilder-forge
+
+services:
+  forge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: voicebuilder-forge:neo
+    container_name: voicebuilder-forge
+    environment:
+      # GPU cible (RTX 4070 = device 0, RTX 3050 = device 1)
+      - CUDA_VISIBLE_DEVICES=${DEVICE_ID:-0}
+      # Arguments supplémentaires éventuels (ex. --api --xformers --sage)
+      - COMMANDLINE_ARGS=${COMMANDLINE_ARGS:-}
+    ports:
+      - "127.0.0.1:7860:7860"
+    volumes:
+      # Modèles partagés (structure ComfyUI) — liés vers Forge dans l'entrypoint
+      - /home/fabrice/partages/models:/home/forge/sd-webui/models
+      # Sorties générées (persistantes)
+      - forge-output:/home/forge/sd-webui/output
+      # Extensions installées par l'utilisateur (persistantes)
+      - forge-extensions:/home/forge/sd-webui/extensions
+      # Configuration / réglages (persistants)
+      - forge-config:/home/forge/sd-webui/config
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  forge-output: {}
+  forge-extensions: {}
+  forge-config: {}

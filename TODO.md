@@ -383,8 +383,8 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [x] Protocole `PROJET_FINE.md` §3.4 (paragraphe FR de référence,
         `coverage` ≥ 0.85, RTF, écoute aveugle à 2+ auditeurs) ; ne garder que
         les LoRA gagnants ; registre (poids, config, étage OOM, scores).
-- [ ] **M18.4 — Intégration inférence (switch par personnage)**
-  - [ ] Chargement dynamique base 0.5B + LoRA du personnage courant (PEFT,
+- [x] **M18.4 — Intégration inférence (switch par personnage)**
+  - [x] Chargement dynamique base 0.5B + LoRA du personnage courant (PEFT,
         fusion optionnelle), cache des adaptateurs (alternance rapide des
         personnages), sans régression RTF ; documenter quel LoRA sert quelle
         voix de `voix.txt`.
@@ -400,14 +400,24 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 > (2 serveurs bi-Xeon 128 Go RAM, sans GPU). Le pipeline (blocs adaptatifs,
 > vérif Whisper, montage, GUI) est réutilisé à l'identique.
 
-- [ ] **M19.0 — Bench hors GUI avant toute intégration**
-  - [ ] Comparer **XTTS-v2 puis Fish-Speech v1.5+** vs CosyVoice3 curé (Palier 0)
-        sur le paragraphe FR de référence (`PROJET_FINE.md` §3.4 : nombres,
-        dates, dialogue, 1 émotion) : `coverage` ≥ 0.85, RTF, écoute aveugle ;
-        n'intégrer que sur victoire mesurée. Trancher au passage le point
-        licence **XTTS-v2 = CPML** (usage commercial restreint) avant d'investir.
-  - [ ] Calibrer en même temps le **RTF CPU-only de référence** sur les bi-Xeon
-        (par moteur et par tâche) pour dimensionner le mode batch (M19.5).
+- [~] **M19.0 — Bench hors GUI avant toute intégration** (en cours, 2026-09-25)
+  - [x] Infra bench : `engine/bench_moteurs.py` + `tools/bench_moteurs.py`
+        (paragraphe FR §3.4, `coverage` ≥ 0.85, RTF, WAV) ; venv `.venv-bench`
+        (torch 2.9.1 cu126 + coqui-tts, 3 patchs venv documentés dans
+        `docs/BENCH_MOTEURS.md`).
+  - [x] **XTTS-v2 vs CosyVoice3 curé** (même voix/prompt, RTX 3050) : XTTS
+        coverage 0,915 / RTF 0,257 ; CosyVoice 0,936 / 0,673 — les deux
+        admissibles, XTTS ×2,6 plus rapide. WAV dans `output/bench_moteurs/`.
+        Reste : **écoute aveugle (utilisateur)** avant décision M19.1.
+  - [x] Licences tranchées : **XTTS-v2 = CPML**, **Fish-Speech 1.5 =
+        CC-BY-NC-SA-4.0** (S2+ = licence recherche) → usage personnel OK
+        (confirmé). ToS XTTS accepté (`COQUI_TOS_AGREED=1`).
+  - [ ] **Fish-Speech v1.5+** : bloqué (deps v1.5.1 : `pydantic==2.9.2`
+        incompilable sur Python 3.14, `lightning`/`litgpt` requis) → reprendre
+        en conteneur Python ≤ 3.12.
+  - [ ] Calibrer le **RTF CPU-only de référence** sur les bi-Xeon (par moteur
+        et par tâche) pour dimensionner le mode batch (M19.5) — reporté sur
+        demande.
 - [ ] **M19.1 — Abstraction worker moteur + routage par voix**
   - [ ] Interface commune `synthesize(texte, prompt_wav, prompt_text, speed)`
         (même signature que `cosyvoice_engine.synthesize`, injectable comme

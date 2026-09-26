@@ -31,4 +31,4 @@ musique/*
 # --- Fichiers de travail locaux non versionnés ---
 BUILDER.md
 RAPPORT.md
-docker/sd-webui-forge/
+docker/sd-webui-forge/.venv-bench/
