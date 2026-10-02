@@ -341,3 +341,15 @@ python -m tools.create_voix SOURCE.wav --nom LeNarrateur --start 12.5 --stop 30
 Extrait `[12.5, 30] s`, transcrit (Whisper), écrit `voix/<slug>.wav` + `.txt`,
 ajoute la ligne dans `voix/voix.txt`. Options : `--out`, `--voix`,
 `--no-transcribe`.
+## LoRA par personnage (M18.4)
+
+Quel LoRA sert quelle voix : registre `lora_registry.json`, fonction
+`engine.lora.chargeur.voix_servies(racine_dataset)`.
+
+```python
+from engine.lora.chargeur import Commutateur
+com = Commutateur()
+com.basculer(modele, "alice", "data/lora")  # charge une fois, cache ensuite
+com.zero_shot(modele)                       # retour zero-shot exact
+com.fusionner(modele, "alice", "data/lora", "alice_fusion.pt")
+```
