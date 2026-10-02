@@ -8,8 +8,10 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from . import adaptive, config, cosyvoice_engine, verifier
-from .tagging import parse_texte, regrouper
+from .tagging import PAUSE, parse_texte, regrouper
 from .voix import Voices, base_nom, grouper_candidats
+
+PAUSE_LABEL = "⏸ Pause"
 
 
 def _read_text(path: str) -> str:
@@ -27,6 +29,11 @@ def _synthesize_for(
         text, str(voice.wav), voice.system_prompt, synth, sr,
         max_chars=block_chars, verify=verify, should_stop=should_stop,
     )
+
+
+def silence(duree: float, sample_rate: int) -> np.ndarray:
+    """Génère un silence de ``duree`` secondes (bloc de pause explicite)."""
+    return np.zeros(max(1, int(duree * sample_rate)), dtype=np.float32)
 
 
 def load(device: Optional[str] = None, fp16: Optional[bool] = None,
@@ -74,6 +81,11 @@ def generate(
     personnage porte le même nom qu'une voix (mapping identité, comportement
     historique de l'outil).
 
+    Lignes ``[pause: Ns]`` (voir ``engine/tagging.py``) et sauts de paragraphe
+    (ligne vide) : insèrent un silence dans le montage, sans appel TTS. Elles
+    ne requièrent aucune voix ; les blocs correspondants portent
+    ``personnage = "⏸ Pause"`` et ``pause = <durée en s>``.
+
     ``out`` : chemin WAV écrit. Renvoie un dict avec ``audio``, ``sample_rate``,
     ``duration``, ``blocs`` et ``out``.
 
@@ -108,7 +120,7 @@ def generate(
 
     segments = parse_texte(_read_text(texte_path), list(personnages))
     blocs = regrouper(segments)
-    inconnus = {pers for pers, _ in blocs if pers not in personnages}
+    inconnus = {pers for pers, _ in blocs if pers not in personnages and pers != PAUSE}
     if inconnus:
         raise ValueError(f"Personnage(s) sans voix définie : {inconnus}")
 
@@ -131,6 +143,12 @@ def generate(
     # raisonnable, écoutable individuellement dans l'onglet « Montage ».
     sous_blocs: List[tuple] = []
     for pers, block in blocs:
+        if pers == PAUSE:
+            # Bloc de silence : aucun TTS. Le slot ``block_chars`` porte la durée.
+            duree_pause = float(block)
+            texte_pause = f"[pause: {duree_pause:g}s]"
+            sous_blocs.append((PAUSE, "—", None, texte_pause, duree_pause, 0.0))
+            continue
         voix_nom = personnages[pers]
         if voix_nom not in voices:
             raise ValueError(f"Voix introuvable pour le personnage « {pers} » : {voix_nom}")
@@ -202,6 +220,24 @@ def generate(
                 # pas encore généré : la boucle le synthétisera frais. Ignoré.
                 continue
             pers, voix_nom, voice, t, block_chars, block_speed = sous_blocs[bid - 1]
+            if pers == PAUSE:
+                # Bloc de silence : on régénère le silence (même durée).
+                duree_pause = float(block_chars)
+                parts[positions[bid - 1]] = silence(duree_pause, sr)
+                blocs_report[bid - 1]["duree"] = round(duree_pause, 2)
+                wav_regen = None
+                if block_dir:
+                    wav_regen = str(block_dir / f"bloc_{bid}.wav")
+                    cosyvoice_engine.save(parts[positions[bid - 1]], sr, wav_regen)
+                if verbose:
+                    print(f"[regen {bid}/{total}] {PAUSE_LABEL} ({duree_pause:g} s de silence)")
+                if progress:
+                    progress({"id": bid, "index": bid, "total": total,
+                              "personnage": PAUSE_LABEL,
+                              "voix": "—", "texte": t,
+                              "chars": len(t), "duree": round(duree_pause, 2),
+                              "wav": wav_regen, "regen": True})
+                continue
             if multi_prompt:
                 audio, prompt, couv = _synth_choisir(t, voice, block_chars, block_speed)
                 if prompt != voix_nom:
@@ -231,9 +267,39 @@ def generate(
         if stop_event is not None and stop_event.is_set():
             stopped = True
             break
+        if pers == PAUSE:
+            # Bloc de silence : aucun TTS, aucune pause inter-blocs ajoutée.
+            duree_pause = float(block_chars)
+            audio = silence(duree_pause, sr)
+            positions.append(len(parts))
+            parts.append(audio)
+            pers_precedent = pers
+            dur = duree_pause
+            info = {
+                "id": i, "personnage": PAUSE_LABEL, "voix": "—", "texte": t,
+                "chars": len(t), "duree": round(dur, 2), "pause": duree_pause,
+            }
+            if block_dir:
+                wav = block_dir / f"bloc_{i}.wav"
+                cosyvoice_engine.save(audio, sr, str(wav))
+                info["wav"] = str(wav)
+            blocs_report.append(info)
+            if verbose:
+                print(f"[{i}/{total}] {PAUSE_LABEL} ({duree_pause:g} s de silence)")
+            if progress:
+                progress({"id": i, "index": i, "total": total,
+                          "personnage": PAUSE_LABEL,
+                          "voix": "—", "texte": t,
+                          "chars": len(t), "duree": round(dur, 2),
+                          "pause": duree_pause,
+                          "wav": info.get("wav")})
+            _drain_regen()
+            continue
         # Pause uniquement au changement de personnage : les sous-blocs d'un même
-        # locuteur s'enchaînent sans coupure dans le montage final.
-        if pers_precedent is not None and pers != pers_precedent:
+        # locuteur s'enchaînent sans coupure dans le montage final. Pas de pause
+        # standard autour d'un silence explicite (paragraphe, [pause: Ns]).
+        if (pers_precedent is not None and pers != pers_precedent
+                and pers_precedent != PAUSE):
             parts.append(np.zeros(pause_n, dtype=np.float32))
         positions.append(len(parts))
         if multi_prompt:

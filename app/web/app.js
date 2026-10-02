@@ -529,13 +529,45 @@ function initBarreTokens() {
     amb.appendChild(construireBouton(a.lib, `${a.titre} — entoure ${a.ouvre}…${a.ferme}${a.racc ? " (" + a.racc + ")" : ""}`,
       () => insererTokenEncadrant(a.ouvre, a.ferme)));
   }
+
+  // Pauses explicites : silences sans TTS ([pause: Ns], ligne seule).
+  const boxPauses = $("pause-boutons");
+  if (boxPauses) {
+    for (const d of [1, 3, 5]) {
+      boxPauses.appendChild(construireBouton(`⏸ ${d}s`,
+        `Insérer un silence de ${d} seconde(s) — ligne [pause: ${d}s]`,
+        () => insererPause(d)));
+    }
+  }
+}
+
+// ---------------------------------------------------------------- pauses explicites (silences)
+// Ligne seule [pause: Ns] (durées 0–30 s) : insérée sur sa propre ligne,
+// jamais confondue avec un personnage (voir detecterPersonnagesTexte).
+const PAUSE_RE = /^\s*\[\s*pause\s*(?:[:=\s]+\s*(\d+(?:[.,]\d+)?)\s*s?)?\s*\]\s*:?\s*$/i;
+
+function estLignePause(ligne) {
+  return PAUSE_RE.test(ligne || "");
+}
+
+function insererPause(duree) {
+  if (!cm) return;
+  const ins = `[pause: ${duree}s]`;
+  const pos = cm.getCursor();
+  const ligne = cm.getLine(pos.line) || "";
+  if (ligne.trim() === "") {
+    cm.replaceRange(ins + "\n", pos);
+  } else {
+    cm.replaceRange("\n" + ins + "\n", { line: pos.line, ch: ligne.length });
+  }
+  cm.focus();
 }
 
 // ---------------------------------------------------------------- groupes modulaires de la barre (M10.2)
 // Chaque groupe est un bloc déplaçable (drag-n-drop natif), repliable et masquable ;
 // l'ordre et l'état sont persistés côté client et restaurés à l'ouverture.
 const CLE_GROUPES = "vb-toolbar-groupes";
-const ORDRE_DEFAUT = ["personnages", "emotions", "sons", "emphase", "langue", "ambiances"];
+const ORDRE_DEFAUT = ["personnages", "emotions", "sons", "pauses", "emphase", "langue", "ambiances"];
 let groupeDrag = null;
 
 function rendreGroupesModulables() {
@@ -735,6 +767,7 @@ const TAGS_NON_VERBAUX = new Set([
 function detecterPersonnagesTexte(texte) {
   const trouves = [];
   for (const ligne of (texte || "").split("\n")) {
+    if (estLignePause(ligne)) continue;
     const m = ligne.match(/^\s*\[([^\]]+)\]/);
     if (!m) continue;
     const nom = m[1].trim();
@@ -1522,7 +1555,7 @@ function construireCarteBloc(b, num) {
   const texte = document.createElement("p");
   texte.className = "bloc-carte-texte";
   texte.textContent = b.texte || "—";
-  rendreTexteEditable(texte, b);
+  if (b.pause == null) rendreTexteEditable(texte, b);
 
   const actions = document.createElement("div");
   actions.className = "bloc-carte-actions";
@@ -1538,7 +1571,9 @@ function construireCarteBloc(b, num) {
   btnSuppr.type = "button";
   btnSuppr.textContent = "✕ Retirer";
   btnSuppr.onclick = () => actionSupprimerBloc(b.id, btnSuppr);
-  actions.append(btnRegen, btnDiv, btnSuppr);
+  actions.append(btnRegen);
+  if (b.pause == null) actions.append(btnDiv);  // pas de division d'un silence
+  actions.append(btnSuppr);
 
   carte.append(tete, audio, texte, actions);
   attacherDndCarte(carte);

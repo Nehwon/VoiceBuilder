@@ -16,7 +16,7 @@ import pytest
 import soundfile as sf
 
 from engine import config
-from engine.tagging import parse_texte, regrouper, TaggingError
+from engine.tagging import PAUSE, PARAGRAPH_PAUSE, parse_texte, regrouper, TaggingError
 from engine.adaptive import build_blocks, split_sentences
 from engine.voix import load_voix, Voices
 from engine import multi
@@ -325,3 +325,80 @@ class TestSynthBloc:
         assert isinstance(audio, np.ndarray)
         assert audio.dtype == np.float32
         assert len(audio) > 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Tier 1 — Pauses explicites [pause: Ns] + silence auto aux paragraphes
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestPauses:
+    """Silences sans TTS : lignes [pause: Ns] et sauts de paragraphe."""
+
+    VOIX_NAMES = ["Narrateur", "Personnage"]
+
+    def test_pause_explicite_variantes(self):
+        for ligne in ("[pause]", "[pause:1s]", "[pause: 3s]",
+                      "[PAUSE 3S]", "[pause=2.5s]"):
+            segs = parse_texte(f"{ligne}\n[Narrateur]: Go.\n", self.VOIX_NAMES)
+            assert segs[0][0] == PAUSE, ligne
+        assert parse_texte("[pause: 3s]\n[Narrateur]: Go.\n",
+                           self.VOIX_NAMES)[0] == (PAUSE, "3.0")
+
+    def test_pause_duree_invalide(self):
+        with pytest.raises(TaggingError):
+            parse_texte("[pause: 99s]\n[Narrateur]: Go.\n", self.VOIX_NAMES)
+
+    def test_pause_sans_locuteur_courant(self):
+        segs = parse_texte("[pause: 2s]\n[Narrateur]: Go.\n", self.VOIX_NAMES)
+        assert segs[0] == (PAUSE, "2.0")
+
+    def test_paragraphe_pause_auto(self):
+        segs = parse_texte("[Narrateur]: Première phrase.\n\nDeuxième paragraphe.\n",
+                           self.VOIX_NAMES)
+        assert segs == [("Narrateur", "Première phrase."),
+                        (PAUSE, str(PARAGRAPH_PAUSE)),
+                        ("Narrateur", "Deuxième paragraphe.")]
+
+    def test_paragraphe_lignes_vides_multiples(self):
+        segs = parse_texte("[Narrateur]: A.\n\n\n\nB.\n", self.VOIX_NAMES)
+        assert [s for s in segs if s[0] == PAUSE] == [(PAUSE, str(PARAGRAPH_PAUSE))]
+
+    def test_paragraphe_pas_de_doublon_avec_pause_explicite(self):
+        segs = parse_texte("[Narrateur]: A.\n\n[pause: 2s]\n\n[Narrateur]: B.\n",
+                           self.VOIX_NAMES)
+        assert segs == [("Narrateur", "A."), (PAUSE, "2.0"), ("Narrateur", "B.")]
+
+    def test_sans_ligne_vide_fusion_inchangee(self):
+        segs = parse_texte("[Narrateur]: A.\nB.\n", self.VOIX_NAMES)
+        assert regrouper(segs) == [("Narrateur", "A. B.")]
+
+    def test_regrouper_coupe_fusion_au_paragraphe(self):
+        segs = parse_texte("[Narrateur]: A.\n\nB.\n", self.VOIX_NAMES)
+        assert regrouper(segs) == [("Narrateur", "A."),
+                                   (PAUSE, str(PARAGRAPH_PAUSE)),
+                                   ("Narrateur", "B.")]
+
+    def test_generate_pause_silence_reel(self, two_voices, mock_cosyvoice,
+                                          mock_verify, tmp_project):
+        """Le montage contient le silence exact, sans appel TTS pour la pause."""
+        txt = tmp_project["textes_dir"] / "pauses.md"
+        txt.write_text("[Narrateur]: Bonjour.\n\n[pause: 1s]\n\n[Personnage]: Salut !\n",
+                       encoding="utf-8")
+        voices = load_voix(two_voices, voix_dir=two_voices.parent)
+        out = str(tmp_project["output_dir"] / "montage.wav")
+        n_avant = mock_cosyvoice["synthesize"].call_count
+
+        result = multi.generate(str(txt), voices, pause=0.5, out=out,
+                                verbose=False)
+
+        assert len(result["blocs"]) == 3
+        milieu = result["blocs"][1]
+        assert milieu["personnage"] == multi.PAUSE_LABEL
+        assert milieu["pause"] == 1.0
+        assert milieu["duree"] == 1.0
+        # 2 appels TTS (un par voix), aucun pour le silence
+        assert mock_cosyvoice["synthesize"].call_count == n_avant + 2
+        # Durée totale = parole + 1,0 s de silence (pas de pause standard autour)
+        parle = result["blocs"][0]["duree"] + result["blocs"][2]["duree"]
+        assert result["duration"] == round(parle + 1.0, 2)
+        assert Path(out).exists()

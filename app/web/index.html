@@ -97,6 +97,17 @@
               <div id="son-boutons" class="token-boutons"></div>
             </span>
           </div>
+          <div class="groupe-toolbar" data-groupe="pauses">
+            <span class="groupe-tete">
+              <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
+              <span class="groupe-label">Pauses</span>
+              <button type="button" class="groupe-replier" title="Replier / déplier le groupe">▾</button>
+              <button type="button" class="groupe-masquer" title="Masquer ce groupe">✕</button>
+            </span>
+            <span class="groupe-corps">
+              <div id="pause-boutons" class="token-boutons"></div>
+            </span>
+          </div>
           <div class="groupe-toolbar" data-groupe="emphase">
             <span class="groupe-tete">
               <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
@@ -315,6 +326,11 @@
         <li>Une ligne qui ne commence pas par une balise reprend donc la voix en cours (celle du dernier personnage cité).</li>
         <li>Les lignes débutant par <code>#</code> sont des commentaires (ignorés du montage).</li>
         <li>L'éditeur complète la balise avec la touche <kbd>Tab</kbd>.</li>
+        <li><code>[pause: 1s]</code> (ligne seule) insère un silence de 1 s — groupe
+          <strong>Pauses</strong> : boutons ⏸ 1s / 3s / 5s (durées 0–30 s, ex.
+          <code>[pause: 3s]</code>).</li>
+        <li>Un <strong>saut de paragraphe</strong> (ligne vide) insère automatiquement
+          un silence de 0,5 s.</li>
         <li>La barre d'outils est <strong>modulaire</strong> : chaque groupe se déplace
           à la prise ⠿, se replie (▾) et se masque (✕) ; l'état est mémorisé et
           réinitialisable via « ↺ Réinitialiser la barre ».</li>

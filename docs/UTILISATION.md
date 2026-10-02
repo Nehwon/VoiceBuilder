@@ -100,7 +100,11 @@ Règles (`engine/tagging.py`) :
 - **`[Nom]:`** en tête de ligne — change de locuteur.
 - **Ligne nue** — reprend le locuteur précédent (prose / narrateur) ; erreur sinon.
 - **`[Nom]` sans deux-points** — variante acceptée (ligne = le texte).
-- Lignes **vides** et **`#…`** — ignorées.
+- Lignes **`#…`** — ignorées (commentaires).
+- **`[pause: Ns]`** (ligne seule, ex. `[pause: 3s]`) — insère un silence de N secondes
+  (0–30 s, sans appel TTS) ; boutons ⏸ 1s / 3s / 5s du groupe Pauses.
+- **Saut de paragraphe** (ligne vide entre deux blocs de texte) — insère automatiquement
+  un silence de **0,5 s** (sans appel TTS) ; plusieurs lignes vides = un seul silence.
 - **`[stop]`** (seul sur une ligne) — arrête la génération.
 - Les autres **`[…]`** en cours de ligne — **conservés tels quels** dans l'éditeur
   TTS (voir §4 pour les tokens reconnus).

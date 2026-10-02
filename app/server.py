@@ -771,16 +771,18 @@ def _cache_effacer(document: str) -> dict:
 
 
 def _offsets_blocs(blocs: list, pause: float) -> list[float]:
-    """Début (s) de chaque bloc dans le montage — pause uniquement au changement de locuteur."""
+    """Début (s) de chaque bloc dans le montage — pause uniquement au changement
+    de locuteur, jamais autour d'un silence explicite (paragraphe, [pause])."""
     offsets: list[float] = []
     start = 0.0
     prec = None
     for b in blocs:
-        if prec is not None and b.get("personnage") != prec:
+        if (prec is not None and b.get("personnage") != prec.get("personnage")
+                and b.get("pause") is None and prec.get("pause") is None):
             start += float(pause)
         offsets.append(round(start, 3))
         start += b.get("duree", 0.0)
-        prec = b.get("personnage")
+        prec = b
     return offsets
 
 
@@ -798,7 +800,8 @@ def _sr_blocs(job: dict) -> int:
 def _reconcat(job: dict, blocs: list) -> float:
     """Réassemble le montage depuis les blocs (ordre courant, même règle que generate).
 
-    Pause (silence) uniquement au changement de locuteur, aucun silence final.
+    Pause (silence) uniquement au changement de locuteur, jamais autour d'un
+    silence explicite (paragraphe, [pause: Ns]) ; aucun silence final.
     Met à jour le WAV ``job["out"]`` et la durée de ``job["result"]``.
     """
     out = Path(job["out"])
@@ -817,10 +820,11 @@ def _reconcat(job: dict, blocs: list) -> float:
     prec = None
     for b in blocs:
         data, _ = _sf.read(b["wav"], dtype="float32")
-        if prec is not None and b.get("personnage") != prec:
+        if (prec is not None and b.get("personnage") != prec.get("personnage")
+                and b.get("pause") is None and prec.get("pause") is None):
             parts.append(_np.zeros(pause_n, dtype=_np.float32))
         parts.append(data)
-        prec = b.get("personnage")
+        prec = b
     final = _np.concatenate(parts)
     cosyvoice_engine.save(final, sr, out)
     duree = round(len(final) / sr, 3)
@@ -859,6 +863,14 @@ def api_bloc_regenerer(jid: int, bid: int):
     bloc = next((b for b in job.get("blocs", []) if b["id"] == bid), None)
     if not bloc:
         raise HTTPException(404, "Bloc inconnu.")
+    if bloc.get("pause") is not None or bloc.get("voix") == "—":
+        _model2, _sr2 = multi.load(device=job["device"], fp16=False)
+        _duree = float(bloc.get("pause") or 1.0)
+        _audio = multi.silence(_duree, _sr2)
+        cosyvoice_engine.save(_audio, _sr2, bloc["wav"])
+        bloc["duree"] = round(_duree, 2)
+        _cache_ecrire(job)  # M16 : le cache suit les retouches
+        return {"bloc": bloc}
     try:
         voix = _voix().get(bloc["voix"])
     except Exception as exc:  # noqa: BLE001
@@ -905,6 +917,8 @@ def api_bloc_diviser(jid: int, bid: int):
     if idx is None:
         raise HTTPException(404, "Bloc inconnu.")
     original = blocs[idx]
+    if original.get("pause") is not None or original.get("voix") == "—":
+        raise HTTPException(400, "On ne divise pas un bloc de pause.")
     try:
         voix = _voix().get(original["voix"])
     except Exception as exc:  # noqa: BLE001
@@ -982,6 +996,8 @@ def api_bloc_texte(jid: int, bid: int, payload: BlocTexteIn):
     bloc = next((b for b in job.get("blocs", []) if b["id"] == bid), None)
     if not bloc:
         raise HTTPException(404, "Bloc inconnu.")
+    if bloc.get("pause") is not None:
+        raise HTTPException(400, "On ne réécrit pas un bloc de pause (retire-le et réinsère un [pause: Ns] si besoin).")
     texte = (payload.texte or "").strip()
     if not texte:
         raise HTTPException(400, "Texte de bloc vide.")
@@ -1016,6 +1032,8 @@ def api_verifier_lancer(jid: int):
             ofs = _offsets_blocs(job["blocs"], pause)
             lignes = []
             for b, start in zip(job["blocs"], ofs):
+                if b.get("pause") is not None:
+                    continue  # silence explicite : rien à vérifier
                 fin = start + b.get("duree", 0.0)
                 cov = verifier.couverture_bloc(b.get("texte", ""), segments,
                                                start, fin)
