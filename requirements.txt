@@ -4,10 +4,6 @@ num2words==0.5.14
 tqdm==4.70.0
 librosa==0.10.2
 openai-whisper==20250625
-torch==2.13.0
-torchcodec==0.16.0
-torchaudio==2.11.0
-torchvision==0.28.0
 gradio==3.43.2
 fastapi==0.141.1
 uvicorn==0.52.1
@@ -19,4 +15,4 @@ python-multipart==0.0.9
 # PyTorch pur, flags --vllm/--trt en repli automatique. Réactiver quand
 # vllm supportera torch 2.13 (ne PAS le réinstaller en best-effort : pip
 # downgraderait torch/fastapi en silence pour le satisfaire).
-tensorrt>=10.0.0
+# NB : tensorrt a déménagé dans requirements.torch.txt (socle lourd).

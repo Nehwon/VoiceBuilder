@@ -1,0 +1,11 @@
+# Socle lourd et stable : PyTorch + écosystème CUDA (~Go).
+# Installé dans sa propre couche Docker (voir docker/vb/Dockerfile, couche 2)
+# pour ne être ni retéléchargé ni repoussé quand seules les dépendances
+# légères ou le patch DeepFilterNet changent. Ne bouge presque jamais ;
+# toute modification invalide les couches suivantes (rebuild complet).
+# L'env final reste garanti par requirements-lock.txt (--no-deps).
+torch==2.13.0
+torchcodec==0.16.0
+torchaudio==2.11.0
+torchvision==0.28.0
+tensorrt>=10.0.0
