@@ -104,6 +104,38 @@ class TestMoteurDefaut:
         finally:
             config.set_moteur_defaut(avant)
 
+
+class TestDefinirMoteur:
+    def test_ajout_colonne(self, tmp_path):
+        vf = _projet_voix(tmp_path, "[A], a.wav, a.txt\n")
+        assert voix.definir_moteur(vf, "A", "omnivoice") == "omnivoice"
+        assert voix.load_voix(vf, voix_dir=tmp_path).get("A").moteur == "omnivoice"
+        assert vf.read_text(encoding="utf-8").strip() == (
+            "[A], a.wav, a.txt, , , , omnivoice")
+
+    def test_retrait_colonne_defaut(self, tmp_path):
+        vf = _projet_voix(tmp_path, "[A], a.wav, a.txt, , , , omnivoice\n")
+        assert voix.definir_moteur(vf, "A", "defaut") == ""
+        assert vf.read_text(encoding="utf-8").strip() == "[A], a.wav, a.txt"
+
+    def test_preserve_autres_colonnes_et_commentaires(self, tmp_path):
+        vf = _projet_voix(
+            tmp_path,
+            "# commentaire\n[A], a.wav, a.txt, 0.3, 1.0\n[B], a.wav, a.txt\n")
+        voix.definir_moteur(vf, "A", "omnivoice")
+        lignes = vf.read_text(encoding="utf-8").splitlines()
+        assert lignes[0] == "# commentaire"
+        assert lignes[1] == "[A], a.wav, a.txt, 0.3, 1.0, , omnivoice"
+        assert lignes[2] == "[B], a.wav, a.txt"
+
+    def test_voix_inconnue_et_moteur_invalide(self, tmp_path):
+        import pytest
+        vf = _projet_voix(tmp_path, "[A], a.wav, a.txt\n")
+        with pytest.raises(KeyError):
+            voix.definir_moteur(vf, "Z", "omnivoice")
+        with pytest.raises(ValueError, match="Moteur inconnu"):
+            voix.definir_moteur(vf, "A", "xtts")
+
 # ═══════════════════════════════════════════════════════════════════════════
 # omnivoice_engine.synthesize (modèle mock)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -139,6 +171,57 @@ class TestSynthesize:
                                          model=faux, out_sr=22050)
         assert out.shape == (22050,)
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Mode worker HTTP (M19.1-bis)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestWorker:
+    def test_load_worker_sans_import_local(self, monkeypatch):
+        import engine.omnivoice_engine as oe
+        monkeypatch.setattr(oe, "_direct_ok", False)
+        monkeypatch.setattr(oe, "_model", None)
+        model, sr = oe.load(worker_url="http://test:8100")
+        assert model == {"worker_url": "http://test:8100"} and sr == 24000
+
+    def test_synthesize_via_worker(self, monkeypatch):
+        import io
+        import engine.omnivoice_engine as oe
+        wav = io.BytesIO()
+        import soundfile as sf
+        sf.write(wav, np.zeros(4800, dtype=np.float32), 24000, format="WAV")
+        corps = wav.getvalue()
+
+        class _Rep:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return corps
+
+        vus = {}
+
+        def _faux_open(req, timeout=None):
+            vus["url"] = req.full_url
+            vus["payload"] = req.data.decode()
+            return _Rep()
+
+        monkeypatch.setattr("urllib.request.urlopen", _faux_open)
+        out = oe.synthesize("Bonjour.", "ref.wav", "reference.",
+                            model={"worker_url": "http://test:8100"},
+                            out_sr=24000)
+        assert out.shape == (4800,)
+        assert vus["url"] == "http://test:8100/synthesize"
+        assert "Bonjour" in vus["payload"]
+
+    def test_worker_injoignable_erreur_claire(self, monkeypatch):
+        import engine.omnivoice_engine as oe
+        import pytest
+
+        def _ko(req, timeout=None):
+            raise ConnectionRefusedError("refuse")
+        monkeypatch.setattr("urllib.request.urlopen", _ko)
+        with pytest.raises(RuntimeError, match="injoignable"):
+            oe.synthesize("Bonjour.", "ref.wav", "reference.",
+                          model={"worker_url": "http://test:8100"})
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Routage multi._synthesize_for

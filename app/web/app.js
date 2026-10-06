@@ -2390,6 +2390,20 @@ function renderVoix(list) {
     info.append(nom, meta);
     const acts = document.createElement("div");
     acts.className = "projet-carte-actions";
+    const selMoteur = document.createElement("select");
+    selMoteur.title = "Moteur TTS de cette voix (Défaut = réglage Configuration)";
+    for (const [val, label] of [["", "Défaut"], ["cosyvoice", "CosyVoice"], ["omnivoice", "OmniVoice"]]) {
+      const opt = document.createElement("option");
+      opt.value = val; opt.textContent = label;
+      selMoteur.append(opt);
+    }
+    selMoteur.value = v.moteur_colonne || "";
+    selMoteur.onchange = async () => {
+      const r = await fetch("/api/voix/moteur", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: v.nom, moteur: selMoteur.value || "defaut" }) });
+      if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+      notifier(`Moteur de « ${v.nom} » : ${selMoteur.selectedOptions[0].textContent}.`, "ok");
+      await chargerVoixListe();
+    };
     const bPlay = document.createElement("button");
     bPlay.textContent = "▶ Écouter";
     bPlay.onclick = () => {
@@ -2413,7 +2427,7 @@ function renderVoix(list) {
       await chargerVoixListe();
       await chargerEtat();
     };
-    acts.append(bPlay, bClean, bDel);
+    acts.append(selMoteur, bPlay, bClean, bDel);
     carte.append(info, acts);
     box.appendChild(carte);
   }

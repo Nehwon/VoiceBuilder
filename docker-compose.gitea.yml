@@ -34,6 +34,8 @@ services:
       - COSYVOICE_MODEL_DIR=/models
       - COSYVOICE_MODEL_SOURCE=${COSYVOICE_MODEL_SOURCE:-modelscope}
       - VOICEBUILDER_ENHANCE_DIR=/models/enhance_models
+      # Réglages persistants sur volume (sinon reset à chaque recreate, M19.1).
+      - VOICEBUILDER_SETTINGS_FILE=/app/tmp/voicebuilder_settings.json
       # Warmup au démarrage (modèle + Whisper préchargés, 1re inférence sans latence) : 1 pour activer.
       - VOICEBUILDER_WARMUP=${VOICEBUILDER_WARMUP:-0}
     volumes:

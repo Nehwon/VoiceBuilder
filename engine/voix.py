@@ -54,6 +54,7 @@ class Voice:
     speed: Optional[float] = None
     max_block_chars: Optional[int] = None
     moteur: str = config.MOTEUR_DEFAUT  # moteur TTS (M19.1)
+    moteur_colonne: str = ""          # valeur brute de la 7ᵉ colonne ("" = défaut)
     prompt_text: str = ""                 # transcription nettoyée
 
     @property
@@ -146,6 +147,50 @@ def generer_voix_txt(dossier=None, out=None) -> Path:
     return out
 
 
+def definir_moteur(path, nom: str, moteur: str) -> str:
+    """Change le moteur d'une voix dans ``voix.txt`` (7ᵉ colonne, M19.1).
+
+    ``moteur`` : ``"cosyvoice"``, ``"omnivoice"`` ou ``"defaut"``/``""``
+    (retire la colonne → la voix suit le moteur par défaut). Les autres
+    colonnes, l'ordre des voix et les commentaires sont préservés
+    (édition ligne à ligne, pas de réécriture via ``ecrire_voix_txt``).
+    Renvoie le moteur écrit (``""`` si colonne retirée). Lève
+    ``ValueError`` (moteur inconnu) ou ``KeyError`` (voix introuvable).
+    """
+    mot = (moteur or "").strip().lower()
+    if mot in ("", "defaut", "default"):
+        mot = ""
+    elif mot not in config.MOTEURS:
+        raise ValueError(
+            f"Moteur inconnu : {moteur} "
+            f"(attendu : {', '.join(config.MOTEURS)} ou defaut)"
+        )
+    path = Path(path) if path else config.VOIX_FILE
+    lignes = path.read_text(encoding="utf-8").splitlines()
+    trouve = False
+    for i, raw in enumerate(lignes):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = [p.strip() for p in line.split(",")]
+        if not (parts[0].startswith("[") and parts[0].endswith("]")):
+            continue
+        if parts[0][1:-1] != nom:
+            continue
+        trouve = True
+        corps = (parts[1:6] + ["", "", "", "", ""])[:5]
+        while corps and not corps[-1]:
+            corps.pop()
+        if mot:
+            corps += ["", "", "", ""][: max(0, 5 - len(corps))]
+            corps = (corps + ["", "", "", "", ""])[:5] + [mot]
+        lignes[i] = ", ".join([parts[0]] + corps)
+    if not trouve:
+        raise KeyError(f"Voix introuvable dans {path} : {nom}")
+    path.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+    return mot
+
+
 def ecrire_voix_txt(entries, out=None) -> Path:
     """Écrit (écrase) ``voix.txt`` à partir d'une liste d'entrées.
 
@@ -230,6 +275,7 @@ def load_voix(path: Optional[Path] = None, voix_dir: Optional[Path] = None) -> V
                         f"(attendu : {', '.join(config.MOTEURS)})"
                     )
                 voice.moteur = moteur
+                voice.moteur_colonne = moteur
             else:
                 # Sans colonne moteur : défaut courant (modifiable au runtime
                 # via le sélecteur Configuration, M19.1).

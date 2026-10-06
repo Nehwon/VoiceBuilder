@@ -47,7 +47,10 @@ from engine import audio_extract
 # Réglages persistants (mêmes clés que le GUI Gradio).
 # ---------------------------------------------------------------------------
 
-_PERSISTANCE = config.PROJECT_ROOT / "voicebuilder_settings.json"
+_PERSISTANCE = Path(
+    os.environ.get("VOICEBUILDER_SETTINGS_FILE")
+    or (config.PROJECT_ROOT / "voicebuilder_settings.json")
+)
 _BROUILLONS = config.TEXTE_DIR / "brouillons"
 _ARCHIVES = config.TEXTE_DIR / "archives"
 
@@ -460,7 +463,7 @@ def api_voix():
     try:
         v = _voix()
         return [{"nom": ve.name, "wav": str(ve.wav), "txt": str(ve.txt),
-                 "moteur": ve.moteur}
+                 "moteur": ve.moteur, "moteur_colonne": ve.moteur_colonne}
                 for ve in v]
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, str(exc))
@@ -475,6 +478,23 @@ def api_couples():
 @app.post("/api/voix/nommer")
 def api_nommer(payload: NommageIn):
     voix.ecrire_voix_txt([tuple(e) for e in payload.entries])
+    return _etat()
+
+
+class VoixMoteurIn(BaseModel):
+    nom: str
+    moteur: str  # "cosyvoice" | "omnivoice" | "defaut" (suit le global)
+
+
+@app.post("/api/voix/moteur")
+def api_voix_moteur(payload: VoixMoteurIn):
+    """Change le moteur d'une voix (7ᵉ colonne de voix.txt, M19.1)."""
+    try:
+        voix.definir_moteur(config.VOIX_FILE, payload.nom, payload.moteur)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(400, str(exc))
+    except OSError as exc:  # noqa: BLE001
+        raise HTTPException(500, str(exc))
     return _etat()
 
 
