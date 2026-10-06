@@ -16,7 +16,7 @@
 #   docker compose run --rm cli gen_multi_voix texte/x.md -o /app/output/x.wav
 
 # Nom de l'image "vb" (réglable) : registre Gitea par défaut, ou tag local.
-ARG VB_IMAGE=gitea.lamachere.fr/fabrice/voicebuilder-vb:cu130
+ARG VB_IMAGE=ghcr.io/nehwon/voicebuilder-vb:cu130
 FROM ${VB_IMAGE}
 
 # --- Copie du projet (sans venv/modèles, voir .dockerignore) ---

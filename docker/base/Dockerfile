@@ -15,7 +15,7 @@
 #
 # Construction :
 #   docker build -f docker/base/Dockerfile -t voicebuilder-base:cu130 .
-#   docker push gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+#   docker push ghcr.io/nehwon/voicebuilder-base:cu130
 
 # Base épurée : les libs CUDA/GPU viennent des wheels pip (torch cu130 +
 # packages nvidia-*). Une base nvidia/cuda embarquerait un NCCL système

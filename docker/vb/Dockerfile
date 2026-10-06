@@ -22,9 +22,9 @@
 #
 # Construction :
 #   docker build -f docker/vb/Dockerfile -t voicebuilder-vb:cu130 .
-#   docker push gitea.lamachere.fr/fabrice/voicebuilder-vb:cu130
+#   docker push ghcr.io/nehwon/voicebuilder-vb:cu130
 
-ARG BASE_IMAGE=gitea.lamachere.fr/fabrice/voicebuilder-base:cu130
+ARG BASE_IMAGE=ghcr.io/nehwon/voicebuilder-base:cu130
 FROM ${BASE_IMAGE}
 
 ENV PATH="/opt/venv/bin:$PATH"
