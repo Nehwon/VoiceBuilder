@@ -8,6 +8,21 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Correction — Reprise après relance / rechargement (prioritaire)
+
+- **Serveur** (`app/server.py`) : le flux SSE rejoue les blocs déjà
+  synthétisés avec les bons offsets (la file étant destructive, la page
+  rechargée partait d'un montage vide) ; manifeste M16 écrit à chaque
+  bloc (status `running`) ; à la relecture, un job `running` orphelin
+  (restart en pleine génération) est requalifié en interrompu au lieu
+  de bloquer Générer (409) ; les blocs au WAV disparu sont écartés au
+  lieu de jeter tout le cache ; `GET /api/cache/{doc}` expose `out_ok`.
+- **Frontend** (`app/web/app.js`) : au rattachement, cartes + timeline
+  repeuplées aussitôt (`chargerBlocs`) ; à la restauration, le montage
+  complet n'est chargé que s'il existe encore.
+- **Tests** : compilation Python/JS + 4 scénarios de logique du cache
+  verts (restart, WAV manquant, cache vide, offsets de replay).
+
 ### Correction — Nettoyage voix : crash sur extraits courts
 
 - **Moteur** (`engine/enhance.py`) : les extraits de moins de 4 s sont

@@ -338,7 +338,15 @@ async function restaurerCacheDoc() {
     const d = await r.json();
     montageId = d.id;
     effacerBadgesVerif();  // autre job : ancienne vérification périmée
-    $("montage").src = `/api/generer/${d.id}/result`;
+    if (d.out_ok !== false) {
+      $("montage").src = `/api/generer/${d.id}/result`;
+    } else {
+      // Montage complet perdu (restart en cours de job) : les cartes
+      // restent écoutables une par une via chargerBlocs().
+      $("montage").removeAttribute("src");
+      $("montage").load();
+      notifier("Montage complet indisponible — blocs restaurés un par un.", "err");
+    }
     majMontage();
     await chargerBlocs();
     notifier(`Dernière génération restaurée (${d.blocs} bloc(s)).`, "ok");
@@ -1269,6 +1277,10 @@ async function rattacherGenerationEnCours() {
   demarrerProgression();
   notifier("Génération en cours reconnectée.", "ok");
   suivreGeneration(info.id);
+  // Repeuple aussitôt cartes + timeline depuis les blocs déjà synthétisés
+  // (le replay SSE en tête de stream complète ensuite, dédupliqué par
+  // data-id) — sans ça le montage restait vide jusqu'aux nouveaux blocs.
+  try { majMontage(); await chargerBlocs(); } catch { /* best effort */ }
 }
 
 async function demanderArret() {

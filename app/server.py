@@ -528,6 +528,10 @@ def api_generer(payload: GenererIn):
             elif "wav" in b:
                 job["blocs"].append(b)
             q.put(("bloc", b))
+            if job.get("document"):
+                _cache_ecrire(job)  # manifest vivant : reprise possible même
+                # si la page recharge ou le serveur redémarre en cours de job
+                # (status running, requalifié en interrompu à la relecture).
         try:
             res = multi.generate(
                 str(tmp), _voix(), personnages=payload.personnages, out=str(sortie),
@@ -568,6 +572,21 @@ def api_stream(jid: int):
         start_cur = 0.0
         pers_prec = None
         pause = float(job.get("pause", 0.0))
+        # Reprise après rechargement : rejoue les blocs déjà synthétisés
+        # (la queue est destructive — la page d'origine a déjà consommé ces
+        # événements, la page rechargée partirait sinon d'un montage vide
+        # avec des offsets recalculés depuis zéro). Le front déduplique par
+        # data-id ; la suite live repart de la fin rejouée.
+        try:
+            deja = list(job.get("blocs", []))
+            if deja:
+                ofs = _offsets_blocs(deja, pause)
+                for b, o in zip(deja, ofs):
+                    yield f"event: bloc\ndata: {json.dumps(dict(b, start=o))}\n\n"
+                start_cur = ofs[-1] + float(deja[-1].get("duree", 0.0) or 0.0)
+                pers_prec = deja[-1].get("personnage")
+        except Exception:  # noqa: BLE001
+            pass  # le flux live suit de toute façon
         while job["status"] == "running":
             try:
                 kind, data = job["queue"].get(timeout=0.5)
@@ -689,7 +708,12 @@ def _cache_chemin(document: str) -> Path:
 
 
 def _cache_lire(document: str) -> dict | None:
-    """Manifeste du cache si présent ET complet (tous les WAV existent)."""
+    """Manifeste du cache : un job encore marqué ``running`` vient d'un
+    serveur relancé en pleine génération (aucun thread derrière) — il est
+    requalifié en ``stopped`` pour restauration via le chemin existant, au
+    lieu de bloquer le bouton Générer (409) ou de rester muet. Les blocs
+    dont le WAV a disparu sont écartés au lieu de jeter tout le cache ;
+    le manifeste n'est supprimé que s'il ne reste rien d'écoutable."""
     chemin = _cache_chemin(document)
     if not chemin.exists():
         return None
@@ -697,8 +721,18 @@ def _cache_lire(document: str) -> dict | None:
         data = json.loads(chemin.read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         return None
-    fichiers = [data.get("out")] + [b.get("wav") for b in data.get("blocs", [])]
-    if not data.get("out") or not all(f and Path(f).exists() for f in fichiers):
+    if data.get("status") == "running":
+        data["status"] = "stopped"
+        data["stopped"] = True
+        try:
+            chemin.write_text(json.dumps(data, ensure_ascii=False),
+                              encoding="utf-8")
+        except OSError:
+            pass
+    data["blocs"] = [b for b in (data.get("blocs") or [])
+                     if b.get("wav") and Path(b["wav"]).exists()]
+    out = data.get("out")
+    if not (out and Path(out).exists()) and not data["blocs"]:
         try:
             chemin.unlink()
         except OSError:
@@ -1111,9 +1145,11 @@ def api_cache_lire(document: str):
            "file_regen": queue.Queue(),
            "blocs": data.get("blocs", [])}
     _jobs[jid] = job
+    out = data.get("out")
     return {"id": jid, "document": data.get("document"),
             "status": job["status"], "duree": data.get("duration"),
-            "blocs": len(job["blocs"])}
+            "blocs": len(job["blocs"]),
+            "out_ok": bool(out) and Path(out).exists()}
 
 
 @app.delete("/api/cache/{document}")

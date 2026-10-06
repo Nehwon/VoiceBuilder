@@ -617,15 +617,20 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 > serveur, le travail en cours n'est pas retrouvé (montage vide,
 > progression perdue, cache non restauré).
 
-- [ ] **Diagnostiquer** : `GET /api/generer/en-cours` + rattachement SSE,
+- [x] **Diagnostiquer** : `GET /api/generer/en-cours` + rattachement SSE,
   `GET /api/cache/{doc}` + `restaurerCacheDoc`, persistance des jobs au
   restart (jobs en mémoire seule → perdus au redémarrage serveur).
-- [ ] **Corriger** : rattachement front fiable (rechargement pendant
-  génération), restauration du cache M16 à l'ouverture du document,
-  reprise ou état clair après restart serveur.
+  Causes trouvées (2026-10-06) : file SSE destructive jamais rejouée +
+  cartes jamais rechargées au rattachement ; aucun manifeste avant la fin
+  du job ; un seul WAV manquant jetait tout le cache.
+- [x] **Corriger** : replay des blocs en tête de stream (offsets
+  `_offsets_blocs`, dédupe front par `data-id`), `chargerBlocs()` au
+  rattachement, manifeste vivant à chaque bloc, `running` orphelin
+  requalifié en interrompu, blocs manquants écartés, `out_ok` exposé.
 - [ ] Critère d'acceptation : recharger la page pendant une génération
   puis après un restart serveur retrouve le montage / la progression
-  sans régénérer ; entrée `CHANGELOG.md`.
+  sans régénérer (validation live par l'utilisateur) ; entrée
+  `CHANGELOG.md`.
 
 ### Correctifs GUI / UX (bugs remontés)
 
