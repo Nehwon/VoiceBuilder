@@ -610,6 +610,23 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ## Backlog / Idées
 
+### Prioritaire — Reprise après relance / rechargement (2026-10-06)
+
+> Malgré les correctifs id-0 (gardes `=== null`, compteurs dès 1) et M16,
+> le problème persiste : après rechargement de la page ou relance du
+> serveur, le travail en cours n'est pas retrouvé (montage vide,
+> progression perdue, cache non restauré).
+
+- [ ] **Diagnostiquer** : `GET /api/generer/en-cours` + rattachement SSE,
+  `GET /api/cache/{doc}` + `restaurerCacheDoc`, persistance des jobs au
+  restart (jobs en mémoire seule → perdus au redémarrage serveur).
+- [ ] **Corriger** : rattachement front fiable (rechargement pendant
+  génération), restauration du cache M16 à l'ouverture du document,
+  reprise ou état clair après restart serveur.
+- [ ] Critère d'acceptation : recharger la page pendant une génération
+  puis après un restart serveur retrouve le montage / la progression
+  sans régénérer ; entrée `CHANGELOG.md`.
+
 ### Correctifs GUI / UX (bugs remontés)
 
 - [ ] **Apostrophes courbes → droites à l'import** : à `POST
