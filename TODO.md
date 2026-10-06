@@ -422,32 +422,57 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         même statut que Fish-Speech) ; API `generate(text, ref_audio,
         ref_text, speed)` quasi identique à la `SynthesizeFn` visée +
         `normalize_text`, tags `[laughter]`/`[sigh]` (compatibles M10.2),
-        voice design et mode auto (sans prompt). À tester **sur Pandora
-        (GPU)** : bench coverage Whisper §3.4 + RTF + écoute aveugle vs
-        CosyVoice3/XTTS avant décision M19.1. (Test local interdit :
-        aucune charge de travail hors hôte propre sans autorisation.)
+        voice design et mode auto (sans prompt). Bench 2026-10-06 sur
+        Pandora (RTX 4070, voix Astronogeek, protocole §3.4 sans token,
+        `output/bench_moteurs/verdict-omni.json`) : **égalité avec
+        VoiceBuilder/CosyVoice à 0,771 / 0,771** (mêmes 12 mots perdus,
+        tous des nombres → biais de transcription Whisper, pas moteur) ;
+        **RTF synthèse 0,093** (1,8 s pour 19,3 s) contre ~0,673 CosyVoice
+        (bench précédent) ; cohabitation VRAM OK avec le serveur (12 Go).
+        **Écoute aveugle utilisateur 2026-10-06 : OmniVoice 9/10
+        (clonage parfait, sensation d'intention), CosyVoice 7/10
+        (robotique), XTTS 6,5/10 — aucun mot perdu audible, la métrique
+        avait tort** → décision M19.1 : intégrer OmniVoice comme moteur
+        alternatif (verdict dans `output/bench_moteurs/verdict-omni.json`,
+        texte dans `paragraphe-reference.md`).
+        **Texte long validé le même jour** (« Divine Opportunite - 1 »,
+        1 563 mots, voix Astronogeek, `verdict-divine.json`) : coverage
+        0,923 OmniVoice contre 0,910 CosyVoice (au-dessus du seuil 0,85
+        des deux côtés ; manquants = noms propres et fautes du texte
+        source, profil identique) ; **RTF 0,094 contre 0,383 (4×)** ;
+        fichier plus court côté OmniVoice (débit + moins de silences,
+        sans perte). (Test local interdit : aucune charge de travail
+        hors hôte propre sans autorisation.)
   - [ ] Calibrer le **RTF CPU-only de référence** sur les bi-Xeon (par moteur
         et par tâche) pour dimensionner le mode batch (M19.5) — reporté sur
         demande.
-- [ ] **M19.1 — Abstraction worker moteur + routage par voix**
-  - [ ] Interface commune `synthesize(texte, prompt_wav, prompt_text, speed)`
-        (même signature que `cosyvoice_engine.synthesize`, injectable comme
-        `SynthesizeFn` dans `adaptive.py`) ; wrappers `engine/xtts_engine.py`
-        **puis `engine/fishspeech_engine.py`**.
-  - [ ] **Rôles de workers par type de calcul** (un rôle = déployable seul sur
+- [x] **M19.1 — Abstraction worker moteur + routage par voix** (implémenté
+  2026-10-06, en attente de commit)
+  - [x] Interface commune `synthesize(texte, prompt_wav, prompt_text, speed)`
+        : `engine/omnivoice_engine.py` (même contrat que
+        `cosyvoice_engine`, 24 kHz natifs, normalisation FR, BGM, `speed`
+        par étirement, `out_sr` pour le montage).
+  - [x] Colonne `moteur` dans `voix.txt` (7ᵉ colonne, défaut `cosyvoice`,
+        rétrocompatible) ; `multi.generate()` charge uniquement les moteurs
+        requis et route chaque bloc (`voice.moteur`) ; sr du montage =
+        sr CosyVoice si requis, sinon 24 kHz (M19.2 partiel : resample).
+  - [x] **Moteur par défaut configurable** : sélecteur dans Réglages
+        (persistant, `POST /api/config {moteur}`, exposé via `GET /api/etat`),
+        `VOICEBUILDER_MOTEUR_DEFAUT`, appliqué aux voix sans colonne et en
+        repli ; changement sans restart. (`GET /api/voix` expose `moteur` ;
+        `/api/voix/nommer` persiste la 7ᵉ colonne.)
+  - [x] `omnivoice==0.2.1` dans `requirements.txt` ; E2E GPU vert
+        (montage 100 % OmniVoice, 24 kHz) ; 16 tests `test_omnivoice.py`
+        verts. Reste : montage **mixte réel** à valider au rebuild de
+        l'image Docker (modèle CosyVoice inaccessible hors conteneur).
+  - [ ] Rôles de workers par type de calcul (un rôle = déployable seul sur
         n'importe quelle machine) : `synthese` (CosyVoice3 / XTTS-v2 /
         Fish-Speech), `verify` (Whisper), `enhance` (Demucs + DeepFilterNet),
         `audit` (M17.1), `lora-train` (M18.2) ; chaque worker s'annonce
         (rôle, moteur, VRAM/CPU, version de modèle) au coordinateur.
-  - [ ] Colonne `moteur` dans `voix.txt` (défaut `cosyvoice3`, rétrocompatible) ;
-        `multi.generate()` dispatche chaque bloc vers le bon worker ; panneau
-        « 🧠 Modèles » étendu au téléchargement/détection des modèles par
-        moteur et par machine.
-  - [ ] **Moteur et modèle par défaut configurables** : réglage global
-        (moteur + variante de modèle) dans le panneau Réglages, persistant
-        (comme `.map`, côte à côte du document ou global), exposé à l'API
-        (`GenererIn` + `GET /api/modeles`), appliqué en repli quand une
-        voix ne précise ni moteur ni modèle ; changement sans restart.
+  - [ ] Panneau « 🧠 Modèles » étendu au téléchargement/détection des modèles
+        par moteur et par machine ; wrappers `engine/xtts_engine.py` **puis
+        `engine/fishspeech_engine.py`**.
 - [ ] **M19.2 — Cohérence du montage multi-moteurs**
   - [ ] Resample + alignement de loudness par bloc (sample rates / niveaux
         différents selon moteur), sinon les changements de voix s'entendent ;

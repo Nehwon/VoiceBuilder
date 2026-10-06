@@ -36,6 +36,23 @@ MODEL_ID_COSYVOICE3 = "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
 # Prompt système requis par CosyVoice3 avant la transcription de référence.
 COSYVOICE3_SYSTEM_PROMPT = "You are a helpful assistant.<|endofprompt|>"
 
+# --- Moteur OmniVoice (M19.1, alternatif à CosyVoice) ---------------------------
+# Modèle HF "k2-fsa/OmniVoice" (fp16, 24 kHz natifs). Téléchargé au premier
+# chargement dans le cache HuggingFace, sauf si OMNIVOICE_MODEL_DIR pointe
+# vers un dossier local déjà rempli (ex. volume Docker /models/omnivoice).
+OMNIVOICE_MODEL_ID = os.environ.get("OMNIVOICE_MODEL_ID", "k2-fsa/OmniVoice")
+OMNIVOICE_MODEL_DIR = Path(
+    os.environ.get("OMNIVOICE_MODEL_DIR")
+    or OMNIVOICE_MODEL_ID
+)
+
+# Moteurs TTS disponibles et moteur par défaut des voix sans colonne moteur
+# (voix.txt). Réglable via VOICEBUILDER_MOTEUR_DEFAUT.
+MOTEURS = ("cosyvoice", "omnivoice")
+MOTEUR_DEFAUT = os.environ.get("VOICEBUILDER_MOTEUR_DEFAUT", "cosyvoice")
+if MOTEUR_DEFAUT not in MOTEURS:
+    MOTEUR_DEFAUT = "cosyvoice"
+
 # --- Dossiers projet ---------------------------------------------------------------
 VOIX_DIR = PROJECT_ROOT / "voix"
 TEXTE_DIR = PROJECT_ROOT / "texte"
@@ -82,6 +99,19 @@ def set_audio_dir(path) -> None:
     global VOIX_AUDIO_DIR, VOIX_SEARCH_DIRS
     VOIX_AUDIO_DIR = Path(path).expanduser()
     VOIX_SEARCH_DIRS = (PROJECT_ROOT, VOIX_DIR, VOIX_AUDIO_DIR)
+
+
+def set_moteur_defaut(nom: str) -> None:
+    """Change au runtime le moteur par défaut (GUI → persistance).
+
+    S'applique aux voix sans colonne moteur dans ``voix.txt``. Lève
+    ``ValueError`` si le moteur est inconnu.
+    """
+    global MOTEUR_DEFAUT
+    nom = (nom or "").strip().lower()
+    if nom not in MOTEURS:
+        raise ValueError(f"Moteur inconnu : {nom} (attendu : {', '.join(MOTEURS)})")
+    MOTEUR_DEFAUT = nom
 
 
 def set_model_dir(path) -> None:

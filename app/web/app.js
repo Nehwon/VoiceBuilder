@@ -997,6 +997,15 @@ $("btn-dir").addEventListener("click", async () => {
 });
 $("btn-save").addEventListener("click", () =>
   notifier("Réglages utilisés côté serveur à la génération.", "ok"));
+$("btn-moteur").addEventListener("click", async () => {
+  const r = await fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ moteur: $("moteur").value }),
+  });
+  if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+  await chargerEtat();
+  notifier("Moteur par défaut appliqué.", "ok");
+});
 
 // ---------------------------------------------------------------- musique de fond (BGM)
 $("bgm-volume").addEventListener("input", () => {
@@ -2149,6 +2158,7 @@ async function telechargerModele() {
 async function chargerEtat() {
   const etat = await (await fetch("/api/etat")).json();
   $("audio-dir").value = etat.audio_dir;
+  if (etat.moteur) $("moteur").value = etat.moteur;
   $("bgm-nom").textContent = etat.bgm_lit || "aucun lit";
   if (etat.bgm_volume != null) {
     $("bgm-volume").value = etat.bgm_volume;

@@ -4,6 +4,7 @@ num2words==0.5.14
 tqdm==4.70.0
 librosa==0.10.2
 openai-whisper==20250625
+omnivoice==0.2.1  # M19.1 : moteur alternatif (clone zero-shot, 24 kHz natifs)
 gradio==3.43.2
 fastapi==0.141.1
 uvicorn==0.52.1

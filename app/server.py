@@ -91,6 +91,12 @@ def _etat() -> dict:
     config.set_audio_dir(d)
     config.ensure_dirs()
     _BROUILLONS.mkdir(parents=True, exist_ok=True)
+    # moteur par défaut persisté (M19.1) : CosyVoice si absent/invalide.
+    try:
+        config.set_moteur_defaut(
+            _charger_persistance().get("moteur") or config.MOTEUR_DEFAUT)
+    except ValueError:  # noqa: BLE001
+        config.set_moteur_defaut("cosyvoice")
     # lit musical BGM persisté (ignoré s'il n'existe plus)
     _restaurer_bgm()
     bgm_etat = {"bgm_lit": Path(config.BGM_LIT).name if config.BGM_LIT else None,
@@ -102,11 +108,13 @@ def _etat() -> dict:
         except Exception as exc:  # noqa: BLE001
             return {"audio_dir": d, "voix_file": False, "voix": [],
                     "erreur": f"{config.VOIX_FILE.name} invalide : {exc}",
-                    **bgm_etat}
+                    "moteur": config.MOTEUR_DEFAUT,
+                    "moteurs": list(config.MOTEURS), **bgm_etat}
     else:
         noms = []
     return {"audio_dir": d, "voix_file": fichier_voix, "voix": noms,
-            "erreur": None, **bgm_etat}
+            "erreur": None, "moteur": config.MOTEUR_DEFAUT,
+            "moteurs": list(config.MOTEURS), **bgm_etat}
 
 
 def _restaurer_bgm() -> None:
@@ -222,6 +230,7 @@ def api_torch_install_stream(jid: int):
 class ConfigIn(BaseModel):
     audio_dir: str | None = None
     bgm_volume: float | None = None
+    moteur: str | None = None  # moteur par défaut : "cosyvoice" | "omnivoice"
 
 
 class ModeleIn(BaseModel):
@@ -361,6 +370,12 @@ def api_config(payload: ConfigIn):
     if payload.bgm_volume is not None:
         config.set_bgm(config.BGM_LIT, payload.bgm_volume)
         _sauver_persistance({"bgm_volume": config.BGM_VOLUME})
+    if payload.moteur is not None:
+        try:
+            config.set_moteur_defaut(payload.moteur)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        _sauver_persistance({"moteur": config.MOTEUR_DEFAUT})
     config.ensure_dirs()
     voix.generer_voix_txt()          # (re)génère si voix.txt absent
     return _etat()
@@ -444,7 +459,8 @@ def api_modele_stream(jid: int):
 def api_voix():
     try:
         v = _voix()
-        return [{"nom": ve.name, "wav": str(ve.wav), "txt": str(ve.txt)}
+        return [{"nom": ve.name, "wav": str(ve.wav), "txt": str(ve.txt),
+                 "moteur": ve.moteur}
                 for ve in v]
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, str(exc))

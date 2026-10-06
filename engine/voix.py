@@ -3,7 +3,10 @@
 Chaque voix = un couple ``.wav`` (échantillon à cloner) + ``.txt`` (sa
 transcription exacte). Le fichier de listage a une entrée par ligne :
 
-    [NomPersonnage] chemin.wav[, chemin.txt][, pause_pré][, vitesse][, max_chars]
+    [Nom], chemin.wav[, chemin.txt][, pause_pré][, vitesse][, max_chars][, moteur]
+
+``moteur`` : ``cosyvoice`` (défaut) ou ``omnivoice``. Les voix sans 7ᵉ
+colonne utilisent le moteur par défaut (``config.MOTEUR_DEFAUT``).
 
 Les chemins sont résolus par rapport au dossier projet ; en repli, par rapport au
 dossier des voix (VOIX_DIR).
@@ -50,6 +53,7 @@ class Voice:
     pause: Optional[float] = None         # surcharge de la pause inter-bloc
     speed: Optional[float] = None
     max_block_chars: Optional[int] = None
+    moteur: str = config.MOTEUR_DEFAUT  # moteur TTS (M19.1)
     prompt_text: str = ""                 # transcription nettoyée
 
     @property
@@ -143,15 +147,23 @@ def generer_voix_txt(dossier=None, out=None) -> Path:
 
 
 def ecrire_voix_txt(entries, out=None) -> Path:
-    """Écrit (écrase) ``voix.txt`` à partir d'une liste ``[(nom, wav, txt)]``."""
+    """Écrit (écrase) ``voix.txt`` à partir d'une liste d'entrées.
+
+    Entrée : ``(nom, wav, txt)`` ou ``(nom, wav, txt, moteur)``. La 7ᵉ
+    colonne ``moteur`` n'est écrite que si elle diffère du défaut
+    (``config.MOTEUR_DEFAUT``), pour ne pas bruiter les voix existantes.
+    """
     out = Path(out) if out else config.VOIX_FILE
     out.parent.mkdir(parents=True, exist_ok=True)
     lignes = []
-    for nom, wav, txt in entries:
+    for e in entries:
+        nom, wav, txt = e[0], e[1], e[2]
+        moteur = (e[3] or "").strip().lower() if len(e) > 3 else ""
         nom = (nom or "").strip()
         if not nom:
             continue
-        lignes.append(f"[{nom}], {Path(wav).name}, {Path(txt).name}")
+        suffixe = f", , , , {moteur}" if moteur and moteur != config.MOTEUR_DEFAUT else ""
+        lignes.append(f"[{nom}], {Path(wav).name}, {Path(txt).name}{suffixe}")
     out.write_text("\n".join(lignes) + ("\n" if lignes else ""), encoding="utf-8")
     return out
 
@@ -210,6 +222,18 @@ def load_voix(path: Optional[Path] = None, voix_dir: Optional[Path] = None) -> V
                 voice.speed = float(parts[4])
             if len(parts) >= 6 and parts[5]:
                 voice.max_block_chars = int(parts[5])
+            if len(parts) >= 7 and parts[6]:
+                moteur = parts[6].strip().lower()
+                if moteur not in config.MOTEURS:
+                    raise ValueError(
+                        f"Moteur inconnu pour la voix « {name} » : {parts[6]} "
+                        f"(attendu : {', '.join(config.MOTEURS)})"
+                    )
+                voice.moteur = moteur
+            else:
+                # Sans colonne moteur : défaut courant (modifiable au runtime
+                # via le sélecteur Configuration, M19.1).
+                voice.moteur = config.MOTEUR_DEFAUT
 
             voices.append(voice)
 

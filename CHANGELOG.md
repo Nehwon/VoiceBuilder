@@ -8,6 +8,32 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Ajout — Moteur OmniVoice alternatif + routage par voix (M19.1)
+
+- **Moteur** (`engine/omnivoice_engine.py`, nouveau) : wrapper
+  `k2-fsa/OmniVoice` (fp16, 24 kHz natifs) au même contrat que
+  `cosyvoice_engine` (`load` / `synthesize` / `save`) — normalisation
+  française, marqueurs BGM et `[en]/[fr]` traités avant synthèse, `speed`
+  par étirement, `out_sr` pour le montage. Bench : RTF 0,094 contre 0,383
+  (4×), écoute utilisateur 9/10 contre 7/10 (`verdict-omni.json`,
+  `verdict-divine.json`).
+- **Voix** (`engine/voix.py`) : 7ᵉ colonne `moteur` dans `voix.txt`
+  (`cosyvoice` par défaut, rétrocompatible) ; `GET /api/voix` expose le
+  moteur, `/api/voix/nommer` le persiste.
+- **Routage** (`engine/multi.py`) : `generate()` ne charge que les moteurs
+  requis (VRAM partagée) et route chaque bloc via `voice.moteur` ; sr du
+  montage = sr CosyVoice si requis, sinon 24 kHz (resample inclus) ;
+  `synth_bloc()` (régénération) suit le même routage.
+- **Réglages** (`app/server.py`, `app/web/`) : sélecteur du moteur par
+  défaut dans Configuration (persistant, `POST /api/config {moteur}`,
+  `VOICEBUILDER_MOTEUR_DEFAUT`), appliqué aux voix sans colonne ;
+  changement sans restart.
+- **Dépendances** (`requirements.txt`) : `omnivoice==0.2.1`.
+- **Tests** (`tests/test_omnivoice.py`, 16 tests verts) : colonne moteur,
+  défaut configurable, engine (mock), routage ; E2E GPU vert (montage
+  100 % OmniVoice). Non-régression : `test_text_fr.py` a 2 échecs
+  préexistants (`TestTimes`, sans rapport, fichier intact).
+
 ### Correction — Déploiement : bascule du registre Gitea vers GHCR
 
 - **Infra** (`docker-compose.gitea.yml`, `.env.gitea`) : l'image de
