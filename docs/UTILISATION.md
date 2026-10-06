@@ -82,8 +82,15 @@ dans Configuration (`POST /api/config {moteur}`, persistant) :
   (RTF ~0,09 contre ~0,4–0,7) et jugé plus naturel à l'écoute (9/10 contre
   7/10, bench `docs/BENCH_MOTEURS.md`). Limites V1 : **pas de routage
   multilingue** (marqueurs `[en]/[fr]` retirés, tout en français),
-  `speed` par étirement temporel. Modèle téléchargé au premier usage
-  (cache HuggingFace, ou `OMNIVOICE_MODEL_DIR` local).
+  `speed` par étirement temporel.
+  - **Prérequis (M19.1-bis)** : OmniVoice exige `transformers>=5.3`, qui
+    casse CosyVoice3 — il tourne donc dans un **worker séparé**
+    (`app/worker_omni.py`, image `voicebuilder-omni`, branche
+    `omnivoice`). Démarrage :
+    `docker compose -f docker-compose.gitea.yml --env-file .env.gitea -f docker-compose.omni.yml --env-file .env.gitea up -d omni`
+    (modèle 3,3 Go en cache HF sur volume). Sans worker joignable, toute
+    synthèse `omnivoice` échoue avec un message explicite (le moteur
+    `cosyvoice` reste utilisable).
 
 #### Choix de l'emplacement des fichiers .wav/.txt
 

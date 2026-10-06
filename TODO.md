@@ -446,8 +446,8 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [ ] Calibrer le **RTF CPU-only de référence** sur les bi-Xeon (par moteur
         et par tâche) pour dimensionner le mode batch (M19.5) — reporté sur
         demande.
-- [x] **M19.1 — Abstraction worker moteur + routage par voix** (implémenté
-  2026-10-06, en attente de commit)
+- [x] **M19.1 — Abstraction worker moteur + routage par voix** (committé
+  2026-10-06 ; M19.1-bis ci-dessous pour le déploiement)
   - [x] Interface commune `synthesize(texte, prompt_wav, prompt_text, speed)`
         : `engine/omnivoice_engine.py` (même contrat que
         `cosyvoice_engine`, 24 kHz natifs, normalisation FR, BGM, `speed`
@@ -461,10 +461,33 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         `VOICEBUILDER_MOTEUR_DEFAUT`, appliqué aux voix sans colonne et en
         repli ; changement sans restart. (`GET /api/voix` expose `moteur` ;
         `/api/voix/nommer` persiste la 7ᵉ colonne.)
-  - [x] `omnivoice==0.2.1` dans `requirements.txt` ; E2E GPU vert
-        (montage 100 % OmniVoice, 24 kHz) ; 16 tests `test_omnivoice.py`
-        verts. Reste : montage **mixte réel** à valider au rebuild de
-        l'image Docker (modèle CosyVoice inaccessible hors conteneur).
+  - [x] E2E GPU verts (montage 100 % OmniVoice, 24 kHz, venv bench) ;
+        23 tests `test_omnivoice.py` verts (dont 3 mode worker HTTP).
+  - [x] **M19.1-bis — Worker OmniVoice séparé** (2026-10-06) : `omnivoice`
+        exige `transformers>=5.3` qui casse CosyVoice3 (prouvé : 4.51 OK /
+        5.18 crash) → pas de cohabitation en un processus.
+    - `app/worker_omni.py` : micro-service FastAPI (`GET /health`,
+      `POST /synthesize`, 24 kHz natifs) ; `engine/omnivoice_engine.py`
+      double-mode (direct si importable, sinon client HTTP vers
+      `OMNIVOICE_WORKER_URL`, défaut `http://omni:8100`).
+    - **Deux images** : `voicebuilder` (CosyVoice, transformers 4.51) +
+      `voicebuilder-omni` (`docker/omni/Dockerfile`, FROM vb + transformers
+      5.18, validée : synthèse conteneur 3,7 s @ 24 kHz, publiée au registre
+      local par la CI).
+    - **CI dédiée** `.gitea/workflows/omni.yml` (build/push sur push
+      branche `omnivoice`, même pattern que `vb.yml`) ; overlay
+      `docker-compose.omni.yml` (service `omni`, cache HF sur volume,
+      mêmes binds voix que le gui) — branche `omnivoice` uniquement pour
+      ne pas casser le déploiement `main`.
+    - **Deux branches distantes** (Gitea + GitHub) : `main` (CosyVoice) et
+      `omnivoice` (`main` + packaging worker) ; maintenir via merge
+      régulier `main` → `omnivoice`.
+    - `requirements.txt`/`requirements-lock.txt` **sans** omnivoice (image
+      CosyVoice pure) ; dépendances worker dans `requirements-omni.txt`.
+  - [x] Réglages persistants sur volume (`VOICEBUILDER_SETTINGS_FILE`,
+        défaut `/app/tmp/voicebuilder_settings.json` dans les compose) :
+        avant, le fichier vivait dans l'image et chaque recreate
+        réinitialisait moteur/audio/BGM.
   - [ ] Rôles de workers par type de calcul (un rôle = déployable seul sur
         n'importe quelle machine) : `synthese` (CosyVoice3 / XTTS-v2 /
         Fish-Speech), `verify` (Whisper), `enhance` (Demucs + DeepFilterNet),
