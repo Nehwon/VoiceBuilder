@@ -146,6 +146,15 @@ documenter l'étage retenu par voix (reproductibilité).
 Pertinent pour le narrateur + 1–2 héros à fort temps d'antenne. Overkill pour
 les 14 voix secondaires → les garder en zéro-shot curé.
 
+> **Mise à jour 2026-10-06 (M19.1).** Le palier 2 a été court-circuité par le
+> bench : **OmniVoice** (`k2-fsa/OmniVoice`) bat CosyVoice3 à l'écoute (9/10
+> contre 7/10) avec un RTF ~4× meilleur, à coverage égal (voir
+> `docs/BENCH_MOTEURS.md`). Il est **intégré comme moteur alternatif** :
+> colonne `moteur` dans `voix.txt` (prévue au §4.2, désormais **active**) +
+> moteur par défaut dans Configuration. Le fine-tune LoRA reste pertinent
+> pour les voix faibles que le zéro-shot (quel que soit le moteur) ne
+> porte pas.
+
 ---
 
 ## 4. Palier 2 — Changer de moteur (seulement si le palier 1 échoue)
@@ -168,9 +177,11 @@ les 14 voix secondaires → les garder en zéro-shot curé.
   même protocole qu'en §3.4** (+ écoute aveugle), face au meilleur CosyVoice
   (palier 0 ou LoRA).
 - Ne migrer que le(s) personnage(s) gagnant(s) : architecture **multi-moteurs
-  côté sidecar** (1 moteur par voix). Prévoir dès le portage GO une colonne
+  côté sidecar** (1 moteur par voix). ~~Prévoir dès le portage GO une colonne
   `moteur` future dans `voix.txt` (sans l'activer) pour ne pas avoir à
-  re-câbler le serveur plus tard.
+  re-câbler le serveur plus tard.~~ **Fait (M19.1, 2026-10-06)** : colonne
+  `moteur` active dans `voix.txt` + `multi.generate()` route chaque bloc
+  (`engine/omnivoice_engine.py`, sélecteur Configuration).
 - Rappel licence : XTTS-v2 = CPML. Si le projet diffuse commercialement,
   trancher le point juridique avant d'investir en fine-tune XTTS.
 

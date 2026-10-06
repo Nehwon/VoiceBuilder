@@ -53,17 +53,37 @@ des tokens vocaux, cf. `vendor/CosyVoice/cosyvoice/cli/frontend.py`).
 Fichier de listage `voix/voix.txt`, une entrée par ligne :
 
 ```
-# [Nom] wav, txt[, pause_pré][, vitesse][, max_chars]
+# [Nom], wav, txt[, pause_pré][, vitesse][, max_chars][, moteur]
 [LeNarrateur],  vb-voice/superama.wav, vb-voice/superama.txt
 [Kaël-An],      echantillons/kael_an.wav,     echantillons/kael_an.txt, 0.3, 1.0, 200
+[Robot],        echantillons/robot.wav,        echantillons/robot.txt, , , , omnivoice
 ```
 
 - **wav**, **txt** : chemins relatifs au projet ou absolus.
 - **pause_pré** (s), **vitesse**, **max_chars** : surcharges optionnelles par voix.
+- **moteur** : `cosyvoice` (défaut, modifiable dans Configuration) ou
+  `omnivoice` — moteur TTS de cette voix (M19.1). Une voix sans 7ᵉ colonne
+  suit le moteur par défaut ; une voix avec colonne garde toujours le sien.
 - le `.txt` : transcription exacte, au besoin horodatée `[0000.00 - 0005.28] texte`.
 
 Au clonage, le prompt TTS =
-`"You are a helpful assistant.<|endofprompt|>" + texte_du_txt`.
+`"You are a helpful assistant.<|endofprompt|>" + texte_du_txt`
+(moteur CosyVoice ; OmniVoice utilise la transcription brute).
+
+#### Moteurs TTS (M19.1)
+
+Deux moteurs au même contrat (`engine/{cosyvoice,omnivoice}_engine.py`),
+routés **par voix** (7ᵉ colonne de `voix.txt`) avec un **défaut global**
+dans Configuration (`POST /api/config {moteur}`, persistant) :
+
+- **CosyVoice3** (défaut) : multilingue (`[en]…[/en]` gardant l'accent
+  anglais), tokens non-verbaux §4, pré-cache de prompts.
+- **OmniVoice** (`k2-fsa/OmniVoice`, fp16, 24 kHz natifs) : plus rapide
+  (RTF ~0,09 contre ~0,4–0,7) et jugé plus naturel à l'écoute (9/10 contre
+  7/10, bench `docs/BENCH_MOTEURS.md`). Limites V1 : **pas de routage
+  multilingue** (marqueurs `[en]/[fr]` retirés, tout en français),
+  `speed` par étirement temporel. Modèle téléchargé au premier usage
+  (cache HuggingFace, ou `OMNIVOICE_MODEL_DIR` local).
 
 #### Choix de l'emplacement des fichiers .wav/.txt
 
@@ -287,7 +307,8 @@ python -m app.web_app --host 127.0.0.1 --port 7860   # puis ouvrir http://127.0.
 ```
 
 Onglets **Éditeur** (texte taggé, insertion `[Nom]:`, bouton **Générer**, aperçu du
-montage), **Réglages** (pause, vitesse, max chars/bloc, vérification, `device`) et
+montage), **Réglages** (pause, vitesse, max chars/bloc, vérification, `device`,
+**moteur par défaut** : `cosyvoice` ou `omnivoice`, M19.1) et
 **Assistant voix** (extraction + transcription Whisper d'un extrait).
 
 ### GUI serveur (référence — FastAPI)

@@ -15,6 +15,9 @@ dans un éditeur Markdown, associer chaque réplique à une voix définie par un
 
 Moteur : **CosyVoice3 (Fun-CosyVoice3-0.5B)** — clonage zéro-shot `wav+txt`,
 multilingue, découpage en blocs adaptatifs + vérification automatique (Whisper).
+**Depuis M19.1 (2026-10-06) : OmniVoice** (`k2-fsa/OmniVoice`) en moteur
+alternatif — routage par voix (`voix.txt`), défaut global dans Configuration
+(voir `docs/BENCH_MOTEURS.md` pour le bench décisif).
 
 ---
 
@@ -197,6 +200,16 @@ depuis l'interface (panneau « 🧠 Modèles », `engine/modeles.py`, volume `vo
 → `/models`) ou **pré-rempli** dans le volume (détection : rien n'est re-téléchargé).
 Tous les dossiers de données utilisent des **volumes Docker nommés** (`volume-audio`,
 `volume-model`, `volume-texte`, `volume-output`, `volume-tmp`).
+
+### M19.1 — Moteur OmniVoice alternatif + routage par voix
+**Objectif** : pouvoir choisir le moteur TTS par voix et par défaut, après
+victoire d'OmniVoice au bench M19 (écoute 9/10 vs 7/10, RTF ×4).
+**Livrables** : `engine/omnivoice_engine.py` (même contrat que CosyVoice) ;
+colonne `moteur` de `voix.txt` ; routage par bloc dans `multi.generate()` ;
+sélecteur du moteur par défaut dans Configuration (persistant) ;
+`omnivoice==0.2.1` dans `requirements.txt` ; 16 tests verts + E2E GPU.
+**Statut** : ✔ Terminé (2026-10-06) — reste le montage **mixte réel** à valider
+au rebuild de l'image (modèle CosyVoice inaccessible hors conteneur).
 
 ---
 

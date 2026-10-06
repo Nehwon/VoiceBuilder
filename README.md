@@ -1,14 +1,18 @@
 # VoiceBuilder
 
-Outil local d'**écriture et de production audio multi-voix** basé sur le moteur
-**CosyVoice3** (`Fun-CosyVoice3-0.5B`).
+Outil local d'**écriture et de production audio multi-voix** basé sur les moteurs
+**CosyVoice3** (`Fun-CosyVoice3-0.5B`, défaut) et **OmniVoice** (`k2-fsa/OmniVoice`,
+alternatif plus rapide et naturel — M19.1, routage par voix).
 
 Taguez un texte dans un éditeur Markdown, associez chaque réplique à une voix
 (définie par un échantillon `.wav` + sa transcription `.txt`), puis générez un
 montage dans lequel chaque personnage parle avec **son** timbre — sans perte de
 contenu et avec une tonalité cohérente.
 
-> Le moteur actif est **CosyVoice3** (multilingue : français, en, zh, ja…).
+> Le moteur par défaut est **CosyVoice3** (multilingue : français, en, zh, ja…).
+> **OmniVoice** est disponible en alternatif (plus rapide, écoute 9/10 — voir
+> `docs/BENCH_MOTEURS.md`) : 7ᵉ colonne `moteur` de `voix.txt` ou sélecteur
+> dans Configuration.
 > CosyVoice2 reste trop faible en français (cf. `PROJET.md` §7).
 
 ---
