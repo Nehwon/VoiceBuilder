@@ -29,6 +29,17 @@ _SR_SORTIE = 44100   # fréquence du wav produit (référence voix)
 # Indices de stems Demucs (htdemucs -> 4 stems : drums, bass, other, vocals)
 _STEM_VOCALS = 3
 
+# Durée minimale paddée avant les réseaux (leurs convolutions exigent une
+# longueur d'entrée supérieure à la taille du noyau ; un extrait de quelques
+# millisecondes provoquait :
+# « Calculated padded input size per channel: (3). Kernel size: (4).
+#    Kernel size can't be greater than actual input size »).
+# On padde au silence à cette durée puis on retronque à la longueur d'origine.
+_DUREE_MIN_S = 4.0
+# En dessous de ce seuil absolu, l'échantillon est inexploitable : on refuse
+# avec un message clair au lieu de lancer les modèles pour rien.
+_DUREE_ABSOLUE_MIN_S = 0.3
+
 
 def modele_dossier() -> Path:
     return Path(config.ENHANCE_MODEL_DIR)
@@ -68,6 +79,27 @@ def _lire_audio(chemin, sr_cible: int):
     return audio, sr_cible
 
 
+def _pader_duree_min(audio, sr: int, min_s: float = _DUREE_MIN_S):
+    """Padde au silence à ``min_s`` secondes si l'audio est trop court.
+
+    Renvoie ``(audio_padde, longueur_origine)`` pour retronquer après le modèle.
+    Lève ``RuntimeError`` si l'audio est vide ou sous le seuil absolu.
+    """
+    import numpy as np
+    n_ori = int(audio.shape[0])
+    duree = n_ori / float(sr) if sr else 0.0
+    if n_ori == 0 or duree < _DUREE_ABSOLUE_MIN_S:
+        raise RuntimeError(
+            f"Échantillon trop court ({duree:.2f} s) : "
+            f"minimum {_DUREE_ABSOLUE_MIN_S:.1f} s requis pour le nettoyage."
+        )
+    n_min = int(sr * min_s)
+    if n_ori >= n_min:
+        return audio, n_ori
+    pad = np.zeros((n_min - n_ori,), dtype=audio.dtype)
+    return np.concatenate([audio, pad]), n_ori
+
+
 def _ecrire_audio(chemin, audio, sr: int) -> None:
     import soundfile as sf
     sf.write(chemin, audio, sr)
@@ -100,8 +132,9 @@ def _demucs_vocals(src: Path, out: Path, mode: str, progress: Callable | None) -
         if fp16:
             model = model.half()
 
-    # lecture + resample 44,1 kHz stéréo
+    # lecture + resample 44,1 kHz stéréo (+ pad anti-kernel si extrait court)
     audio, sr = _lire_audio(src, _SR_DEMUCS)
+    audio, n_ori = _pader_duree_min(audio, _SR_DEMUCS)
     # stéréo pour Demucs (2 canaux attendus)
     mix = np.stack([audio, audio], axis=0)  # [2, T]
     wav = torch.from_numpy(mix).unsqueeze(0)  # [1, 2, T]
@@ -120,6 +153,8 @@ def _demucs_vocals(src: Path, out: Path, mode: str, progress: Callable | None) -
     if vocals.ndim > 1 and vocals.shape[0] > 1:
         vocals = vocals.mean(dim=0)
     vocals = vocals.squeeze(0).cpu().numpy()
+    # retronque au silence de padding (garde la durée d'origine)
+    vocals = vocals[:n_ori]
 
     if fp16:
         model.float()  # libère proprement
@@ -147,6 +182,7 @@ def _deepfilternet(chemins_in: Path, out: Path, progress: Callable | None) -> di
     model, df_state, suffix = init_df(model_base_dir=None, log_level="WARNING")
 
     audio, sr = _lire_audio(chemins_in, _SR_DF)
+    audio, n_ori = _pader_duree_min(audio, _SR_DF)
     audio_t = torch.from_numpy(audio).unsqueeze(0)  # [1, T]
 
     if progress:
@@ -155,6 +191,8 @@ def _deepfilternet(chemins_in: Path, out: Path, progress: Callable | None) -> di
         out_t = enhance(model, df_state, audio_t)
 
     final = out_t.squeeze(0).cpu().numpy()
+    # retronque au silence de padding avant de repasser en 44,1 kHz
+    final = final[:n_ori]
     # on repasse en 44,1 kHz pour un échantillon voix standard
     import librosa
     if _SR_DF != _SR_SORTIE:

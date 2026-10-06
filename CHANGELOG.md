@@ -8,6 +8,14 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Correction — Nettoyage voix : crash sur extraits courts
+
+- **Moteur** (`engine/enhance.py`) : les extraits de moins de 4 s sont
+  paddés au silence avant Demucs / DeepFilterNet puis retronqués à leur
+  durée d'origine (fini le crash `Kernel size can't be greater than actual
+  input size` sur les échantillons trop courts). Sous 0,3 s, refus net
+  avec message clair au lieu de lancer les modèles pour rien.
+
 ### Correction — Build image vb : conflit pip vllm/torch/fastapi
 
 - **Dépendances** (`requirements.txt`, `docker/vb/Dockerfile`) : `vllm>=0.9.0`
