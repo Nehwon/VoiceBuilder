@@ -415,6 +415,17 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [ ] **Fish-Speech v1.5+** : bloqué (deps v1.5.1 : `pydantic==2.9.2`
         incompilable sur Python 3.14, `lightning`/`litgpt` requis) → reprendre
         en conteneur Python ≤ 3.12.
+  - [ ] **OmniVoice (k2-fsa, ref Korben 2026-09-11)** : zero-shot 600+
+        langues (FR 5e du corpus, 23 675 h), prompt 3–10 s, 3,3 Go,
+        Python 3.10–3.13, RTF annoncé 0,025 (diffusion NAR), sortie
+        24 kHz ; code Apache 2.0, modèle CC-BY-NC (usage personnel OK,
+        même statut que Fish-Speech) ; API `generate(text, ref_audio,
+        ref_text, speed)` quasi identique à la `SynthesizeFn` visée +
+        `normalize_text`, tags `[laughter]`/`[sigh]` (compatibles M10.2),
+        voice design et mode auto (sans prompt). À tester **sur Pandora
+        (GPU)** : bench coverage Whisper §3.4 + RTF + écoute aveugle vs
+        CosyVoice3/XTTS avant décision M19.1. (Test local interdit :
+        aucune charge de travail hors hôte propre sans autorisation.)
   - [ ] Calibrer le **RTF CPU-only de référence** sur les bi-Xeon (par moteur
         et par tâche) pour dimensionner le mode batch (M19.5) — reporté sur
         demande.
@@ -432,6 +443,11 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
         `multi.generate()` dispatche chaque bloc vers le bon worker ; panneau
         « 🧠 Modèles » étendu au téléchargement/détection des modèles par
         moteur et par machine.
+  - [ ] **Moteur et modèle par défaut configurables** : réglage global
+        (moteur + variante de modèle) dans le panneau Réglages, persistant
+        (comme `.map`, côte à côte du document ou global), exposé à l'API
+        (`GenererIn` + `GET /api/modeles`), appliqué en repli quand une
+        voix ne précise ni moteur ni modèle ; changement sans restart.
 - [ ] **M19.2 — Cohérence du montage multi-moteurs**
   - [ ] Resample + alignement de loudness par bloc (sample rates / niveaux
         différents selon moteur), sinon les changements de voix s'entendent ;

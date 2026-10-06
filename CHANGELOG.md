@@ -8,6 +8,14 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Correction — Déploiement : bascule du registre Gitea vers GHCR
+
+- **Infra** (`docker-compose.gitea.yml`, `.env.gitea`) : l'image de
+  déploiement est tirée du miroir public `ghcr.io/nehwon/voicebuilder`
+  (vars `APP_IMAGE` / `APP_TAG`) au lieu du registre Gitea privé, dont
+  l'absence d'authentification sur les hôtes faisait échouer le webhook
+  (`docker compose pull` → 401 → HTTP 500 à chaque push).
+
 ### Correction — Reprise après relance / rechargement (prioritaire)
 
 - **Serveur** (`app/server.py`) : le flux SSE rejoue les blocs déjà

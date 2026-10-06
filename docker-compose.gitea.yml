@@ -1,12 +1,14 @@
-# VoiceBuilder — orchestration Docker : mode « registre Gitea ».
+# VoiceBuilder — orchestration Docker : mode « image publiée ».
 #
-# Variante de docker-compose.yml qui UTILISE les images publiées sur le
-# registre container Gitea (construites par le CI, cf. .gitea/workflows/)
-# au lieu de construire localement. Aucune section `build:` : tout est tiré
-# du registre distant (`docker compose pull`).
+# Variante de docker-compose.yml qui UTILISE les images publiées
+# (construites par le CI, cf. .gitea/workflows/) au lieu de construire
+# localement. Aucune section `build:` : tout est tiré du registre distant
+# (`docker compose pull`).
 #
-# Images utilisées (toutes construites par le CI Gitea) :
-#   gitea.lamachere.fr/fabrice/voicebuilder:latest   (image finale)
+# Images utilisées (miroir GHCR, public — pas d'authentification requise ;
+# le registre Gitea privé imposait un `docker login` sur chaque hôte de
+# déploiement, source d'échecs 500 du webhook, cf. 2026-10-06) :
+#   ghcr.io/nehwon/voicebuilder:latest   (image finale)
 #
 # Usage (tests / déploiement sans rebuild) :
 #   docker compose -f docker-compose.gitea.yml --env-file .env.gitea up -d
@@ -17,7 +19,7 @@
 # téléchargé au premier lancement dans le volume `volume-model` (/models).
 
 x-app-image: &app-image
-  image: ${GITEA_REGISTRY:-gitea.lamachere.fr}/fabrice/voicebuilder:${GITEA_TAG:-latest}
+  image: ${APP_IMAGE:-ghcr.io/nehwon/voicebuilder}:${APP_TAG:-latest}
 
 services:
   # GUI FastAPI — http://127.0.0.1:8001
