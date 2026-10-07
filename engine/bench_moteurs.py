@@ -15,7 +15,7 @@ import numpy as np
 
 from . import verifier
 from .bench import PARAGRAPHE_REF
-from . import cosyvoice_engine
+from . import omnivoice_engine
 
 SynthFn = Callable[[str], tuple[np.ndarray, int]]
 SEUIL_COVERAGE = 0.85
@@ -36,7 +36,7 @@ def comparer(moteurs: Dict[str, SynthFn], out_dir: str | Path,
         couverture = verifier.coverage(PARAGRAPHE_REF, audio, sr)
         rtf = duree_gen / duree if duree > 0 else 0.0
         wav = out_dir / f"moteur-{nom}.wav"
-        cosyvoice_engine.save(audio, sr, str(wav))
+        omnivoice_engine.save(audio, sr, str(wav))
         ligne = {"moteur": nom, "coverage": round(float(couverture), 4),
                  "rtf": round(float(rtf), 3), "duree": round(float(duree), 2),
                  "duree_gen": round(float(duree_gen), 1), "wav": str(wav)}

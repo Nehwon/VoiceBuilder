@@ -18,7 +18,7 @@ from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
-from . import config, cosyvoice_engine, multi, verifier
+from . import config, multi, omnivoice_engine, verifier
 from .voix import Voices, base_nom, grouper_candidats
 
 # Paragraphe FR de référence (validé) : nombres, date, dialogue, 1 émotion.
@@ -66,7 +66,7 @@ def bench_personnage(
         couverture = verifier.coverage(PARAGRAPHE_REF, np.asarray(audio), sr)
         rtf = duree_gen / duree if duree > 0 else 0.0
         wav = out_dir / f"{slug(nom)}.wav"
-        cosyvoice_engine.save(np.asarray(audio), sr, str(wav))
+        omnivoice_engine.save(np.asarray(audio), sr, str(wav))
         ligne = {"candidat": nom, "coverage": round(couverture, 4),
                  "rtf": round(rtf, 3), "duree": round(duree, 2),
                  "duree_gen": round(duree_gen, 1), "wav": str(wav)}
