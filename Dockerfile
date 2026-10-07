@@ -46,8 +46,7 @@ RUN pip install "omnivoice==0.2.1" "transformers==5.18.0" "tokenizers==0.23.2" \
 # cache HuggingFace (volume dédié, conservé entre recréations). Les modèles
 # enhance (Demucs/DeepFilterNet) restent dans /models (volume-model).
 ENV VOICEBUILDER_AUDIO_DIR=/app/voix
-VOLUME ["/app/output", "/app/texte", "/app/voix", "/models",
-        "/root/.cache/huggingface"]
+VOLUME ["/app/output", "/app/texte", "/app/voix", "/models", "/root/.cache/huggingface"]
 
 EXPOSE 8000
 
