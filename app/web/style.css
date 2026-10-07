@@ -430,7 +430,7 @@ button.secondaire { border-color: var(--bor); }
   height: 8px; border-radius: 4px; overflow: hidden;
   background: var(--panel2); border: 1px solid var(--bor);
 }
-#progression-remplie, #modele-progress-remplie, #voix-progress-fill {
+#progression-remplie, #modele-remplie, #modele-progress-remplie, #voix-progress-fill {
   height: 100%; width: 0%;
   background: var(--acc); transition: width 0.25s ease;
 }

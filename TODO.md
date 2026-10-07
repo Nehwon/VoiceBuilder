@@ -9,13 +9,13 @@ Légende :
 
 ## Prioritaire — Premier lancement (noté 2026-10-07)
 
-- [ ] **Modal de progression au téléchargement du modèle** : au 1er lancement,
+- [x] **Modal de progression au téléchargement du modèle** : au 1er lancement,
   le modèle OmniVoice (3,3 Go) se télécharge en silence pendant que la barre
   reste figée sur « Lancement de la génération... » sans trafic GPU — afficher
   impérativement une popup modale avec progression réelle (hook
   `huggingface_hub`, progression exposée via SSE/job, comme le panneau
   « 🧠 Modèles » d'avant).
-- [ ] **Clé HuggingFace configurable** : demander le token HF dans les Réglages
+- [x] **Clé HuggingFace configurable** : demander le token HF dans les Réglages
   (persistant, `HF_TOKEN`, passé à `huggingface_hub.login` / `HF_TOKEN` env au
   chargement) même si le modèle est téléchargeable sans — évite les erreurs
   CAS côté XetHub vues sans clé :

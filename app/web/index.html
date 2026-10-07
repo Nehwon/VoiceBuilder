@@ -56,6 +56,20 @@
     </div>
   </div>
 
+  <div id="modal-modele" class="modal" hidden>
+    <div class="modal-boite">
+      <h2>📦 Téléchargement du modèle OmniVoice</h2>
+      <p class="modal-sub">Premier lancement : les poids (3,3 Go) arrivent
+        depuis HuggingFace. La synthèse démarrera ensuite — inutile de
+        relancer, la carte graphique s'active à la génération.</p>
+      <div class="progression-barre">
+        <div id="modele-remplie"></div>
+      </div>
+      <p class="modal-sub"><span id="modele-compteur">0%</span> —
+        <span id="modele-fichier">connexion…</span></p>
+    </div>
+  </div>
+
   <main id="vue-edit" class="vue">
     <section class="col-edit">
       <div class="box-editeur">
@@ -375,6 +389,17 @@
         <input id="audio-dir" type="text" />
       </label>
       <button id="btn-dir">Appliquer le dossier</button>
+
+      <h3>Clé HuggingFace</h3>
+      <p class="modal-sub">Recommandée même si le modèle est téléchargeable
+        sans : évite les erreurs réseau CAS/XetHub au téléchargement
+        (3,3 Go au premier lancement). Conservée côté serveur, jamais affichée.</p>
+      <label>Token HF (lecture)
+        <input id="hf-token" type="password" autocomplete="off"
+          placeholder="hf_…" />
+      </label>
+      <button id="btn-hf">💾 Enregistrer la clé</button>
+      <span id="hf-statut" class="voix-upload-info"></span>
 
       <h3>Moteur de synthèse</h3>
       <p class="modal-sub">Branche omni : <strong>OmniVoice</strong>, moteur

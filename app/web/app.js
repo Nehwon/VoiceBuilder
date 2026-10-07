@@ -992,6 +992,51 @@ $("btn-dir").addEventListener("click", async () => {
 $("btn-save").addEventListener("click", () =>
   notifier("Réglages utilisés côté serveur à la génération.", "ok"));
 
+// ---------------------------------------------------------------- premier lancement : modèle + clé HF
+$("btn-hf").addEventListener("click", async () => {
+  const token = $("hf-token").value.trim();
+  if (!token) { notifier("Colle d'abord ton token HF (lecture).", "err"); return; }
+  const r = await fetch("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hf_token: token }),
+  });
+  if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+  $("hf-token").value = "";
+  await chargerEtat();
+  notifier("Clé HuggingFace enregistrée.", "ok");
+});
+
+let _modelePret = null;  // null = inconnu (avant 1er /api/etat)
+
+function majStatutHf(et) {
+  $("hf-statut").textContent = et.hf_token_configuree
+    ? "✅ clé configurée" : "⚠️ aucune clé (recommandée)";
+  if (typeof et.modele?.pret === "boolean") _modelePret = et.modele.pret;
+}
+
+async function assurerModele() {
+  // Vrai quand les poids sont prêts. Affiche la modale de progression
+  // pendant le téléchargement (1er lancement), au lieu d'une barre figée.
+  try {
+    let et = await (await fetch("/api/etat")).json();
+    if (et.modele?.pret) { _modelePret = true; return true; }
+    await fetch("/api/modele/precharger", { method: "POST" });
+    ouvrirModal($("modal-modele"));
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 2000));
+      et = await (await fetch("/api/etat")).json();
+      if (et.modele?.pret) break;
+      const dl = et.modele?.telechargement || {};
+      $("modele-remplie").style.width = (dl.pct || 0) + "%";
+      $("modele-compteur").textContent = (dl.pct || 0) + "%";
+      $("modele-fichier").textContent = dl.fichier || "connexion…";
+    }
+    fermerModal($("modal-modele"));
+    _modelePret = true;
+    return true;
+  } catch { fermerModal($("modal-modele")); return true; }  // ne jamais bloquer
+}
+
 // ---------------------------------------------------------------- musique de fond (BGM)
 $("bgm-volume").addEventListener("input", () => {
   $("bgm-volume-val").textContent = Number($("bgm-volume").value).toFixed(2);
@@ -1077,6 +1122,7 @@ $("generer").addEventListener("click", async () => {
   contenuGenere = null;
   majBoutonGenerer();
   $("log").textContent = "Lancement…\n";
+  await assurerModele();
   initialiserFileCreation();
   effacerBadgesVerif();  // nouvelle génération : ancienne vérif périmée
   $("montage").src = "";
@@ -2132,6 +2178,7 @@ async function chargerEtat() {
   else if (!etat.voix_file) msg = { texte: "Aucun fichier de voix : configure le dossier des voix.", lien: "→ Régler le dossier des voix" };
   banniereVoix = msg;
   majBanniere();
+  majStatutHf(etat);
 }
 
 // ---------------------------------------------------------------- bannière (voix → modèle, priorité absolue au modèle)

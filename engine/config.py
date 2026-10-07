@@ -92,11 +92,36 @@ def set_moteur_defaut(nom: str) -> None:
 def set_model_dir(path) -> None:
     """Change au runtime le dossier du modèle TTS (legacy).
 
+HF_TOKEN = clé HuggingFace (optionnelle mais recommandée : évite les
+erreurs CAS/XetHub au téléchargement du modèle). Priorité : variable
+d'environnement ``HF_TOKEN`` > valeur persistée via ``set_hf_token``.
+
+
     Utile quand le modèle est rangé hors du sous-module (volume Docker, autre
     disque, etc.) ou téléchargé depuis l'interface.
     """
     global COSYVOICE_MODEL_DIR
     COSYVOICE_MODEL_DIR = Path(path).expanduser()
+
+
+# --- Clé HuggingFace (téléchargement modèle, anti-erreurs CAS) -----------------
+HF_TOKEN: str | None = os.environ.get("HF_TOKEN") or None
+
+
+def set_hf_token(token: str | None) -> None:
+    """Mémorise la clé HuggingFace (GUI → persistance + ``os.environ``)."""
+    global HF_TOKEN
+    token = (token or "").strip() or None
+    HF_TOKEN = token
+    if token:
+        os.environ["HF_TOKEN"] = token
+    else:
+        os.environ.pop("HF_TOKEN", None)
+
+
+def hf_token() -> str | None:
+    """Clé effective (env prioritaire, puis valeur persistée)."""
+    return os.environ.get("HF_TOKEN") or HF_TOKEN
 
 # --- Génération ---------------------------------------------------------------------
 DEFAULT_DEVICE = "cuda:0"

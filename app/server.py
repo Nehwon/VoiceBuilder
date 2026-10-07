@@ -84,6 +84,13 @@ def _voix():
     return load_voix()
 
 
+def _etat_modele() -> dict:
+    """Statut du modèle OmniVoice : présent en cache ? téléchargement en cours ?"""
+    from engine import omnivoice_engine
+    return {"pret": omnivoice_engine.modele_en_cache(),
+            "telechargement": omnivoice_engine.progression_telechargement()}
+
+
 def _etat() -> dict:
     """État général : dossier des voix, présence de voix.txt, liste des voix."""
     d = _charger_persistance().get("audio_dir") or str(config.VOIX_AUDIO_DIR)
@@ -108,12 +115,16 @@ def _etat() -> dict:
             return {"audio_dir": d, "voix_file": False, "voix": [],
                     "erreur": f"{config.VOIX_FILE.name} invalide : {exc}",
                     "moteur": config.MOTEUR_DEFAUT,
-                    "moteurs": list(config.MOTEURS), **bgm_etat}
+                    "moteurs": list(config.MOTEURS),
+                    "hf_token_configuree": bool(config.hf_token()),
+                    "modele": _etat_modele(), **bgm_etat}
     else:
         noms = []
     return {"audio_dir": d, "voix_file": fichier_voix, "voix": noms,
             "erreur": None, "moteur": config.MOTEUR_DEFAUT,
-            "moteurs": list(config.MOTEURS), **bgm_etat}
+            "moteurs": list(config.MOTEURS),
+            "hf_token_configuree": bool(config.hf_token()),
+            "modele": _etat_modele(), **bgm_etat}
 
 
 def _restaurer_bgm() -> None:
@@ -129,6 +140,8 @@ def _restaurer_bgm() -> None:
 def _bootstrap() -> None:
     """Applique le dossier sauvegardé et génère ``voix.txt`` s'il manque."""
     data = _charger_persistance()
+    if data.get("hf_token"):
+        config.set_hf_token(data["hf_token"])
     if data.get("audio_dir"):
         chemin = data["audio_dir"]
         if not Path(chemin).is_dir():
@@ -229,6 +242,7 @@ def api_torch_install_stream(jid: int):
 class ConfigIn(BaseModel):
     audio_dir: str | None = None
     bgm_volume: float | None = None
+    hf_token: str | None = None
 
 
 class NommageIn(BaseModel):
@@ -364,9 +378,19 @@ def api_config(payload: ConfigIn):
     if payload.bgm_volume is not None:
         config.set_bgm(config.BGM_LIT, payload.bgm_volume)
         _sauver_persistance({"bgm_volume": config.BGM_VOLUME})
+    if payload.hf_token:
+        config.set_hf_token(payload.hf_token)
+        _sauver_persistance({"hf_token": payload.hf_token.strip()})
     config.ensure_dirs()
     voix.generer_voix_txt()          # (re)génère si voix.txt absent
     return _etat()
+
+
+@app.post("/api/modele/precharger")
+def api_modele_precharger():
+    """Lance le téléchargement des poids en tâche de fond (1er lancement)."""
+    from engine import omnivoice_engine
+    return omnivoice_engine.precharger_async()
 
 
 @app.get("/api/voix")
