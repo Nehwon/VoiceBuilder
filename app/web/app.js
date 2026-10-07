@@ -1022,14 +1022,24 @@ async function assurerModele() {
     if (et.modele?.pret) { _modelePret = true; return true; }
     await fetch("/api/modele/precharger", { method: "POST" });
     ouvrirModal($("modal-modele"));
+    $("btn-modele-retry").hidden = true;
     for (;;) {
       await new Promise((r) => setTimeout(r, 2000));
       et = await (await fetch("/api/etat")).json();
       if (et.modele?.pret) break;
       const dl = et.modele?.telechargement || {};
-      if (dl.erreur) {
+      if (dl.erreur && !dl.en_cours) {
         $("modele-fichier").textContent = "❌ " + dl.erreur;
-        break;
+        $("btn-modele-retry").hidden = false;
+        await new Promise((r) => {
+          $("btn-modele-retry").onclick = () => {
+            $("btn-modele-retry").hidden = true;
+            $("modele-fichier").textContent = "connexion…";
+            r();
+          };
+        });
+        await fetch("/api/modele/precharger", { method: "POST" });
+        continue;
       }
       $("modele-remplie").style.width = (dl.pct || 0) + "%";
       $("modele-compteur").textContent = (dl.pct || 0) + "%";

@@ -97,29 +97,65 @@ def modele_en_cache() -> bool:
         return False
 
 
-def precacher_modele() -> None:
-    """Télécharge les poids (bloquant) avec progression ; sans effet si en cache."""
+_MOTS_XET = ("xet", "cas-server", "reconstruction", "middleware")
+
+
+def _sans_xet() -> None:
+    """Bascule le téléchargement sur S3 classique (contourne les erreurs CAS/Xet)."""
+    import os
+
+    import huggingface_hub.constants as _cst
+
+    os.environ["HF_HUB_DISABLE_XET"] = "1"
+    _cst.HF_HUB_DISABLE_XET = True  # relu à chaque appel (file_download)
+
+
+def precacher_modele(tentatives: int = 3) -> None:
+    """Télécharge les poids (bloquant) avec progression ; sans effet si en cache.
+
+    Robuste au premier lancement : réessaie avec pause croissante, et bascule
+    automatiquement sur le téléchargement S3 classique (sans Xet) dès qu'une
+    erreur CAS/Xet est détectée — c'est elle qui provoquait les
+    ``CAS Client Error ... cas-server.xethub.hf.co``.
+    """
+    import time
+
     from huggingface_hub import snapshot_download
 
     if modele_en_cache():
         _maj_progression(100, en_cours=False)
         return
-    _maj_progression(0, "connexion…")
     with _VERROU_DL:
         _TELECHARGEMENT["erreur"] = None
-    try:
-        snapshot_download(
-            repo_id=_repo_id(),
-            token=config.hf_token(),
-            tqdm_class=_TqdmProgression,
-        )
-    except Exception as exc:  # noqa: BLE001 — exposée à l'UI, re-levée
-        with _VERROU_DL:
-            _TELECHARGEMENT["erreur"] = f"{type(exc).__name__} : {exc}"[:300]
-            _TELECHARGEMENT["en_cours"] = False
-        raise
-    else:
-        _maj_progression(100, en_cours=False)
+    derniere: Exception | None = None
+    for essai in range(1, tentatives + 1):
+        _maj_progression(0, f"connexion… (tentative {essai}/{tentatives})")
+        try:
+            snapshot_download(
+                repo_id=_repo_id(),
+                token=config.hf_token(),
+                tqdm_class=_TqdmProgression,
+            )
+        except Exception as exc:  # noqa: BLE001 — repli, puis exposition UI
+            derniere = exc
+            bas = str(exc).lower()
+            if any(m in bas for m in _MOTS_XET):
+                _sans_xet()
+                _maj_progression(0, "repli S3 (sans Xet)…")
+                continue  # réessaie aussitôt sans Xet, sans consommer de pause
+            if essai < tentatives:
+                time.sleep(5 * essai)
+                continue
+        else:
+            _maj_progression(100, en_cours=False)
+            return
+    with _VERROU_DL:
+        _TELECHARGEMENT["erreur"] = (
+            f"{type(derniere).__name__} : {derniere}"[:300]
+            + " — renseigne ta clé HF dans Réglages puis Réessayer.")
+        _TELECHARGEMENT["en_cours"] = False
+    assert derniere is not None
+    raise derniere
 
 
 def precharger_async() -> dict:
