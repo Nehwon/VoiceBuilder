@@ -193,15 +193,27 @@ def _sans_xet() -> None:
     _cst.HF_HUB_DISABLE_XET = True  # relu à chaque appel (file_download)
 
 
+try:
+    _sans_xet()  # Xet désactivé par défaut (instable même avec clé)
+except ImportError:  # hub absent (tests) : precacher échouera proprement
+    pass
+# opt-in explicite : VOICEBUILDER_XET=1 (variable d'environnement uniquement)
+
+
 def precacher_modele(tentatives: int = 3) -> None:
     """Télécharge les poids (bloquant) avec progression ; sans effet si en cache.
 
-    Robuste au premier lancement : réessaie avec pause croissante, et bascule
-    automatiquement sur le téléchargement S3 classique (sans Xet) dès qu'une
-    erreur CAS/Xet est détectée — c'est elle qui provoquait les
-    ``CAS Client Error ... cas-server.xethub.hf.co``.
+    Robuste au premier lancement : téléchargement S3 classique (Xet désactivé
+    par défaut — reconstruction CAS instable même avec clé), réessaie avec
+    pause croissante, watchdog d'inactivité (3 min sans octet = nouvel essai).
     """
+    import os
     import time
+
+    if os.environ.get("VOICEBUILDER_XET") != "1":
+        _sans_xet()
+    else:
+        print("📦 Xet activé (VOICEBUILDER_XET=1, expérimental)", flush=True)
 
     from huggingface_hub import snapshot_download
 
