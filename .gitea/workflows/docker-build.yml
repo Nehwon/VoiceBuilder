@@ -92,7 +92,7 @@ jobs:
           git add VERSION
           git commit -m "chore(release): bump version to ${{ needs.prepare.outputs.new }} [skip ci]"
           git tag "v${{ needs.prepare.outputs.new }}"
-          git push origin "HEAD:main"
+          git push origin "HEAD:omni"
           git push origin "v${{ needs.prepare.outputs.new }}"
 
   build:
