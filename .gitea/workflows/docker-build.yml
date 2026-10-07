@@ -63,7 +63,7 @@ jobs:
   version:
     name: Bump version
     needs: prepare
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push'  # branche omni : bump auto comme sur main (v1.0.0 restera manuelle)
     runs-on: ubuntu-latest
     permissions:
       contents: write
