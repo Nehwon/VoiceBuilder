@@ -244,6 +244,11 @@ h1 .logo { height: 1.7em; width: 1.7em; vertical-align: -0.35em; margin-right: 2
 }
 .toggle-pauses input { vertical-align: -1px; margin-right: 4px; }
 
+.badge-moteur {
+  font-size: 11px; color: var(--dim); border: 1px solid var(--bor);
+  border-radius: 10px; padding: 1px 8px; white-space: nowrap;
+}
+
 /* poignée de réordonnancement + carte surlignée en lecture */
 .grip-bloc { cursor: grab; color: var(--dim); user-select: none; padding: 0 6px 0 0; font-size: 14px; }
 .grip-bloc:active { cursor: grabbing; }

@@ -997,15 +997,6 @@ $("btn-dir").addEventListener("click", async () => {
 });
 $("btn-save").addEventListener("click", () =>
   notifier("Réglages utilisés côté serveur à la génération.", "ok"));
-$("btn-moteur").addEventListener("click", async () => {
-  const r = await fetch("/api/config", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ moteur: $("moteur").value }),
-  });
-  if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
-  await chargerEtat();
-  notifier("Moteur par défaut appliqué.", "ok");
-});
 
 // ---------------------------------------------------------------- musique de fond (BGM)
 $("bgm-volume").addEventListener("input", () => {
@@ -2216,7 +2207,6 @@ async function telechargerModele() {
 async function chargerEtat() {
   const etat = await (await fetch("/api/etat")).json();
   $("audio-dir").value = etat.audio_dir;
-  if (etat.moteur) $("moteur").value = etat.moteur;
   $("bgm-nom").textContent = etat.bgm_lit || "aucun lit";
   if (etat.bgm_volume != null) {
     $("bgm-volume").value = etat.bgm_volume;
@@ -2448,20 +2438,10 @@ function renderVoix(list) {
     info.append(nom, meta);
     const acts = document.createElement("div");
     acts.className = "projet-carte-actions";
-    const selMoteur = document.createElement("select");
-    selMoteur.title = "Moteur TTS de cette voix (Défaut = réglage Configuration)";
-    for (const [val, label] of [["", "Défaut"], ["cosyvoice", "CosyVoice"], ["omnivoice", "OmniVoice"]]) {
-      const opt = document.createElement("option");
-      opt.value = val; opt.textContent = label;
-      selMoteur.append(opt);
-    }
-    selMoteur.value = v.moteur_colonne || "";
-    selMoteur.onchange = async () => {
-      const r = await fetch("/api/voix/moteur", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: v.nom, moteur: selMoteur.value || "defaut" }) });
-      if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
-      notifier(`Moteur de « ${v.nom} » : ${selMoteur.selectedOptions[0].textContent}.`, "ok");
-      await chargerVoixListe();
-    };
+    const badgeMoteur = document.createElement("span");
+    badgeMoteur.className = "badge-moteur";
+    badgeMoteur.title = "Branche legacy : moteur unique";
+    badgeMoteur.textContent = "CosyVoice";
     const bPlay = document.createElement("button");
     bPlay.textContent = "▶ Écouter";
     bPlay.onclick = () => {
@@ -2485,7 +2465,7 @@ function renderVoix(list) {
       await chargerVoixListe();
       await chargerEtat();
     };
-    acts.append(selMoteur, bPlay, bClean, bDel);
+    acts.append(badgeMoteur, bPlay, bClean, bDel);
     carte.append(info, acts);
     box.appendChild(carte);
   }

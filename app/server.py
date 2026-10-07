@@ -233,7 +233,6 @@ def api_torch_install_stream(jid: int):
 class ConfigIn(BaseModel):
     audio_dir: str | None = None
     bgm_volume: float | None = None
-    moteur: str | None = None  # moteur par défaut : "cosyvoice" | "omnivoice"
 
 
 class ModeleIn(BaseModel):
@@ -373,12 +372,6 @@ def api_config(payload: ConfigIn):
     if payload.bgm_volume is not None:
         config.set_bgm(config.BGM_LIT, payload.bgm_volume)
         _sauver_persistance({"bgm_volume": config.BGM_VOLUME})
-    if payload.moteur is not None:
-        try:
-            config.set_moteur_defaut(payload.moteur)
-        except ValueError as exc:
-            raise HTTPException(400, str(exc))
-        _sauver_persistance({"moteur": config.MOTEUR_DEFAUT})
     config.ensure_dirs()
     voix.generer_voix_txt()          # (re)génère si voix.txt absent
     return _etat()
@@ -478,23 +471,6 @@ def api_couples():
 @app.post("/api/voix/nommer")
 def api_nommer(payload: NommageIn):
     voix.ecrire_voix_txt([tuple(e) for e in payload.entries])
-    return _etat()
-
-
-class VoixMoteurIn(BaseModel):
-    nom: str
-    moteur: str  # "cosyvoice" | "omnivoice" | "defaut" (suit le global)
-
-
-@app.post("/api/voix/moteur")
-def api_voix_moteur(payload: VoixMoteurIn):
-    """Change le moteur d'une voix (7ᵉ colonne de voix.txt, M19.1)."""
-    try:
-        voix.definir_moteur(config.VOIX_FILE, payload.nom, payload.moteur)
-    except (ValueError, KeyError) as exc:
-        raise HTTPException(400, str(exc))
-    except OSError as exc:  # noqa: BLE001
-        raise HTTPException(500, str(exc))
     return _etat()
 
 

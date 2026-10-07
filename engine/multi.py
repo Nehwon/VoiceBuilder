@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from . import adaptive, config, cosyvoice_engine, omnivoice_engine, verifier
+from . import adaptive, config, cosyvoice_engine, verifier
 from .tagging import PAUSE, parse_texte, regrouper
 from .voix import Voices, base_nom, grouper_candidats
 
@@ -24,34 +24,25 @@ def _synthesize_for(
 ) -> np.ndarray:
     """Synthetise un bloc pour une voix donnée (avec découpage adaptatif vérifié).
 
-    ``moteurs`` : ``{nom_moteur: (modele, sample_rate)}``. Le moteur vient de
-    ``voice.moteur`` (M19.1) ; un moteur manquant est chargé à la volée
-    (repli, paramètres par défaut). Chaque bloc sort au ``sr_montage``
-    (rééchantillonné si besoin) pour un montage homogène.
+    ``moteurs`` : ``{"cosyvoice": (modele, sample_rate)}`` ; le modèle
+    manquant est chargé à la volée (repli, paramètres par défaut). Chaque
+    bloc sort au ``sr_montage`` (rééchantillonné si besoin) pour un montage
+    homogène. Branche legacy : moteur unique, ``voice.moteur`` (7ᵉ colonne)
+    est ignoré.
     """
-    moteur = voice.moteur or config.MOTEUR_DEFAUT
+    moteur = "cosyvoice"
     if moteur not in moteurs:
-        if moteur == "omnivoice":
-            moteurs[moteur] = omnivoice_engine.load()
-        else:
-            moteurs[moteur] = cosyvoice_engine.load()
+        moteurs[moteur] = cosyvoice_engine.load()
     model, sr = moteurs[moteur]
-    if moteur == "omnivoice":
-        prompt = voice.prompt_text
-        def synth(t: str, _pw="", _pt=""):
-            return omnivoice_engine.synthesize(
-                t, str(voice.wav), voice.prompt_text,
-                model, sr, speed=speed, out_sr=sr_montage)
-    else:
-        prompt = voice.system_prompt
-        def synth(t: str, _pw="", _pt=""):
-            return cosyvoice_engine.synthesize(t, str(voice.wav), voice.system_prompt,
-                                              model, sr, speed=speed)
+    prompt = voice.system_prompt
+    def synth(t: str, _pw="", _pt=""):
+        return cosyvoice_engine.synthesize(t, str(voice.wav), voice.system_prompt,
+                                          model, sr, speed=speed)
     audio = adaptive.synthesize_verified(
         text, str(voice.wav), prompt, synth, sr_montage,
         max_chars=block_chars, verify=verify, should_stop=should_stop,
     )
-    if sr != sr_montage and moteur != "omnivoice":
+    if sr != sr_montage:
         import librosa
         audio = np.asarray(
             librosa.resample(audio, orig_sr=sr, target_sr=sr_montage),
@@ -71,35 +62,16 @@ def load(device: Optional[str] = None, fp16: Optional[bool] = None,
                                  load_vllm=load_vllm, load_trt=load_trt)
 
 
-def load_omnivoice(device: Optional[str] = None):
-    """Ré-export du chargement (une fois) du modèle OmniVoice (M19.1)."""
-    return omnivoice_engine.load(device=device)
-
-
 def synth_bloc(
     voice, text: str, model, sample_rate, block_chars=None, speed=None, verify=None,
 ) -> np.ndarray:
     """Synthetise un seul bloc pour une voix (réutilisable pour la régénération).
 
-    Le moteur vient de ``voice.moteur`` (M19.1) : ``model``/``sample_rate``
-    (montage en cours, généralement CosyVoice) ne servent qu'au cas CosyVoice
-    et comme fréquence cible du montage ; un bloc OmniVoice est synthétisé
-    via le modèle OmniVoice (chargé une fois) puis rééchantillonné.
+    Branche legacy : CosyVoice uniquement (``voice.moteur`` ignoré).
     """
     block_chars = voice.max_block_chars or block_chars or config.DEFAULT_MAX_BLOCK_CHARS
     spd = voice.speed if voice.speed is not None else (speed or config.DEFAULT_SPEED)
     chk = config.VERIFY_ENABLED if verify is None else verify
-    moteur = voice.moteur or config.MOTEUR_DEFAUT
-    if moteur == "omnivoice":
-        omodel, _ = omnivoice_engine.load()
-        def synth(t: str, _pw="", _pt=""):
-            return omnivoice_engine.synthesize(
-                t, str(voice.wav), voice.prompt_text,
-                omodel, None, speed=spd, out_sr=sample_rate)
-        return adaptive.synthesize_verified(
-            text, str(voice.wav), voice.prompt_text, synth, sample_rate,
-            max_chars=block_chars, verify=chk,
-        )
     return _synthesize_for(text, {"cosyvoice": (model, sample_rate)},
                            sample_rate, voice, block_chars, spd, chk)
 
@@ -219,27 +191,12 @@ def generate(
 
     groupes_prompts = grouper_candidats(voices.names()) if multi_prompt else {}
 
-    # Moteurs requis par les voix des sous-blocs (M19.1) : on ne charge que
-    # l'utile (VRAM partagée). En multi-prompt, les candidats peuvent relever
-    # d'un autre moteur que la voix du bloc : on les inclut. Le sr du montage
-    # est celui de CosyVoice dès qu'il est requis (comportement historique),
-    # sinon les 24 kHz natifs d'OmniVoice.
-    moteurs_requis = set()
-    for _, _, _voice, _, _, _ in sous_blocs:
-        if _voice is None:
-            continue
-        moteurs_requis.add(_voice.moteur or config.MOTEUR_DEFAUT)
-        if multi_prompt:
-            for _nom in groupes_prompts.get(base_nom(_voice.name), [_voice.name]):
-                if _nom in voices:
-                    moteurs_requis.add(voices.get(_nom).moteur or config.MOTEUR_DEFAUT)
+    # Branche legacy : moteur unique (7ᵉ colonne ignorée). Le sr du montage
+    # est celui de CosyVoice (comportement historique).
     moteurs: dict = {}
-    if "cosyvoice" in moteurs_requis:
-        moteurs["cosyvoice"] = cosyvoice_engine.load(
-            device=device, fp16=fp16, load_vllm=load_vllm, load_trt=load_trt)
-    if "omnivoice" in moteurs_requis:
-        moteurs["omnivoice"] = omnivoice_engine.load(device=device)
-    sr = moteurs["cosyvoice"][1] if "cosyvoice" in moteurs else moteurs["omnivoice"][1]
+    moteurs["cosyvoice"] = cosyvoice_engine.load(
+        device=device, fp16=fp16, load_vllm=load_vllm, load_trt=load_trt)
+    sr = moteurs["cosyvoice"][1]
     pause_n = int(pause * sr)
 
     def _synth_choisir(t, voice, block_chars, block_speed):

@@ -36,19 +36,8 @@ MODEL_ID_COSYVOICE3 = "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
 # Prompt système requis par CosyVoice3 avant la transcription de référence.
 COSYVOICE3_SYSTEM_PROMPT = "You are a helpful assistant.<|endofprompt|>"
 
-# --- Moteur OmniVoice (M19.1, alternatif à CosyVoice) ---------------------------
-# Modèle HF "k2-fsa/OmniVoice" (fp16, 24 kHz natifs). Téléchargé au premier
-# chargement dans le cache HuggingFace, sauf si OMNIVOICE_MODEL_DIR pointe
-# vers un dossier local déjà rempli (ex. volume Docker /models/omnivoice).
-OMNIVOICE_MODEL_ID = os.environ.get("OMNIVOICE_MODEL_ID", "k2-fsa/OmniVoice")
-OMNIVOICE_MODEL_DIR = Path(
-    os.environ.get("OMNIVOICE_MODEL_DIR")
-    or OMNIVOICE_MODEL_ID
-)
-
-# Moteurs TTS disponibles et moteur par défaut des voix sans colonne moteur
-# (voix.txt). Réglable via VOICEBUILDER_MOTEUR_DEFAUT.
-MOTEURS = ("cosyvoice", "omnivoice")
+# Branche legacy : moteur unique (le multi-moteurs vit sur main / omni).
+MOTEURS = ("cosyvoice",)
 MOTEUR_DEFAUT = os.environ.get("VOICEBUILDER_MOTEUR_DEFAUT", "cosyvoice")
 if MOTEUR_DEFAUT not in MOTEURS:
     MOTEUR_DEFAUT = "cosyvoice"

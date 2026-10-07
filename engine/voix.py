@@ -5,8 +5,8 @@ transcription exacte). Le fichier de listage a une entrée par ligne :
 
     [Nom], chemin.wav[, chemin.txt][, pause_pré][, vitesse][, max_chars][, moteur]
 
-``moteur`` : ``cosyvoice`` (défaut) ou ``omnivoice``. Les voix sans 7ᵉ
-colonne utilisent le moteur par défaut (``config.MOTEUR_DEFAUT``).
+``moteur`` : 7ᵉ colonne lue et préservée (compatibilité des fichiers),
+sans effet — branche legacy : CosyVoice uniquement.
 
 Les chemins sont résolus par rapport au dossier projet ; en repli, par rapport au
 dossier des voix (VOIX_DIR).
@@ -148,10 +148,11 @@ def generer_voix_txt(dossier=None, out=None) -> Path:
 
 
 def definir_moteur(path, nom: str, moteur: str) -> str:
-    """Change le moteur d'une voix dans ``voix.txt`` (7ᵉ colonne, M19.1).
+    """Écrit la 7ᵉ colonne ``moteur`` d'une voix dans ``voix.txt``.
 
-    ``moteur`` : ``"cosyvoice"``, ``"omnivoice"`` ou ``"defaut"``/``""``
-    (retire la colonne → la voix suit le moteur par défaut). Les autres
+    Branche legacy : CosyVoice uniquement — seul ``"cosyvoice"`` ou
+    ``"defaut"``/``""`` (retire la colonne) est accepté, le reste lève
+    ``ValueError``. La colonne est préservée sans effet moteur. Les autres
     colonnes, l'ordre des voix et les commentaires sont préservés
     (édition ligne à ligne, pas de réécriture via ``ecrire_voix_txt``).
     Renvoie le moteur écrit (``""`` si colonne retirée). Lève

@@ -1,8 +1,11 @@
-# VoiceBuilder
+# VoiceBuilder — branche `cosy` (legacy)
 
-Outil local d'**écriture et de production audio multi-voix** basé sur les moteurs
-**CosyVoice3** (`Fun-CosyVoice3-0.5B`, défaut) et **OmniVoice** (`k2-fsa/OmniVoice`,
-alternatif plus rapide et naturel — M19.1, routage par voix).
+> **Branche legacy : moteur CosyVoice3 uniquement.** Le multi-moteurs
+> (OmniVoice, routage par voix) vit sur `main` ; la version OmniVoice seule
+> sur `omni`. Ici, la 7ᵉ colonne `moteur` de `voix.txt` est lue sans effet.
+
+Outil local d'**écriture et de production audio multi-voix** basé sur le moteur
+**CosyVoice3** (`Fun-CosyVoice3-0.5B`).
 
 Taguez un texte dans un éditeur Markdown, associez chaque réplique à une voix
 (définie par un échantillon `.wav` + sa transcription `.txt`), puis générez un
