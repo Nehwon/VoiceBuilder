@@ -33,7 +33,9 @@ from . import text_fr
 # ``precharger_async()`` lance le téléchargement en tâche de fond pendant que
 # l'UI affiche une modale avec la progression réelle (au lieu d'une barre
 # figée sur « Lancement de la génération... »).
-_TELECHARGEMENT = {"en_cours": False, "pct": 0, "fichier": "", "erreur": None}
+_TELECHARGEMENT = {"en_cours": False, "pct": 0, "etape": "", "fichier": "",
+                        "pct_fichier": 0, "erreur": None}
+_JALONS_LOGGES: set = set()  # paliers globaux deja traces (log serveur)
 _VERROU_DL = threading.Lock()
 _FIL_DL: threading.Thread | None = None
 
@@ -50,6 +52,31 @@ def _maj_progression(pct: float, fichier: str = "", en_cours: bool = True) -> No
         if fichier:
             _TELECHARGEMENT["fichier"] = fichier
         _TELECHARGEMENT["en_cours"] = en_cours
+
+
+def _maj_global(pct: float, label: str) -> None:
+    """Barre globale (tous fichiers) + jalon visible dans le log serveur."""
+    _maj_progression(pct)
+    with _VERROU_DL:
+        _TELECHARGEMENT["etape"] = label
+    palier = int(pct // 25) * 25
+    if palier > 0 and palier not in _JALONS_LOGGES:
+        _JALONS_LOGGES.add(palier)
+        print(f"📦 modèle OmniVoice : {palier}% des fichiers ({label})", flush=True)
+
+
+def _maj_fichier(pct: float, nom: str) -> None:
+    """Barre du fichier en cours + ligne log à chaque fichier terminé."""
+    with _VERROU_DL:
+        _TELECHARGEMENT["fichier"] = nom or _TELECHARGEMENT["fichier"]
+        _TELECHARGEMENT["pct_fichier"] = max(0, min(100, round(pct)))
+        _TELECHARGEMENT["en_cours"] = True
+    if pct >= 100 and nom:
+        with _VERROU_DL:
+            cle = f"fichier:{nom}"
+            if cle not in _JALONS_LOGGES:
+                _JALONS_LOGGES.add(cle)
+                print(f"📦 téléchargé : {nom}", flush=True)
 
 
 class _TqdmProgression(__import__("tqdm").tqdm):
@@ -74,8 +101,13 @@ class _TqdmProgression(__import__("tqdm").tqdm):
                 pct = 100.0 * (self.n or 0) / total
                 if pct - self._dernier_pct >= 0.5 or pct >= 100:
                     self._dernier_pct = pct
-                    desc = (getattr(self, "desc", "") or "").split("/")[-1][:60]
-                    _maj_progression(pct, desc)
+                    desc = (getattr(self, "desc", "") or "").strip()
+                    if desc.lower().startswith("fetching"):
+                        # barre globale « Fetching 13 files » → libellé français
+                        _maj_global(pct, f"Fichiers : {int(self.n or 0)}/{int(total)}")
+                    else:
+                        # barre par fichier → nom + avancement propre
+                        _maj_fichier(pct, desc.split("/")[-1][:60])
         except Exception:  # noqa: BLE001 — le report ne doit jamais casser le DL
             pass
         return res

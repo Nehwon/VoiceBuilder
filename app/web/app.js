@@ -1042,6 +1042,10 @@ async function assurerModele() {
         continue;
       }
       $("modele-remplie").style.width = (dl.pct || 0) + "%";
+      $("modele-fichier").textContent = dl.etape || dl.fichier || "connexion…";
+      $("modele-fichier-remplie").style.width = (dl.pct_fichier || 0) + "%";
+      $("modele-fichier-nom").textContent = dl.fichier || "—";
+      $("modele-fichier-compteur").textContent = (dl.pct_fichier || 0) + "%";
       $("modele-compteur").textContent = (dl.pct || 0) + "%";
       $("modele-fichier").textContent = dl.fichier || "connexion…";
     }

@@ -11,11 +11,18 @@ from engine import omnivoice_engine as oe
 
 
 def test_tqdm_progression_bornes():
-    q = oe._TqdmProgression(total=200)
-    q.update(50)
-    assert oe.progression_telechargement()["pct"] == 25
-    q.update(300)  # dépasse : borné à 100
-    assert oe.progression_telechargement()["pct"] == 100
+    g = oe._TqdmProgression(total=13, desc="Fetching 13 files")
+    g.update(10)
+    st = oe.progression_telechargement()
+    assert st["pct"] == 77 and st["etape"] == "Fichiers : 10/13"
+    g.close()
+    f = oe._TqdmProgression(total=200, desc="poids/modele.safetensors")
+    f.update(50)
+    st = oe.progression_telechargement()
+    assert st["pct_fichier"] == 25 and st["fichier"] == "modele.safetensors"
+    f.update(300)  # dépasse : borné à 100
+    assert oe.progression_telechargement()["pct_fichier"] == 100
+    f.close()
     oe._maj_progression(0, en_cours=False)
 
 
