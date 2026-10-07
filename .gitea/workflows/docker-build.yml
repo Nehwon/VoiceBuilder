@@ -9,9 +9,9 @@ name: Build VoiceBuilder-omni final image (branche omni) (à la demande)
 
 on:
   push:
-    branches: [omni]
+    branches: [main]
   pull_request:
-    branches: [omni]
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -92,7 +92,7 @@ jobs:
           git add VERSION
           git commit -m "chore(release): bump version to ${{ needs.prepare.outputs.new }} [skip ci]"
           git tag "v${{ needs.prepare.outputs.new }}"
-          git push origin "HEAD:omni"
+          git push origin "HEAD:main"
           git push origin "v${{ needs.prepare.outputs.new }}"
 
   build:

@@ -496,10 +496,12 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [ ] Panneau « 🧠 Modèles » étendu au téléchargement/détection des modèles
         par moteur et par machine ; wrappers `engine/xtts_engine.py` **puis
         `engine/fishspeech_engine.py`**.
-- [ ] **Branches moteur (2026-10-07)** : `main` = base multi-moteurs
-  (développement courant) ; `cosy` = CosyVoice3 seul (legacy) ;
-  `omni` = OmniVoice seul (cette branche, v1.0.0 à venir, tag manuel plus
-  tard). Resynchroniser les variantes depuis `main` (merge régulier).
+- [x] **Branches moteur (2026-10-07)** : `omni` = OmniVoice seul
+  (choix fixé : qualité FR supérieure — PR #2 vers `main`, à accepter) ;
+  `cosy` = CosyVoice3 seul (legacy). `main` devient OmniVoice au merge.
+- [ ] **Après merge PR #2** : resynchroniser `cosy`/`omnivoice` si besoin,
+  tagger v1.0.0 manuellement plus tard, activer le déploiement prod
+  (`voicebuilder-omni`, projet webhook dédié).
 - [ ] **M19.2 — Cohérence du montage multi-moteurs**
   - [ ] Resample + alignement de loudness par bloc (sample rates / niveaux
         différents selon moteur), sinon les changements de voix s'entendent ;

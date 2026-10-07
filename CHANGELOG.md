@@ -8,6 +8,16 @@ Le format suit les principes de [Keep a Changelog](https://keepachangelog.com/fr
 
 ## [Unreleased]
 
+### Changement — OmniVoice moteur unique, branche `omni` (2026-10-07)
+
+- **Choix fixé** : OmniVoice seul (qualité FR 9/10, RTF ~0,09 —
+  `docs/BENCH_MOTEURS.md`). CosyVoice retiré (code, sous-module `vendor/`,
+  panneau Modèles, GUI Gradio) ; `multi.py` force OmniVoice en 24 kHz ;
+  badge fixe dans l'UI, enhance/verify/BGM conservés.
+- **Image `voicebuilder-omni`** (`:omni`, `:latest`, miroir GHCR) + CI dédiée
+  (bump auto, **sans déploiement auto**) ; volume `volume-omni-cache`.
+- Branche `cosy` = CosyVoice3 legacy ; PR #2 (`omni` → `main`) en cours.
+
 ### Ajout — Moteur OmniVoice alternatif + routage par voix (M19.1)
 
 - **Moteur** (`engine/omnivoice_engine.py`, nouveau) : wrapper

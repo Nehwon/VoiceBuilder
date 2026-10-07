@@ -1,15 +1,18 @@
-# VoiceBuilder — Guide d'utilisation
+# VoiceBuilder — Guide d'utilisation (branche `omni`, moteur OmniVoice)
 
-Usage complet : CLI, GUI, format de texte taggé, et en particulier le jeu de
-**tags non-verbaux / émotions spécifiques à CosyVoice3**.
+Usage complet : CLI, GUI, format de texte taggé.
 
-Prérequis techniques : moteur **CosyVoice3** (`Fun-CosyVoice3-0.5B`) et son venv
-(`vendor/CosyVoice/venv`, sous-module git) ; chemins dans `engine/config.py`.
-Un **conteneur Docker GPU** est disponible pour un déploiement portable
-(cf. `TODO.md` §Phase 7) ; nécessite `nvidia-container-toolkit` sur l'hôte.
-Tous les dossiers utilisent désormais des **volumes Docker nommés** (pas de bind mounts hôte) :
+> ✅ **Choix fixé (2026-10-07)** : moteur unique **OmniVoice**
+> (`k2-fsa/OmniVoice`, 24 kHz natifs) — meilleure qualité de rendu final,
+> particulièrement en français (écoute 9/10 contre 7/10, 4–7× plus rapide,
+> voir `BENCH_MOTEURS.md`). La branche `cosy` conserve CosyVoice3 en legacy.
+
+Prérequis techniques : image Docker GPU `voicebuilder-omni` (transformers 5.x,
+torch cu130) ; nécessite `nvidia-container-toolkit` sur l'hôte.
+Tous les dossiers utilisent des **volumes Docker nommés** (pas de bind mounts hôte) :
 - `volume-audio` : fichiers `.wav`/`.txt` des voix (monté en écriture, interface y écrit)
-- `volume-model` : modèle CosyVoice3 (~9,7 Go, téléchargé automatiquement au 1er lancement)
+- `volume-omni-cache` : modèle OmniVoice (3,3 Go, téléchargé automatiquement au 1er lancement)
+- `volume-model` : modèles enhance Demucs/DeepFilterNet (`/models/enhance_models`)
 - `volume-texte` : fichiers `.md`/`.txt` du projet (solution d'upload interface)
 - `volume-output` : générations audio `.wav`
 - `volume-tmp` : fichiers temporaires
@@ -61,36 +64,21 @@ Fichier de listage `voix/voix.txt`, une entrée par ligne :
 
 - **wav**, **txt** : chemins relatifs au projet ou absolus.
 - **pause_pré** (s), **vitesse**, **max_chars** : surcharges optionnelles par voix.
-- **moteur** : `cosyvoice` (défaut, modifiable dans Configuration) ou
-  `omnivoice` — moteur TTS de cette voix (M19.1). Une voix sans 7ᵉ colonne
-  suit le moteur par défaut ; une voix avec colonne garde toujours le sien.
+- **moteur** (7ᵉ colonne historique) : **lue sans effet** sur cette branche
+  (moteur unique OmniVoice).
 - le `.txt` : transcription exacte, au besoin horodatée `[0000.00 - 0005.28] texte`.
 
-Au clonage, le prompt TTS =
-`"You are a helpful assistant.<|endofprompt|>" + texte_du_txt`
-(moteur CosyVoice ; OmniVoice utilise la transcription brute).
+Au clonage, OmniVoice utilise la **transcription brute** comme prompt
+(plus de préfixe système).
 
-#### Moteurs TTS (M19.1)
+#### Moteur TTS : OmniVoice unique (choix fixé 2026-10-07)
 
-Deux moteurs au même contrat (`engine/{cosyvoice,omnivoice}_engine.py`),
-routés **par voix** (7ᵉ colonne de `voix.txt`) avec un **défaut global**
-dans Configuration (`POST /api/config {moteur}`, persistant) :
-
-- **CosyVoice3** (défaut) : multilingue (`[en]…[/en]` gardant l'accent
-  anglais), tokens non-verbaux §4, pré-cache de prompts.
-- **OmniVoice** (`k2-fsa/OmniVoice`, fp16, 24 kHz natifs) : plus rapide
-  (RTF ~0,09 contre ~0,4–0,7) et jugé plus naturel à l'écoute (9/10 contre
-  7/10, bench `docs/BENCH_MOTEURS.md`). Limites V1 : **pas de routage
-  multilingue** (marqueurs `[en]/[fr]` retirés, tout en français),
-  `speed` par étirement temporel.
-  - **Prérequis (M19.1-bis)** : OmniVoice exige `transformers>=5.3`, qui
-    casse CosyVoice3 — il tourne donc dans un **worker séparé**
-    (`app/worker_omni.py`, image `voicebuilder-omni`, branche
-    `omnivoice`). Démarrage :
-    `docker compose -f docker-compose.gitea.yml --env-file .env.gitea -f docker-compose.omni.yml --env-file .env.gitea up -d omni`
-    (modèle 3,3 Go en cache HF sur volume). Sans worker joignable, toute
-    synthèse `omnivoice` échoue avec un message explicite (le moteur
-    `cosyvoice` reste utilisable).
+**OmniVoice** (`k2-fsa/OmniVoice`, fp16, 24 kHz natifs, direct dans l'image
+`voicebuilder-omni`) : plus rapide (RTF ~0,09 contre ~0,4–0,7 pour
+CosyVoice3) et jugé plus naturel à l'écoute (9/10 contre 7/10, bench
+`docs/BENCH_MOTEURS.md`). Notes V1 : **pas de routage multilingue**
+(marqueurs `[en]/[fr]` retirés, tout en français), `speed` par étirement
+temporel. CosyVoice3 reste disponible sur la branche `cosy` (legacy).
 
 #### Choix de l'emplacement des fichiers .wav/.txt
 

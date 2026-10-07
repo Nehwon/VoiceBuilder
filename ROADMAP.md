@@ -13,11 +13,11 @@ dans un éditeur Markdown, associer chaque réplique à une voix définie par un
 `.wav` + `.txt`, puis générer un montage dans lequel chaque personnage parle avec
 **son** timbre — sans perte de contenu, avec une tonalité cohérente.
 
-Moteur : **CosyVoice3 (Fun-CosyVoice3-0.5B)** — clonage zéro-shot `wav+txt`,
-multilingue, découpage en blocs adaptatifs + vérification automatique (Whisper).
-**Depuis M19.1 (2026-10-06) : OmniVoice** (`k2-fsa/OmniVoice`) en moteur
-alternatif — routage par voix (`voix.txt`), défaut global dans Configuration
-(voir `docs/BENCH_MOTEURS.md` pour le bench décisif).
+Moteur : **OmniVoice (`k2-fsa/OmniVoice`)** — clonage zéro-shot `wav+txt`,
+24 kHz natifs, découpage en blocs adaptatifs + vérification automatique
+(Whisper). **Choix fixé le 2026-10-07** (qualité FR supérieure, 4–7× plus
+rapide — voir `docs/BENCH_MOTEURS.md`) ; CosyVoice3 conservé en legacy
+(branche `cosy`).
 
 ---
 

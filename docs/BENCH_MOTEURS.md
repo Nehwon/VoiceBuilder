@@ -39,6 +39,17 @@ propres et fautes source), RTF **0,094 vs 0,383**.
 **Décision M19.1 : OmniVoice intégré comme moteur alternatif**
 (`engine/omnivoice_engine.py`, routage par voix, sélecteur Configuration).
 
+## Décision fixée (2026-10-07) : OmniVoice moteur unique ✅
+
+Écoute comparative sur productions réelles + bench chiffré (tableaux
+ci-dessus) : OmniVoice l'emporte sur la **qualité du rendu final,
+particulièrement en français** (voix naturelle, intention juste, zéro
+robotique), à fidélité texte égale ou meilleure et 4–7× plus vite.
+En conséquence :
+- branche `omni` : OmniVoice seul (cette branche, image `voicebuilder-omni`,
+  v1.0.0 à venir) — PR #2 vers `main` ;
+- branche `cosy` : CosyVoice3 seul, conservée en legacy.
+
 ## Licences (usage personnel confirmé)
 
 - **XTTS-v2 = CPML** : non-commercial uniquement ; Coqui fermé (01/2024),
