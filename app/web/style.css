@@ -227,6 +227,23 @@ h1 .logo { height: 1.7em; width: 1.7em; vertical-align: -0.35em; margin-right: 2
 .bloc-carte-actions { display: flex; gap: 8px; }
 .bloc-carte-actions button { margin: 0; }
 
+/* filets de silence (blocs pause) + interrupteur global */
+.bloc-carte.bloc-pause {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 10px; border-style: dashed; opacity: 0.8;
+}
+.filet-pause-lib { color: var(--dim); font-size: 12px; flex: 1 1 auto; }
+.filet-retirer {
+  background: none; border: none; color: var(--dim); cursor: pointer;
+  font-size: 13px; padding: 0 2px; margin: 0;
+}
+.filet-retirer:hover { color: var(--err, #e5534b); }
+.toggle-pauses {
+  font-size: 12px; font-weight: 400; color: var(--dim);
+  margin-left: 12px; cursor: pointer; white-space: nowrap;
+}
+.toggle-pauses input { vertical-align: -1px; margin-right: 4px; }
+
 /* poignée de réordonnancement + carte surlignée en lecture */
 .grip-bloc { cursor: grab; color: var(--dim); user-select: none; padding: 0 6px 0 0; font-size: 14px; }
 .grip-bloc:active { cursor: grabbing; }

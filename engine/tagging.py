@@ -3,6 +3,9 @@
 Règles :
   - ``[Nom]: texte``  -> nouveau segment attribué à la voix ``Nom``.
   - ``[Nom] texte``   -> variante sans ``:`` autorisée.
+  - ``[Nom]`` **inline** (milieu de ligne) -> découpe automatique : le texte
+    qui suit appartient à ``Nom`` jusqu'au prochain marqueur de voix
+    (plusieurs locuteurs par phrase, sans silence artificiel entre eux).
   - ligne nue          -> reprend le locuteur précédent (narrateur).
   - ``[tag]`` inline (ex. ``[sigh]``) -> conservé dans le texte (s'il n'est pas
     un nom de voix, il est traité comme du contenu).
@@ -33,6 +36,40 @@ _PAUSE_RE = re.compile(
     r"^\[\s*pause\s*(?:[:=\s]+?\s*(\d+(?:[.,]\d+)?)\s*s?)?\s*\]\s*:?\s*$",
     re.IGNORECASE,
 )
+
+
+# Tout crochet ``[quelque chose]`` (voix ou tag non-verbal).
+_MARQUEUR_RE = re.compile(r"\[([^\[\]]+)\]")
+
+
+def _decouper_inline(line: str, voices: set) -> List[Tuple[str | None, str]]:
+    """Découpe une ligne en ``[(marqueur_ou_None, texte)]``.
+
+    Seuls les crochets dont le contenu est un nom de voix coupent ; les
+    autres (ex. ``[sigh]``) restent dans le texte. Un ``:`` en tête du texte
+    qui suit un marqueur (variante ``[Nom]: texte``) est retiré. Les morceaux
+    vides sont éliminés (ex. ligne ``[Nom]`` seul).
+    """
+    morceaux: List[Tuple[str | None, str]] = []
+    marqueur: str | None = None
+    pos = 0
+    for m in _MARQUEUR_RE.finditer(line):
+        nom = m.group(1).strip()
+        if nom not in voices:
+            continue
+        avant = line[pos:m.start()].strip()
+        if marqueur is not None and avant.startswith(":"):
+            avant = avant[1:].strip()
+        if avant:
+            morceaux.append((marqueur, avant))
+        marqueur = nom
+        pos = m.end()
+    reste = line[pos:].strip()
+    if marqueur is not None and reste.startswith(":"):
+        reste = reste[1:].strip()
+    if reste:
+        morceaux.append((marqueur, reste))
+    return morceaux
 
 
 def parse_duree_pause(texte: str) -> float | None:
@@ -67,7 +104,8 @@ def parse_texte(text: str, voix_names: Sequence[str]) -> List[Segment]:
     Les segments de pause sont ``(__pause__, "<duree>")`` (durée en secondes,
     en texte) et ne requièrent aucun locuteur courant. Un saut de paragraphe
     (une ou plusieurs lignes vides) insère ``PARAGRAPH_PAUSE`` secondes de
-    silence entre deux segments parlés.
+    silence entre deux segments parlés — une seule fois par ligne, même si
+    elle contient plusieurs locuteurs (pas de silence entre eux).
     """
     voices = set(voix_names)
     segments: List[Segment] = []
@@ -89,39 +127,24 @@ def parse_texte(text: str, voix_names: Sequence[str]) -> List[Segment]:
             segments.append((PAUSE, str(duree)))
             saut_paragraphe = False
             continue
-        if stripped.startswith("[") and "]" in stripped:
-            close = stripped.index("]")
-            marker = stripped[1:close].strip()
-            content = stripped[close + 1 :].lstrip()
-            if content.startswith(":"):
-                content = content[1:].strip()
-            if marker not in voices:
-                # C'est un tag non-verbal (ex. [sigh]) : on le garde en contenu.
-                if current is None:
-                    raise TaggingError(
-                        f"Ligne sans locuteur avant tout personnage défini : {line}"
-                    )
+        morceaux = _decouper_inline(stripped, voices)
+        if not morceaux:
+            continue
+        premier = True
+        for marqueur, texte in morceaux:
+            pers = marqueur if marqueur is not None else current
+            if pers is None:
+                raise TaggingError(
+                    f"Ligne sans locuteur avant tout personnage défini : {line}"
+                )
+            if premier:
                 if saut_paragraphe:
                     _pause_paragraphe(segments)
                 saut_paragraphe = False
-                segments.append((current, stripped))
-                continue
-            if not content:
-                continue
-            if saut_paragraphe:
-                _pause_paragraphe(segments)
-            saut_paragraphe = False
-            current = marker
-            segments.append((current, content))
-        else:
-            if current is None:
-                raise TaggingError(
-                    f"Ligne sans tag avant tout personnage défini : {line}"
-                )
-            if saut_paragraphe:
-                _pause_paragraphe(segments)
-            saut_paragraphe = False
-            segments.append((current, stripped))
+                premier = False
+            if marqueur is not None:
+                current = marqueur
+            segments.append((pers, texte))
 
     if not segments:
         raise TaggingError("Le texte taggé est vide.")

@@ -1535,7 +1535,63 @@ function libelleCarteBloc(b) {
   return (b.prompt && b.prompt !== b.voix) ? `${base} · prompt ${b.prompt}` : base;
 }
 
+function pausesVisibles() {
+  try { return localStorage.getItem("vb_afficher_pauses") !== "0"; }
+  catch { return true; }
+}
+
+// Interrupteur global des silences (filets ⏸) dans « Blocs générés ».
+function assurerTogglePauses() {
+  if ($("toggle-pauses")) return;
+  const titre = document.querySelector(".montage-blocs h2");
+  if (!titre) return;
+  const lab = document.createElement("label");
+  lab.className = "toggle-pauses";
+  lab.title = "Afficher/masquer les silences dans la liste";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.id = "toggle-pauses";
+  cb.checked = pausesVisibles();
+  cb.addEventListener("change", () => {
+    try { localStorage.setItem("vb_afficher_pauses", cb.checked ? "1" : "0"); }
+    catch { /* affichage seul */ }
+    document.querySelectorAll("#liste-blocs .bloc-pause").forEach((f) => {
+      f.style.display = cb.checked ? "" : "none";
+    });
+  });
+  lab.append(cb, document.createTextNode("\u23F8 pauses"));
+  titre.appendChild(lab);
+}
+
+// Filet mince pour un bloc de silence : durée + retrait, réordonnable,
+// sans lecteur ni texte éditable. Garde .bloc-carte + data-id pour le DnD,
+// l'ordre et les badges.
+function construireFiletPause(b, num) {
+  const filet = document.createElement("article");
+  filet.className = "bloc-carte bloc-pause";
+  filet.dataset.id = b.id;
+  if (!pausesVisibles()) filet.style.display = "none";
+  const grip = document.createElement("span");
+  grip.className = "grip-bloc";
+  grip.textContent = "\u283F";
+  grip.title = "Glisser pour déplacer le silence";
+  const lib = document.createElement("span");
+  lib.className = "filet-pause-lib";
+  lib.textContent = `\u23F8 ${num} \u00B7 ${b.duree} s de silence`;
+  lib.title = "Silence (pause explicite ou de paragraphe)";
+  const btnSuppr = document.createElement("button");
+  btnSuppr.type = "button";
+  btnSuppr.className = "filet-retirer";
+  btnSuppr.textContent = "\u2715";
+  btnSuppr.title = "Retirer ce silence";
+  btnSuppr.onclick = () => actionSupprimerBloc(b.id, btnSuppr);
+  filet.append(grip, lib, btnSuppr);
+  attacherDndCarte(filet);
+  return filet;
+}
+
 function construireCarteBloc(b, num) {
+  if (b.pause != null) return construireFiletPause(b, num);
   const carte = document.createElement("article");
   carte.className = "bloc-carte";
   carte.dataset.id = b.id;
@@ -1742,6 +1798,7 @@ async function verifierSynchroEditeur() {
 // Une carte par bloc : audio + texte + infos + boutons.
 function remplirListeBlocs() {
   const box = $("liste-blocs");
+  assurerTogglePauses();
   box.innerHTML = "";
   blocEnCoursId = null;
   if (!montageBlocs.length) {
@@ -1760,6 +1817,7 @@ function remplirListeBlocs() {
 // ---------------------------------------------------------------- écoute temps réel : ajoute un bloc au fur et à mesure
 function ajouterBlocTempsReel(b) {
   const box = $("liste-blocs");
+  assurerTogglePauses();
   // si c'est le premier bloc, vider le message "Aucun bloc"
   if (box.querySelector(".liste-vide")) {
     box.innerHTML = "";
@@ -2018,7 +2076,7 @@ function appliquerBadgesVerif() {
     const tete = carte.querySelector(".bloc-carte-tete");
     let badge = carte.querySelector(".badge-couv");
     const ligne = verifResultats[bid];
-    if (!ligne) { if (badge) badge.remove(); return; }
+    if (!ligne || !tete) { if (badge) badge.remove(); return; }
     if (!badge) {
       badge = document.createElement("span");
       badge.className = "badge-couv";
