@@ -39,7 +39,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engine import bench
-from engine import config, cosyvoice_engine, modeles, multi, voix
+from engine import config, multi, omnivoice_engine, voix
 from engine.voix import load_voix
 from engine import audio_extract
 
@@ -94,12 +94,8 @@ def _etat() -> dict:
     config.set_audio_dir(d)
     config.ensure_dirs()
     _BROUILLONS.mkdir(parents=True, exist_ok=True)
-    # moteur par défaut persisté (M19.1) : CosyVoice si absent/invalide.
-    try:
-        config.set_moteur_defaut(
-            _charger_persistance().get("moteur") or config.MOTEUR_DEFAUT)
-    except ValueError:  # noqa: BLE001
-        config.set_moteur_defaut("cosyvoice")
+    # Branche omni : moteur unique (persistance "moteur" ignorée).
+    config.set_moteur_defaut("omnivoice")
     # lit musical BGM persisté (ignoré s'il n'existe plus)
     _restaurer_bgm()
     bgm_etat = {"bgm_lit": Path(config.BGM_LIT).name if config.BGM_LIT else None,
@@ -233,11 +229,6 @@ def api_torch_install_stream(jid: int):
 class ConfigIn(BaseModel):
     audio_dir: str | None = None
     bgm_volume: float | None = None
-    moteur: str | None = None  # moteur par défaut : "cosyvoice" | "omnivoice"
-
-
-class ModeleIn(BaseModel):
-    source: str | None = None  # "modelscope" | "huggingface"
 
 
 class NommageIn(BaseModel):
@@ -373,89 +364,9 @@ def api_config(payload: ConfigIn):
     if payload.bgm_volume is not None:
         config.set_bgm(config.BGM_LIT, payload.bgm_volume)
         _sauver_persistance({"bgm_volume": config.BGM_VOLUME})
-    if payload.moteur is not None:
-        try:
-            config.set_moteur_defaut(payload.moteur)
-        except ValueError as exc:
-            raise HTTPException(400, str(exc))
-        _sauver_persistance({"moteur": config.MOTEUR_DEFAUT})
     config.ensure_dirs()
     voix.generer_voix_txt()          # (re)génère si voix.txt absent
     return _etat()
-
-
-# ---------------------------------------------------------------------------
-# Modèle CosyVoice3 (hors image — téléchargé au premier lancement, M15)
-# ---------------------------------------------------------------------------
-
-@app.get("/api/modeles")
-def api_modeles():
-    return modeles.infos()
-
-
-_model_jobs: dict[int, dict] = {}
-_model_jobid = itertools.count(1)
-
-
-@app.post("/api/modeles/telecharger")
-def api_modele_telecharger(payload: ModeleIn):
-    if modeles.modele_present():
-        raise HTTPException(400, "Le modèle CosyVoice3 est déjà présent.")
-    if _model_jobs and any(j["status"] == "running" for j in _model_jobs.values()):
-        raise HTTPException(400, "Un téléchargement est déjà en cours.")
-    source = (payload.source or config.MODEL_SOURCE).lower()
-    if source not in ("modelscope", "huggingface"):
-        raise HTTPException(400, "Source inconnue : modelscope | huggingface")
-
-    jid = next(_model_jobid)
-    q: "queue.Queue[tuple]" = queue.Queue()
-    job = {"status": "running", "source": source, "queue": q,
-           "error": None, "result": None}
-    _model_jobs[jid] = job
-
-    def _run():
-        def progress(pct, octets):
-            q.put(("prog", {"pct": round(pct, 1), "octets": octets}))
-        try:
-            dest = modeles.telecharger(source=source, progress=progress)
-            job["result"] = {"dossier": str(dest)}
-            job["status"] = "done"
-        except Exception as exc:  # noqa: BLE001
-            job["error"] = str(exc)
-            job["status"] = "error"
-        finally:
-            q.put(("fin", None))
-
-    threading.Thread(target=_run, daemon=True).start()
-    return {"id": jid}
-
-
-@app.get("/api/modeles/{jid}/stream")
-def api_modele_stream(jid: int):
-    job = _model_jobs.get(jid)
-    if not job:
-        raise HTTPException(404, "Téléchargement inconnu.")
-
-    def gen():
-        yield ": connected\n\n"
-        while job["status"] == "running":
-            try:
-                kind, data = job["queue"].get(timeout=0.5)
-            except queue.Empty:
-                yield ": ping\n\n"
-                continue
-            if kind == "prog":
-                yield f"event: prog\ndata: {json.dumps(data)}\n\n"
-            elif kind == "fin":
-                break
-        if job["error"]:
-            yield f"event: error\ndata: {json.dumps({'error': job['error']})}\n\n"
-        elif job["result"]:
-            r = job["result"]
-            yield f"event: result\ndata: {json.dumps({'dossier': r['dossier']})}\n\n"
-        yield "event: end\ndata: {}\n\n"
-
-    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @app.get("/api/voix")
@@ -478,23 +389,6 @@ def api_couples():
 @app.post("/api/voix/nommer")
 def api_nommer(payload: NommageIn):
     voix.ecrire_voix_txt([tuple(e) for e in payload.entries])
-    return _etat()
-
-
-class VoixMoteurIn(BaseModel):
-    nom: str
-    moteur: str  # "cosyvoice" | "omnivoice" | "defaut" (suit le global)
-
-
-@app.post("/api/voix/moteur")
-def api_voix_moteur(payload: VoixMoteurIn):
-    """Change le moteur d'une voix (7ᵉ colonne de voix.txt, M19.1)."""
-    try:
-        voix.definir_moteur(config.VOIX_FILE, payload.nom, payload.moteur)
-    except (ValueError, KeyError) as exc:
-        raise HTTPException(400, str(exc))
-    except OSError as exc:  # noqa: BLE001
-        raise HTTPException(500, str(exc))
     return _etat()
 
 
@@ -896,7 +790,7 @@ def _reconcat(job: dict, blocs: list) -> float:
         parts.append(data)
         prec = b
     final = _np.concatenate(parts)
-    cosyvoice_engine.save(final, sr, out)
+    omnivoice_engine.save(final, sr, out)
     duree = round(len(final) / sr, 3)
     if job.get("result") is None:
         job["result"] = {"duration": duree, "blocs": blocs, "out": str(out)}
@@ -937,7 +831,7 @@ def api_bloc_regenerer(jid: int, bid: int):
         _model2, _sr2 = multi.load(device=job["device"], fp16=False)
         _duree = float(bloc.get("pause") or 1.0)
         _audio = multi.silence(_duree, _sr2)
-        cosyvoice_engine.save(_audio, _sr2, bloc["wav"])
+        omnivoice_engine.save(_audio, _sr2, bloc["wav"])
         bloc["duree"] = round(_duree, 2)
         _cache_ecrire(job)  # M16 : le cache suit les retouches
         return {"bloc": bloc}
@@ -949,7 +843,7 @@ def api_bloc_regenerer(jid: int, bid: int):
     audio = multi.synth_bloc(voix, bloc["texte"], model, sr,
                              block_chars=job["max_chars"],
                              speed=job["vitesse"], verify=job["verify"])
-    cosyvoice_engine.save(audio, sr, bloc["wav"])
+    omnivoice_engine.save(audio, sr, bloc["wav"])
     bloc["duree"] = round(len(audio) / sr, 2)
     _cache_ecrire(job)  # M16 : le cache suit les retouches
     return {"bloc": bloc}
@@ -1003,7 +897,7 @@ def api_bloc_diviser(jid: int, bid: int):
                                  block_chars=job["max_chars"],
                                  speed=job["vitesse"], verify=job["verify"])
         wav = str(Path(original["wav"]).with_name(f"bloc_{suffix}.wav"))
-        cosyvoice_engine.save(audio, sr, wav)
+        omnivoice_engine.save(audio, sr, wav)
         results.append({"id": suffix, "personnage": original["personnage"],
                         "voix": original["voix"], "texte": h["texte"],
                         "chars": len(h["texte"]), "duree": round(len(audio) / sr, 2),

@@ -146,7 +146,7 @@ class TestMultiGenerate:
     """Test bout en bout : texte tagué → parsing → génération → sortie WAV."""
 
     def test_generate_minimal(self, two_voices, minimal_text_file,
-                               mock_cosyvoice, mock_verify, tmp_project):
+                               mock_moteur, mock_verify, tmp_project):
         """Scénario M11 : 1 phrase/balise, 2 voix, sortie WAV valide."""
         voices = load_voix(two_voices, voix_dir=two_voices.parent)
         out = str(tmp_project["output_dir"] / "montage.wav")
@@ -191,7 +191,7 @@ class TestMultiGenerate:
         assert len(data) > 0
 
     def test_generate_with_progress_callback(self, two_voices, minimal_text_file,
-                                              mock_cosyvoice, mock_verify, tmp_project):
+                                              mock_moteur, mock_verify, tmp_project):
         """Vérifie que le callback progress est appelé."""
         voices = load_voix(two_voices, voix_dir=two_voices.parent)
         out = str(tmp_project["output_dir"] / "montage.wav")
@@ -212,7 +212,7 @@ class TestMultiGenerate:
         assert "blocs" in calls[-1]
 
     def test_generate_sans_sortie(self, two_voices, minimal_text_file,
-                                   mock_cosyvoice, mock_verify):
+                                   mock_moteur, mock_verify):
         """Pas de chemin de sortie → pas de fichier écrit."""
         voices = load_voix(two_voices, voix_dir=two_voices.parent)
 
@@ -226,7 +226,7 @@ class TestMultiGenerate:
         assert result["out"] is None
         assert result["duration"] > 0
 
-    def test_generate_personnages_mapping(self, two_voices, mock_cosyvoice,
+    def test_generate_personnages_mapping(self, two_voices, mock_moteur,
                                            mock_verify, tmp_project):
         """Mapping personnages → voix (M9) : le personnage « Héros » utilise la voix « Narrateur »."""
         vd = two_voices.parent
@@ -249,7 +249,7 @@ class TestMultiGenerate:
         assert result["blocs"][0]["voix"] == "Narrateur"
 
     def test_generate_voix_introuvable_erreur(self, two_voices,
-                                               mock_cosyvoice, mock_verify,
+                                               mock_moteur, mock_verify,
                                                tmp_project):
         """Personnage mappé vers une voix inexistante → ValueError."""
         txt = tmp_project["textes_dir"] / "test.md"
@@ -269,7 +269,7 @@ class TestMultiGenerate:
             )
 
     def test_generate_bloc_dir(self, two_voices, minimal_text_file,
-                                mock_cosyvoice, mock_verify, tmp_project):
+                                mock_moteur, mock_verify, tmp_project):
         """block_dir → chaque bloc est sauvegardé individuellement."""
         voices = load_voix(two_voices, voix_dir=two_voices.parent)
         block_dir = str(tmp_project["output_dir"] / "blocs")
@@ -289,7 +289,7 @@ class TestMultiGenerate:
             assert Path(b["wav"]).exists()
 
     def test_generate_no_verify(self, two_voices, minimal_text_file,
-                                 mock_cosyvoice, tmp_project):
+                                 mock_moteur, tmp_project):
         """verify=False désactive la vérification Whisper."""
         voices = load_voix(two_voices, voix_dir=two_voices.parent)
         out = str(tmp_project["output_dir"] / "montage.wav")
@@ -310,15 +310,15 @@ class TestMultiGenerate:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSynthBloc:
-    def test_synth_bloc_single(self, two_voices, mock_cosyvoice, mock_verify):
+    def test_synth_bloc_single(self, two_voices, mock_moteur, mock_verify):
         voices = load_voix(two_voices, voix_dir=two_voices.parent)
         voice = voices.get("Narrateur")
 
         audio = multi.synth_bloc(
             voice,
             "Bonjour le monde.",
-            mock_cosyvoice["model"],
-            mock_cosyvoice["sample_rate"],
+            mock_moteur["model"],
+            mock_moteur["sample_rate"],
             verify=False,
         )
 
@@ -378,7 +378,7 @@ class TestPauses:
                                    (PAUSE, str(PARAGRAPH_PAUSE)),
                                    ("Narrateur", "B.")]
 
-    def test_generate_pause_silence_reel(self, two_voices, mock_cosyvoice,
+    def test_generate_pause_silence_reel(self, two_voices, mock_moteur,
                                           mock_verify, tmp_project):
         """Le montage contient le silence exact, sans appel TTS pour la pause."""
         txt = tmp_project["textes_dir"] / "pauses.md"
@@ -386,7 +386,7 @@ class TestPauses:
                        encoding="utf-8")
         voices = load_voix(two_voices, voix_dir=two_voices.parent)
         out = str(tmp_project["output_dir"] / "montage.wav")
-        n_avant = mock_cosyvoice["synthesize"].call_count
+        n_avant = mock_moteur["synthesize"].call_count
 
         result = multi.generate(str(txt), voices, pause=0.5, out=out,
                                 verbose=False)
@@ -397,7 +397,7 @@ class TestPauses:
         assert milieu["pause"] == 1.0
         assert milieu["duree"] == 1.0
         # 2 appels TTS (un par voix), aucun pour le silence
-        assert mock_cosyvoice["synthesize"].call_count == n_avant + 2
+        assert mock_moteur["synthesize"].call_count == n_avant + 2
         # Durée totale = parole + 1,0 s de silence (pas de pause standard autour)
         parle = result["blocs"][0]["duree"] + result["blocs"][2]["duree"]
         assert result["duration"] == round(parle + 1.0, 2)

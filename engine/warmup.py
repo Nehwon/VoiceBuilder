@@ -20,15 +20,15 @@ def etapes(model_dir=None) -> dict:
 
     Renvoie ``{etape: True/False}``. Ne lève jamais.
     """
-    from . import cosyvoice_engine
+    from . import omnivoice_engine
     from . import verifier
     from .voix import load_voix
 
     resultat: dict = {}
     try:
-        cosyvoice_engine.load(model_dir=model_dir)
+        omnivoice_engine.load()
         resultat["modele"] = True
-        log.info("Warmup : modèle CosyVoice3 chargé.")
+        log.info("Warmup : modèle OmniVoice chargé.")
     except Exception as exc:  # noqa: BLE001
         log.warning("Warmup : modèle non chargé (%s).", exc)
         resultat["modele"] = False
@@ -36,9 +36,9 @@ def etapes(model_dir=None) -> dict:
     try:
         voix = load_voix()
         v = voix.get(voix.names()[0])
-        model, sr = cosyvoice_engine.load(model_dir=model_dir)
-        cosyvoice_engine.synthesize(
-            PHRASE_WARMUP, str(v.wav), v.system_prompt, model, sr)
+        model, sr = omnivoice_engine.load()
+        omnivoice_engine.synthesize(
+            PHRASE_WARMUP, str(v.wav), v.prompt_text, model, sr)
         resultat["synthese"] = True
         log.info("Warmup : micro-synthèse OK.")
     except Exception as exc:  # noqa: BLE001

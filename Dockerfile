@@ -1,6 +1,6 @@
-# VoiceBuilder — image applicative finale (GPU/NVIDIA).
+# VoiceBuilder-omni — image applicative finale (GPU/NVIDIA, branche omni).
 #
-# Construit l'environnement : moteur CosyVoice3 (sous-module vendor/CosyVoice)
+# Construit l'environnement : moteur OmniVoice (transformers 5.x, direct)
 # + pipeline engine/ + GUI FastAPI.
 #
 # FROM l'image `voicebuilder-vb` (docker/vb/Dockerfile) qui apporte déjà le
@@ -36,20 +36,18 @@ RUN python -c "import demucs, df, libdf, tqdm" 2>/dev/null \
          && python /tmp/patch_deepfilternet.py; }
 RUN rm -f /tmp/patch_deepfilternet.py
 
-# --- Patches locaux du moteur ---
-# L'image vb n'a PAS les patches (elle ne contient que les dépendances pip).
-# On applique ici les patches CosyVoice (fix load_wav, etc.) au code du
-# sous-module copié ci-dessus.
-RUN bash /app/scripts/apply_cosyvoice_patches.sh
+# --- Moteur OmniVoice (branche omni : transformers 5.x, incompatible
+# CosyVoice — aucun code CosyVoice dans cette image) ---
+RUN pip install "omnivoice==0.2.1" "transformers==5.18.0" "tokenizers==0.23.2" \
+    "accelerate==1.15.0" "tensorboardx==2.6.5" "webdataset==1.0.2"
 
 # --- Volumes (dossier des voix réglable) ---
-# Le modèle CosyVoice3 est volontairement HORS image : téléchargé au premier
-# lancement depuis l'interface dans /models (volume inscriptible), ou monté
-# depuis un volume/dossier pré-rempli. Voir docker-compose.yml (COSYVOICE_MODEL_DIR).
-ENV VOICEBUILDER_AUDIO_DIR=/app/voix \
-    COSYVOICE_MODEL_DIR=/models \
-    COSYVOICE_MODEL_SOURCE=modelscope
-VOLUME ["/app/output", "/app/texte", "/app/voix", "/models"]
+# Le modèle OmniVoice (3,3 Go) est téléchargé au premier lancement dans le
+# cache HuggingFace (volume dédié, conservé entre recréations). Les modèles
+# enhance (Demucs/DeepFilterNet) restent dans /models (volume-model).
+ENV VOICEBUILDER_AUDIO_DIR=/app/voix
+VOLUME ["/app/output", "/app/texte", "/app/voix", "/models",
+        "/root/.cache/huggingface"]
 
 EXPOSE 8000
 

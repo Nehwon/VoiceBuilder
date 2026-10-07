@@ -1,8 +1,14 @@
-# VoiceBuilder
+# VoiceBuilder — branche `omni` (v1.0.0 à venir)
 
-Outil local d'**écriture et de production audio multi-voix** basé sur les moteurs
-**CosyVoice3** (`Fun-CosyVoice3-0.5B`, défaut) et **OmniVoice** (`k2-fsa/OmniVoice`,
-alternatif plus rapide et naturel — M19.1, routage par voix).
+> **Branche omni : moteur OmniVoice uniquement** (direct, transformers 5.x).
+> Le multi-moteurs vit sur `main` ; CosyVoice seul sur `cosy`. Ici, la 7ᵉ
+> colonne `moteur` de `voix.txt` est lue sans effet. Pas de déploiement
+> automatique (le webhook déploie la prod) : déploiement manuel depuis
+> l'image `voicebuilder-omni`.
+
+Outil local d'**écriture et de production audio multi-voix** basé sur le moteur
+**OmniVoice** (`k2-fsa/OmniVoice`, 24 kHz natifs, écoute 9/10 — voir
+`docs/BENCH_MOTEURS.md`).
 
 Taguez un texte dans un éditeur Markdown, associez chaque réplique à une voix
 (définie par un échantillon `.wav` + sa transcription `.txt`), puis générez un
