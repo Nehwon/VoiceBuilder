@@ -80,14 +80,15 @@ def minimal_text_file(tmp_project):
 
 
 # ---------------------------------------------------------------------------
-# Fixture : mock du moteur CosyVoice (pas de GPU requis)
+# Fixture : mock du moteur OmniVoice (pas de GPU requis, branche omni)
 # ---------------------------------------------------------------------------
 
-_SAMPLE_RATE = 22050
+_SAMPLE_RATE = 24000
 
 
 def _fake_synthesize(text: str, prompt_wav: str, prompt_text: str,
-                     model=None, sample_rate=None, speed=1.0) -> np.ndarray:
+                     model=None, sample_rate=None, speed=1.0,
+                     **kwargs) -> np.ndarray:
     """Retourne une onde sinusoïdale factice dont la durée dépend de la longueur du texte."""
     sr = sample_rate or _SAMPLE_RATE
     duration = max(0.5, len(text) * 0.05)  # ~50 ms par caractère
@@ -101,13 +102,13 @@ def _fake_save(audio: np.ndarray, sample_rate: int, path: str) -> None:
 
 
 @pytest.fixture()
-def mock_cosyvoice():
-    """Mock le moteur CosyVoice : load + synthesize (save écrit pour de vrai)."""
-    mock_model = MagicMock(name="CosyVoiceModel")
+def mock_moteur():
+    """Mock le moteur OmniVoice : load + synthesize (save écrit pour de vrai)."""
+    mock_model = MagicMock(name="OmniVoiceModel")
 
-    with patch("engine.cosyvoice_engine.load", return_value=(mock_model, _SAMPLE_RATE)) as m_load, \
-         patch("engine.cosyvoice_engine.synthesize", side_effect=_fake_synthesize) as m_synth, \
-         patch("engine.cosyvoice_engine.save", side_effect=_fake_save) as m_save:
+    with patch("engine.omnivoice_engine.load", return_value=(mock_model, _SAMPLE_RATE)) as m_load, \
+         patch("engine.omnivoice_engine.synthesize", side_effect=_fake_synthesize) as m_synth, \
+         patch("engine.omnivoice_engine.save", side_effect=_fake_save) as m_save:
         yield {
             "load": m_load,
             "synthesize": m_synth,

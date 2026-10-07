@@ -8,6 +8,13 @@ gradio==3.43.2
 fastapi==0.141.1
 uvicorn==0.52.1
 python-multipart==0.0.9
+# Branche omni : moteur unique (transformers 5.x, incompatible CosyVoice).
+omnivoice==0.2.1
+transformers==5.18.0
+tokenizers==0.23.2
+accelerate==1.15.0
+tensorboardx==2.6.5
+webdataset==1.0.2
 # vllm RETIRÉ (2026-09-21) : aucune version ne satisfait torch==2.13.0 +
 # fastapi==0.141.1 (vllm épingle torch ≤2.11 et fastapi<0.137) → pip
 # ResolutionImpossible sur l'image vb. Les imports vllm/tensorrt sont

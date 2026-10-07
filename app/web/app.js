@@ -113,15 +113,9 @@ $("btn-modal-fermer").addEventListener("click", () => fermerModal(modalReglages)
 $("btn-aide").addEventListener("click", () => ouvrirModal(modalAide));
 $("btn-aide-fermer").addEventListener("click", () => fermerModal(modalAide));
 
-const modalModeles = $("modal-modeles");
-$("btn-modeles").addEventListener("click", () => { chargerModele(); ouvrirModal(modalModeles); });
-$("btn-modele-fermer").addEventListener("click", () => fermerModal(modalModeles));
-$("btn-modele-telecharger").addEventListener("click", telechargerModele);
-modalModeles.addEventListener("click", (e) => { if (e.target === modalModeles) fermerModal(modalModeles); });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!modalNom.hidden) { annulerNom(); return; }
-    if (!modalModeles.hidden) { fermerModal(modalModeles); return; }
     if (!$("modal-nettoyage").hidden) { fermerModal($("modal-nettoyage")); return; }
     if (!$("modal-confirm").hidden) { fermerModal($("modal-confirm")); if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; } return; }
     if (!$("modal-voix-import").hidden) { fermerModal($("modal-voix-import")); return; }
@@ -997,15 +991,6 @@ $("btn-dir").addEventListener("click", async () => {
 });
 $("btn-save").addEventListener("click", () =>
   notifier("Réglages utilisés côté serveur à la génération.", "ok"));
-$("btn-moteur").addEventListener("click", async () => {
-  const r = await fetch("/api/config", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ moteur: $("moteur").value }),
-  });
-  if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
-  await chargerEtat();
-  notifier("Moteur par défaut appliqué.", "ok");
-});
 
 // ---------------------------------------------------------------- musique de fond (BGM)
 $("bgm-volume").addEventListener("input", () => {
@@ -2133,90 +2118,10 @@ async function suivreVerification() {
   } catch { clearInterval(verifPollTimer); $("montage-progress").hidden = true; }
 }
 
-// ---------------------------------------------------------------- modèle CosyVoice3
-let modelePresent = null;          // true | false | null (inconnu)
-function afficherStatutModele(m) {
-  const el = $("modele-statut");
-  const fmt = (n) => (n >= 1e9 ? (n / 1e9).toFixed(1) + " Go" : (n >= 1e6 ? (n / 1e6).toFixed(0) + " Mo" : n + " o"));
-  $("modele-manquants").textContent = (m.manquants && m.manquants.length ? m.manquants.join("\n") : "— aucun —");
-  modelePresent = !!m.present;
-  if (m.present) {
-    el.className = "modele-statut ok";
-    el.innerHTML = "✔ Modèle présent dans <code>" + m.dossier + "</code>.";
-    $("btn-modele-telecharger").disabled = true;
-  } else {
-    el.className = "modele-statut missing";
-    const partiel = m.octets > 0 ? ` · ${fmt(m.octets)} déjà présents` : "";
-    el.innerHTML = `⚠ Modèle absent (${fmt(m.total)} attendus${partiel}).<br/>
-      Source : <code>${m.source}</code> · <code>${m.id}</code>`;
-    $("btn-modele-telecharger").disabled = false;
-  }
-  $("modele-source").value = m.source || "modelscope";
-  majBanniere();
-}
-
-async function chargerModele() {
-  try {
-    const r = await fetch("/api/modeles");
-    if (!r.ok) { afficherStatutModele({ present: false, manquants: [], octets: 0, total: 0, source: "modelscope", id: "", dossier: "?" }); return; }
-    afficherStatutModele(await r.json());
-  } catch { notifier("Impossible de lire l'état du modèle.", "err"); }
-}
-
-function setModeleProgression(label, pct) {
-  $("modele-progress").hidden = false;
-  $("modele-progress-label").textContent = label;
-  $("modele-progress-compteur").textContent = (pct >= 0 ? Math.round(pct) + "%" : "");
-  $("modele-progress-remplie").style.width = (pct >= 0 ? pct : 0) + "%";
-  $("btn-modele-telecharger").disabled = true;
-}
-
-async function telechargerModele() {
-  if (generationActive) { notifier("Attends la fin de la génération.", "err"); return; }
-  const source = $("modele-source").value;
-  const r = await fetch("/api/modeles/telecharger", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source }),
-  });
-  if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
-  const { id } = await r.json();
-
-  setModeleProgression("Téléchargement du modèle…", 0);
-  const ev = new EventSource(`/api/modeles/${id}/stream`);
-  let fini = false;
-  const fin = () => {
-    if (fini) return;
-    fini = true;
-    ev.close();
-    $("modele-progress").hidden = true;
-    chargerModele();
-  };
-  ev.addEventListener("prog", (e) => {
-    const d = JSON.parse(e.data);
-    setModeleProgression("Téléchargement du modèle…", d.pct);
-  });
-  ev.addEventListener("result", () => {
-    notifier("Modèle CosyVoice3 téléchargé.", "ok");
-    $("modele-progress-label").textContent = "Téléchargement terminé.";
-    $("modele-progress-compteur").textContent = "100%";
-    $("modele-progress-remplie").style.width = "100%";
-  });
-  ev.addEventListener("error", (e) => {
-    if (e.data) {
-      const d = JSON.parse(e.data).error;
-      $("modele-progress-label").textContent = "Échec du téléchargement.";
-      notifier(d, "err");
-      afficherErreur(d);
-    }
-  });
-  ev.addEventListener("end", fin);
-}
-
 // ---------------------------------------------------------------- état (dossier des voix)
 async function chargerEtat() {
   const etat = await (await fetch("/api/etat")).json();
   $("audio-dir").value = etat.audio_dir;
-  if (etat.moteur) $("moteur").value = etat.moteur;
   $("bgm-nom").textContent = etat.bgm_lit || "aucun lit";
   if (etat.bgm_volume != null) {
     $("bgm-volume").value = etat.bgm_volume;
@@ -2232,19 +2137,6 @@ async function chargerEtat() {
 // ---------------------------------------------------------------- bannière (voix → modèle, priorité absolue au modèle)
 let banniereVoix = null;   // {texte, lien} | null
 function majBanniere() {
-  // le modèle est un prérequis : sa bannière prime toujours
-  if (modelePresent === false) {
-    if ($("banniere").dataset.perso !== "modele") {
-      $("banniere").dataset.perso = "modele";
-      $("banniere-msg").textContent =
-        "Le modèle CosyVoice3 n'est pas encore téléchargé — télécharge-le depuis 🧠 Modèles (premier lancement).";
-      $("banniere-lien").textContent = "→ Télécharger le modèle (~11 Go)";
-      $("banniere-lien").hidden = false;
-    }
-    $("banniere-lien").onclick = (e) => { e.preventDefault(); ouvrirModal(modalModeles); };
-    $("banniere").hidden = false;
-    return;
-  }
   $("banniere").dataset.perso = "";
   if (banniereVoix) {
     $("banniere-msg").textContent = banniereVoix.texte;
@@ -2448,20 +2340,10 @@ function renderVoix(list) {
     info.append(nom, meta);
     const acts = document.createElement("div");
     acts.className = "projet-carte-actions";
-    const selMoteur = document.createElement("select");
-    selMoteur.title = "Moteur TTS de cette voix (Défaut = réglage Configuration)";
-    for (const [val, label] of [["", "Défaut"], ["cosyvoice", "CosyVoice"], ["omnivoice", "OmniVoice"]]) {
-      const opt = document.createElement("option");
-      opt.value = val; opt.textContent = label;
-      selMoteur.append(opt);
-    }
-    selMoteur.value = v.moteur_colonne || "";
-    selMoteur.onchange = async () => {
-      const r = await fetch("/api/voix/moteur", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: v.nom, moteur: selMoteur.value || "defaut" }) });
-      if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
-      notifier(`Moteur de « ${v.nom} » : ${selMoteur.selectedOptions[0].textContent}.`, "ok");
-      await chargerVoixListe();
-    };
+    const badgeMoteur = document.createElement("span");
+    badgeMoteur.className = "badge-moteur";
+    badgeMoteur.title = "Branche omni : moteur unique";
+    badgeMoteur.textContent = "OmniVoice";
     const bPlay = document.createElement("button");
     bPlay.textContent = "▶ Écouter";
     bPlay.onclick = () => {
@@ -2485,7 +2367,7 @@ function renderVoix(list) {
       await chargerVoixListe();
       await chargerEtat();
     };
-    acts.append(selMoteur, bPlay, bClean, bDel);
+    acts.append(badgeMoteur, bPlay, bClean, bDel);
     carte.append(info, acts);
     box.appendChild(carte);
   }
@@ -3123,6 +3005,5 @@ $("btn-voix-enregistrer").addEventListener("click", async () => {
   await chargerDocuments();
   await chargerEtat();
   await chargerVoix();
-  await chargerModele();
   await rattacherGenerationEnCours();  // job encore en cours après rechargement ?
 })();

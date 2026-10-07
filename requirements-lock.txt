@@ -2,6 +2,7 @@
 # Extra index: https://download.pytorch.org/whl/cu130
 # Requirements: requirements.txt
 
+accelerate==1.15.0
 absl-py==2.5.0
 aiofiles==23.2.1
 aiohappyeyeballs==2.7.1
@@ -171,6 +172,7 @@ nvidia-nvshmem-cu13==3.4.5
 nvidia-nvtx==13.0.85
 nvidia-nvtx-cu12==12.1.105
 omegaconf==2.3.0
+omnivoice==0.2.1  # branche omni : moteur unique
 onnxruntime-gpu==1.23.2
 openai-whisper==20250625
 optuna==2.10.1
@@ -247,12 +249,13 @@ starlette==1.6.0
 stevedore==5.8.0
 sympy==1.14.0
 tensorboard==2.20.0
+tensorboardx==2.6.5
 tensorboard-data-server==0.7.2
 terminado==0.18.1
 threadpoolctl==3.6.0
 tiktoken==0.13.0
 tinycss2==1.5.1
-tokenizers==0.21.4
+tokenizers==0.23.2
 tomli==2.4.1
 tomlkit==0.14.0
 torch==2.13.0
@@ -263,7 +266,7 @@ torchvision==0.28.0
 tornado==6.5.8
 tqdm==4.70.0
 traitlets==5.16.1
-transformers==4.51.3
+transformers==5.18.0
 triton==3.7.1
 typeguard==4.6.0
 typer==0.27.1
@@ -282,6 +285,7 @@ webcolors==25.10.0
 webencodings==0.5.1
 websocket-client==1.9.0
 websockets==11.0.3
+webdataset==1.0.2
 werkzeug==3.1.8
 wget==3.2
 widgetsnbextension==4.0.15

@@ -1,21 +1,23 @@
-name: Build VoiceBuilder final image (à la demande)
+name: Build VoiceBuilder-omni final image (branche omni) (à la demande)
 
-# Image applicative finale : FROM vb + code + patches. Déclenchée par push main
-# (à la demande). Skip du build si le code n'a pas changé depuis le dernier tag.
+# Image applicative finale omni : FROM vb + code + OmniVoice direct.
+# Déclenchée par push omni. PAS de déploiement auto (le webhook déploie la
+# prod CosyVoice : un deploy auto écraserait le service en ligne).
+# Déploiement manuel depuis l'image publiée voicebuilder-omni.
 # Le bump de version M.m.f est calculé à chaque push ; le build final référence
 # l'image vb stable (cu130) déjà publiée par le workflow journalier.
 
 on:
   push:
-    branches: [main]
+    branches: [omni]
   pull_request:
-    branches: [main]
+    branches: [omni]
   workflow_dispatch:
 
 env:
   OWNER: fabrice
   REGISTRY: 192.168.0.5:3000
-  IMAGE_NAME: 192.168.0.5:3000/fabrice/voicebuilder
+  IMAGE_NAME: 192.168.0.5:3000/fabrice/voicebuilder-omni
   VB_IMAGE: 192.168.0.5:3000/fabrice/voicebuilder-vb:cu130
 
 jobs:
@@ -44,10 +46,10 @@ jobs:
           new="$before"
           changed_files=$(git diff-tree --no-commit-id --name-only -r HEAD || true)
           commit_subject=$(git log -1 --pretty=%s)
-          if echo "$commit_subject" | grep -Eqi 'major|breaking'; then
+          if echo "$commit_subject" | grep -Eqi 'major|breaking'; then  # v1.0.0 posée à la main, pas par ce workflow
             bump_type=major
             new="$before"
-          elif echo "$changed_files" | grep -Eqi '(web_app|server\.py|Dockerfile|entrypoint|wizard)'; then
+          elif echo "$changed_files" | grep -Eqi '(server\.py|Dockerfile|entrypoint|wizard)'; then
             bump_type=minor
             minor=$((minor + 1))
             patch=0
@@ -61,7 +63,7 @@ jobs:
   version:
     name: Bump version
     needs: prepare
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push'  # branche omni : bump auto comme sur main (v1.0.0 restera manuelle)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -90,7 +92,7 @@ jobs:
           git add VERSION
           git commit -m "chore(release): bump version to ${{ needs.prepare.outputs.new }} [skip ci]"
           git tag "v${{ needs.prepare.outputs.new }}"
-          git push origin "HEAD:main"
+          git push origin "HEAD:omni"
           git push origin "v${{ needs.prepare.outputs.new }}"
 
   build:
@@ -111,14 +113,14 @@ jobs:
       - name: Compute content hash
         id: hash
         run: |
-          hash=$(git ls-files -z ':(exclude)vendor/CosyVoice' | xargs -0 sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1 | cut -c1-12)
+          hash=$(git ls-files -z | xargs -0 sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1 | cut -c1-12)
           echo "tag=${{ needs.prepare.outputs.new }}-$hash" >> "$GITHUB_OUTPUT"
           echo "Hash du contenu : $hash"
 
       - name: Skip if already built
         id: skip
         run: |
-          if bash scripts/ci/needs_rebuild.sh "${{ env.OWNER }}" voicebuilder "${{ steps.hash.outputs.tag }}"; then
+          if bash scripts/ci/needs_rebuild.sh "${{ env.OWNER }}" voicebuilder-omni "${{ steps.hash.outputs.tag }}"; then
             echo "build=yes" >> "$GITHUB_OUTPUT"
           else
             echo "build=no" >> "$GITHUB_OUTPUT"
@@ -142,7 +144,7 @@ jobs:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.IMAGE_NAME }}:main
+            ${{ env.IMAGE_NAME }}:omni
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:v${{ needs.prepare.outputs.new }}
             ${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.new }}
@@ -157,30 +159,6 @@ jobs:
             PIP_NO_CACHE_DIR=1
             VB_IMAGE=${{ env.VB_IMAGE }}
 
-      - name: Deploy local
-        if: steps.skip.outputs.build == 'yes' && github.event_name == 'push'
-        run: |
-          # Non-fatal : 3 tentatives (le client local peut redémarrer), puis
-          # diagnostic précis (000 = injoignable depuis le runner, 401 = token
-          # DEPLOY_TOKEN invalide, 500 = pull/up échoué côté client, voir
-          # ~/.config/deploy-webhook/deploy.log sur 192.168.0.120).
-          code="000"
-          for i in 1 2 3; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 \
-              -X POST "http://192.168.0.120:63200/deploy/voicebuilder" \
-              -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -d '{"tag":"${{ needs.prepare.outputs.new }}"}') || code="000"
-            if [ "$code" = "200" ]; then break; fi
-            echo "Tentative $i : HTTP $code, nouvel essai dans 15 s…"
-            sleep 15
-          done
-          if [ "$code" = "200" ]; then
-            echo "Deploy webhook OK (HTTP 200)."
-          else
-            echo "Deploy webhook FAILED (HTTP $code) — non-fatal."
-          fi
-
       - name: Mirror to GitHub Container Registry
         # Miroir sans calcul côté GitHub : l'image déjà buildée/poussée est
         # simplement retaggée vers ghcr.io (secret GHCR_TOKEN, scope packages:write).
@@ -189,10 +167,10 @@ jobs:
         run: |
           set -euo pipefail
           echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u Nehwon --password-stdin
-          for tag in main latest "v${{ needs.prepare.outputs.new }}" "${{ needs.prepare.outputs.new }}"; do
+          for tag in omni latest "v${{ needs.prepare.outputs.new }}" "${{ needs.prepare.outputs.new }}"; do
             docker pull "${{ env.IMAGE_NAME }}:$tag"
-            docker tag "${{ env.IMAGE_NAME }}:$tag" "ghcr.io/nehwon/voicebuilder:$tag"
-            docker push "ghcr.io/nehwon/voicebuilder:$tag"
+            docker tag "${{ env.IMAGE_NAME }}:$tag" "ghcr.io/nehwon/voicebuilder-omni:$tag"
+            docker push "ghcr.io/nehwon/voicebuilder-omni:$tag"
           done
 
   release:

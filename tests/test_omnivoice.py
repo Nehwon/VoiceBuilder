@@ -28,10 +28,10 @@ def _projet_voix(tmp_path: Path, lignes: str):
 
 
 class TestColonneMoteur:
-    def test_defaut_cosyvoice(self, tmp_path):
+    def test_defaut_omnivoice(self, tmp_path):
         vf = _projet_voix(tmp_path, "[A], a.wav, a.txt\n")
         v = voix.load_voix(vf, voix_dir=tmp_path).get("A")
-        assert v.moteur == "cosyvoice" == config.MOTEUR_DEFAUT
+        assert v.moteur == "omnivoice" == config.MOTEUR_DEFAUT
 
     def test_omnivoice_explicite(self, tmp_path):
         vf = _projet_voix(tmp_path, "[A], a.wav, a.txt, , , , omnivoice\n")
@@ -56,21 +56,23 @@ class TestEcrireVoixTxt:
                                    out=tmp_path / "voix.txt")
         assert out.read_text(encoding="utf-8") == "[A], a.wav, a.txt\n"
 
-    def test_omnivoice_suffixe_7e_colonne(self, tmp_path):
+    def test_omnivoice_defaut_pas_de_suffixe(self, tmp_path):
+        # Branche omni : omnivoice = défaut -> pas de suffixe.
         out = voix.ecrire_voix_txt([("A", "a.wav", "a.txt", "omnivoice")],
                                    out=tmp_path / "voix.txt")
         ligne = out.read_text(encoding="utf-8").strip()
-        assert ligne.endswith(", omnivoice")
+        assert ligne == "[A], a.wav, a.txt"
         # Round-trip : la ligne relue donne moteur omnivoice.
         (tmp_path / "a.wav").write_bytes(b"RIFF....")
         (tmp_path / "a.txt").write_text("bonjour", encoding="utf-8")
         v = voix.load_voix(out, voix_dir=tmp_path).get("A")
         assert v.moteur == "omnivoice"
 
-    def test_cosyvoice_explicite_pas_de_suffixe(self, tmp_path):
+    def test_cosyvoice_explicite_suffixe_inerte(self, tmp_path):
+        # Branche omni : cosyvoice != défaut -> suffixe écrit mais sans effet.
         out = voix.ecrire_voix_txt([("A", "a.wav", "a.txt", "cosyvoice")],
                                    out=tmp_path / "voix.txt")
-        assert out.read_text(encoding="utf-8") == "[A], a.wav, a.txt\n"
+        assert out.read_text(encoding="utf-8").strip().endswith(", cosyvoice")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -78,8 +80,8 @@ class TestEcrireVoixTxt:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestMoteurDefaut:
-    def test_defaut_cosyvoice(self):
-        assert config.MOTEUR_DEFAUT in config.MOTEURS
+    def test_defaut_omnivoice(self):
+        assert config.MOTEUR_DEFAUT == "omnivoice" == config.MOTEURS[0]
 
     def test_bascule_et_retour(self):
         avant = config.MOTEUR_DEFAUT
@@ -173,56 +175,6 @@ class TestSynthesize:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Mode worker HTTP (M19.1-bis)
-# ═══════════════════════════════════════════════════════════════════════════
-
-class TestWorker:
-    def test_load_worker_sans_import_local(self, monkeypatch):
-        import engine.omnivoice_engine as oe
-        monkeypatch.setattr(oe, "_direct_ok", False)
-        monkeypatch.setattr(oe, "_model", None)
-        model, sr = oe.load(worker_url="http://test:8100")
-        assert model == {"worker_url": "http://test:8100"} and sr == 24000
-
-    def test_synthesize_via_worker(self, monkeypatch):
-        import io
-        import engine.omnivoice_engine as oe
-        wav = io.BytesIO()
-        import soundfile as sf
-        sf.write(wav, np.zeros(4800, dtype=np.float32), 24000, format="WAV")
-        corps = wav.getvalue()
-
-        class _Rep:
-            def __enter__(self): return self
-            def __exit__(self, *a): return False
-            def read(self): return corps
-
-        vus = {}
-
-        def _faux_open(req, timeout=None):
-            vus["url"] = req.full_url
-            vus["payload"] = req.data.decode()
-            return _Rep()
-
-        monkeypatch.setattr("urllib.request.urlopen", _faux_open)
-        out = oe.synthesize("Bonjour.", "ref.wav", "reference.",
-                            model={"worker_url": "http://test:8100"},
-                            out_sr=24000)
-        assert out.shape == (4800,)
-        assert vus["url"] == "http://test:8100/synthesize"
-        assert "Bonjour" in vus["payload"]
-
-    def test_worker_injoignable_erreur_claire(self, monkeypatch):
-        import engine.omnivoice_engine as oe
-        import pytest
-
-        def _ko(req, timeout=None):
-            raise ConnectionRefusedError("refuse")
-        monkeypatch.setattr("urllib.request.urlopen", _ko)
-        with pytest.raises(RuntimeError, match="injoignable"):
-            oe.synthesize("Bonjour.", "ref.wav", "reference.",
-                          model={"worker_url": "http://test:8100"})
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Routage multi._synthesize_for
 # ═══════════════════════════════════════════════════════════════════════════
@@ -234,28 +186,14 @@ def _voix(nom: str, moteur: str) -> voix.Voice:
 
 
 class TestRoutage:
-    def test_omni_appelle_omni_avec_prompt_brut(self):
+    def test_omni_force_meme_voix_cosy(self):
+        # Branche omni : voice.moteur ignoré, toujours OmniVoice direct.
         with patch("engine.omnivoice_engine.synthesize",
                    return_value=np.zeros(24000, dtype=np.float32)) as m_omni, \
-             patch("engine.cosyvoice_engine.synthesize") as m_cosy, \
              patch("engine.adaptive.synthesize_verified",
                    side_effect=lambda t, w, p, synth, sr, **kw: synth(t)):
-            multi._synthesize_for("Texte.", {"omnivoice": (object(), 24000)},
-                                  22050, _voix("A", "omnivoice"), 600, 1.0,
-                                  False)
-        assert m_omni.called and not m_cosy.called
+            multi._synthesize_for("Texte.", {}, 24000,
+                                  _voix("A", "cosyvoice"), 600, 1.0, False)
+        assert m_omni.called
         _, kw = m_omni.call_args
-        assert kw.get("out_sr") == 22050
-
-    def test_cosy_appelle_cosy_avec_system_prompt(self):
-        with patch("engine.omnivoice_engine.synthesize") as m_omni, \
-             patch("engine.cosyvoice_engine.synthesize",
-                   return_value=np.zeros(22050, dtype=np.float32)) as m_cosy, \
-             patch("engine.adaptive.synthesize_verified",
-                   side_effect=lambda t, w, p, synth, sr, **kw: synth(t)):
-            multi._synthesize_for("Texte.", {"cosyvoice": (object(), 22050)},
-                                  22050, _voix("A", "cosyvoice"), 600, 1.0,
-                                  False)
-        assert m_cosy.called and not m_omni.called
-        args, _ = m_cosy.call_args
-        assert args[2].startswith(config.COSYVOICE3_SYSTEM_PROMPT)
+        assert kw.get("out_sr") == 24000

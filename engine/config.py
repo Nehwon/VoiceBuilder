@@ -48,10 +48,10 @@ OMNIVOICE_MODEL_DIR = Path(
 
 # Moteurs TTS disponibles et moteur par défaut des voix sans colonne moteur
 # (voix.txt). Réglable via VOICEBUILDER_MOTEUR_DEFAUT.
-MOTEURS = ("cosyvoice", "omnivoice")
-MOTEUR_DEFAUT = os.environ.get("VOICEBUILDER_MOTEUR_DEFAUT", "cosyvoice")
+MOTEURS = ("omnivoice",)  # branche omni : moteur unique
+MOTEUR_DEFAUT = os.environ.get("VOICEBUILDER_MOTEUR_DEFAUT", "omnivoice")
 if MOTEUR_DEFAUT not in MOTEURS:
-    MOTEUR_DEFAUT = "cosyvoice"
+    MOTEUR_DEFAUT = "omnivoice"
 
 # --- Dossiers projet ---------------------------------------------------------------
 VOIX_DIR = PROJECT_ROOT / "voix"

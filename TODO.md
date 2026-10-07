@@ -496,6 +496,10 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
   - [ ] Panneau « 🧠 Modèles » étendu au téléchargement/détection des modèles
         par moteur et par machine ; wrappers `engine/xtts_engine.py` **puis
         `engine/fishspeech_engine.py`**.
+- [ ] **Branches moteur (2026-10-07)** : `main` = base multi-moteurs
+  (développement courant) ; `cosy` = CosyVoice3 seul (legacy) ;
+  `omni` = OmniVoice seul (cette branche, v1.0.0 à venir, tag manuel plus
+  tard). Resynchroniser les variantes depuis `main` (merge régulier).
 - [ ] **M19.2 — Cohérence du montage multi-moteurs**
   - [ ] Resample + alignement de loudness par bloc (sample rates / niveaux
         différents selon moteur), sinon les changements de voix s'entendent ;
