@@ -1027,6 +1027,10 @@ async function assurerModele() {
       et = await (await fetch("/api/etat")).json();
       if (et.modele?.pret) break;
       const dl = et.modele?.telechargement || {};
+      if (dl.erreur) {
+        $("modele-fichier").textContent = "❌ " + dl.erreur;
+        break;
+      }
       $("modele-remplie").style.width = (dl.pct || 0) + "%";
       $("modele-compteur").textContent = (dl.pct || 0) + "%";
       $("modele-fichier").textContent = dl.fichier || "connexion…";

@@ -33,7 +33,7 @@ from . import text_fr
 # ``precharger_async()`` lance le téléchargement en tâche de fond pendant que
 # l'UI affiche une modale avec la progression réelle (au lieu d'une barre
 # figée sur « Lancement de la génération... »).
-_TELECHARGEMENT = {"en_cours": False, "pct": 0, "fichier": ""}
+_TELECHARGEMENT = {"en_cours": False, "pct": 0, "fichier": "", "erreur": None}
 _VERROU_DL = threading.Lock()
 _FIL_DL: threading.Thread | None = None
 
@@ -52,35 +52,33 @@ def _maj_progression(pct: float, fichier: str = "", en_cours: bool = True) -> No
         _TELECHARGEMENT["en_cours"] = en_cours
 
 
-class _TqdmProgression:
-    """Façade tqdm minimale : ``snapshot_download`` reporte ici l'avancement."""
+class _TqdmProgression(__import__("tqdm").tqdm):
+    """Barre tqdm réelle + report de l'avancement vers l'UI.
+
+    Sous-classe du vrai ``tqdm`` (et non façade minimale) : huggingface_hub
+    appelle ``refresh``/``close``/``set_description``/contexte, y compris pour
+    les barres de reconstruction Xet — d'où le crash ``AttributeError:
+    refresh`` avec la façade précédente.
+    """
 
     def __init__(self, *args, **kwargs):
-        self.total = kwargs.get("total") or 0
-        self.n = 0
-        self._desc = ""
+        kwargs.setdefault("leave", False)
+        super().__init__(*args, **kwargs)
+        self._dernier_pct = -1.0
 
     def update(self, n=1):
-        self.n += n
-        if self.total:
-            _maj_progression(100.0 * self.n / self.total, self._desc)
-
-    def set_description_str(self, desc=None, *args, **kwargs):
-        if desc:
-            self._desc = str(desc).split("/")[-1][:60]
-
-    def set_description(self, desc=None, *args, **kwargs):
-        self.set_description_str(desc)
-
-    def close(self):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-        return False
+        res = super().update(n)
+        try:
+            total = self.total or 0
+            if total > 0:
+                pct = 100.0 * (self.n or 0) / total
+                if pct - self._dernier_pct >= 0.5 or pct >= 100:
+                    self._dernier_pct = pct
+                    desc = (getattr(self, "desc", "") or "").split("/")[-1][:60]
+                    _maj_progression(pct, desc)
+        except Exception:  # noqa: BLE001 — le report ne doit jamais casser le DL
+            pass
+        return res
 
 
 def _repo_id() -> str:
@@ -107,13 +105,20 @@ def precacher_modele() -> None:
         _maj_progression(100, en_cours=False)
         return
     _maj_progression(0, "connexion…")
+    with _VERROU_DL:
+        _TELECHARGEMENT["erreur"] = None
     try:
         snapshot_download(
             repo_id=_repo_id(),
             token=config.hf_token(),
             tqdm_class=_TqdmProgression,
         )
-    finally:
+    except Exception as exc:  # noqa: BLE001 — exposée à l'UI, re-levée
+        with _VERROU_DL:
+            _TELECHARGEMENT["erreur"] = f"{type(exc).__name__} : {exc}"[:300]
+            _TELECHARGEMENT["en_cours"] = False
+        raise
+    else:
         _maj_progression(100, en_cours=False)
 
 
