@@ -36,6 +36,25 @@ from . import text_fr
 _TELECHARGEMENT = {"en_cours": False, "pct": 0, "etape": "", "fichier": "",
                         "pct_fichier": 0, "erreur": None}
 _JALONS_LOGGES: set = set()  # paliers globaux deja traces (log serveur)
+_DERNIER_OCTET = 0.0  # monotonic() du dernier update (watchdog anti-blocage)
+
+
+def _toucher():
+    global _DERNIER_OCTET
+    _DERNIER_OCTET = __import__("time").monotonic()
+
+
+def _octets(n) -> str:
+    """Quantité lisible (``1048576`` → ``1.0 Mo``) pour les labels sans total."""
+    try:
+        x = float(n or 0)
+    except (TypeError, ValueError):
+        return "0 o"
+    for unite in ("o", "Ko", "Mo", "Go"):
+        if x < 1024 or unite == "Go":
+            return f"{x:.0f} {unite}" if unite == "o" else f"{x:.1f} {unite}"
+        x /= 1024
+    return f"{x:.1f} Go"
 _VERROU_DL = threading.Lock()
 _FIL_DL: threading.Thread | None = None
 
@@ -65,13 +84,16 @@ def _maj_global(pct: float, label: str) -> None:
         print(f"📦 modèle OmniVoice : {palier}% des fichiers ({label})", flush=True)
 
 
-def _maj_fichier(pct: float, nom: str) -> None:
+def _maj_fichier(pct: float, nom: str, pct_fichier: float | None = None) -> None:
     """Barre du fichier en cours + ligne log à chaque fichier terminé."""
+    _toucher()
     with _VERROU_DL:
         _TELECHARGEMENT["fichier"] = nom or _TELECHARGEMENT["fichier"]
-        _TELECHARGEMENT["pct_fichier"] = max(0, min(100, round(pct)))
+        _TELECHARGEMENT["pct_fichier"] = (
+            max(0, min(100, round(pct_fichier))) if pct_fichier is not None
+            else _TELECHARGEMENT["pct_fichier"])
         _TELECHARGEMENT["en_cours"] = True
-    if pct >= 100 and nom:
+    if (pct_fichier or 0) >= 100 and nom:
         with _VERROU_DL:
             cle = f"fichier:{nom}"
             if cle not in _JALONS_LOGGES:
@@ -96,18 +118,31 @@ class _TqdmProgression(__import__("tqdm").tqdm):
     def update(self, n=1):
         res = super().update(n)
         try:
+            _toucher()
             total = self.total or 0
+            desc = (getattr(self, "desc", "") or "").strip()
+            bas = desc.lower()
+            if bas.startswith("fetching"):
+                # barre globale « Fetching 13 files » → libellé français
+                if total > 0:
+                    _maj_global(100.0 * (self.n or 0) / total,
+                                f"Fichiers : {int(self.n or 0)}/{int(total)}")
+                return res
+            if bas.startswith("downloading"):
+                nom = "Préparation…"
+            elif bas.startswith("reconstructing"):
+                nom = "Reconstruction…"
+            else:
+                nom = desc.split("/")[-1][:60] or "fichier…"
             if total > 0:
                 pct = 100.0 * (self.n or 0) / total
                 if pct - self._dernier_pct >= 0.5 or pct >= 100:
                     self._dernier_pct = pct
-                    desc = (getattr(self, "desc", "") or "").strip()
-                    if desc.lower().startswith("fetching"):
-                        # barre globale « Fetching 13 files » → libellé français
-                        _maj_global(pct, f"Fichiers : {int(self.n or 0)}/{int(total)}")
-                    else:
-                        # barre par fichier → nom + avancement propre
-                        _maj_fichier(pct, desc.split("/")[-1][:60])
+                    _maj_fichier(pct, f"{nom} — {_octets(self.n)} / {_octets(total)}",
+                                 pct_fichier=pct)
+            else:
+                # total inconnu (Xet) : afficher les octets reçus, ça bouge
+                _maj_fichier(-1, f"{nom} — {_octets(self.n)} reçus")
         except Exception:  # noqa: BLE001 — le report ne doit jamais casser le DL
             pass
         return res
@@ -130,6 +165,21 @@ def modele_en_cache() -> bool:
 
 
 _MOTS_XET = ("xet", "cas-server", "reconstruction", "middleware")
+DELAI_MAX_ESSAI_S = 600  # un essai sans aucun octet pendant 10 min = bloqué
+
+
+def _telecharger_une_fois(issue: dict) -> None:
+    """Un appel ``snapshot_download`` ; l'exception éventuelle va dans ``issue``."""
+    from huggingface_hub import snapshot_download
+
+    try:
+        snapshot_download(
+            repo_id=_repo_id(),
+            token=config.hf_token(),
+            tqdm_class=_TqdmProgression,
+        )
+    except Exception as exc:  # noqa: BLE001 — remonte via issue
+        issue["erreur"] = exc
 
 
 def _sans_xet() -> None:
@@ -161,26 +211,36 @@ def precacher_modele(tentatives: int = 3) -> None:
         _TELECHARGEMENT["erreur"] = None
     derniere: Exception | None = None
     for essai in range(1, tentatives + 1):
+        print(f"📦 modèle OmniVoice : tentative {essai}/{tentatives}", flush=True)
         _maj_progression(0, f"connexion… (tentative {essai}/{tentatives})")
-        try:
-            snapshot_download(
-                repo_id=_repo_id(),
-                token=config.hf_token(),
-                tqdm_class=_TqdmProgression,
-            )
-        except Exception as exc:  # noqa: BLE001 — repli, puis exposition UI
-            derniere = exc
-            bas = str(exc).lower()
-            if any(m in bas for m in _MOTS_XET):
-                _sans_xet()
-                _maj_progression(0, "repli S3 (sans Xet)…")
-                continue  # réessaie aussitôt sans Xet, sans consommer de pause
+        _toucher()
+        issue: dict = {}
+        fil = threading.Thread(
+            target=_telecharger_une_fois, args=(issue,), daemon=True)
+        fil.start()
+        fil.join(DELAI_MAX_ESSAI_S)
+        if fil.is_alive():
+            _inactif = int(__import__("time").monotonic() - _DERNIER_OCTET)
+            derniere = TimeoutError(
+                f"essai de plus de {DELAI_MAX_ESSAI_S // 60} min "
+                f"(derniers octets il y a {_inactif} s — reprise au prochain)")
+            print(f"📦 {derniere}", flush=True)
             if essai < tentatives:
-                time.sleep(5 * essai)
-                continue
-        else:
+                time.sleep(5)
+            continue  # l'essai orphelin reste en fond (reprise au prochain)
+        if "erreur" not in issue:
             _maj_progression(100, en_cours=False)
             return
+        exc = issue["erreur"]
+        derniere = exc
+        bas = str(exc).lower()
+        if any(m in bas for m in _MOTS_XET):
+            _sans_xet()
+            print("📦 repli S3 (sans Xet)…", flush=True)
+            _maj_progression(0, "repli S3 (sans Xet)…")
+            continue  # réessaie aussitôt sans Xet, sans consommer de pause
+        if essai < tentatives:
+            time.sleep(5 * essai)
     with _VERROU_DL:
         _TELECHARGEMENT["erreur"] = (
             f"{type(derniere).__name__} : {derniere}"[:300]

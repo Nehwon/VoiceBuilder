@@ -19,7 +19,7 @@ def test_tqdm_progression_bornes():
     f = oe._TqdmProgression(total=200, desc="poids/modele.safetensors")
     f.update(50)
     st = oe.progression_telechargement()
-    assert st["pct_fichier"] == 25 and st["fichier"] == "modele.safetensors"
+    assert st["pct_fichier"] == 25 and st["fichier"].startswith("modele.safetensors")
     f.update(300)  # dépasse : borné à 100
     assert oe.progression_telechargement()["pct_fichier"] == 100
     f.close()

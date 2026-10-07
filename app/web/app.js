@@ -1023,9 +1023,26 @@ async function assurerModele() {
     await fetch("/api/modele/precharger", { method: "POST" });
     ouvrirModal($("modal-modele"));
     $("btn-modele-retry").hidden = true;
+    let echecs = 0;
     for (;;) {
       await new Promise((r) => setTimeout(r, 2000));
-      et = await (await fetch("/api/etat")).json();
+      try {
+        et = await (await fetch("/api/etat")).json();
+        echecs = 0;
+      } catch {
+        if (++echecs <= 5) continue;  // micro-coupure : on insiste
+        $("modele-fichier").textContent =
+          "❌ serveur injoignable — vérifie Pandora puis Réessayer.";
+        $("btn-modele-retry").hidden = false;
+        await new Promise((r) => {
+          $("btn-modele-retry").onclick = () => {
+            $("btn-modele-retry").hidden = true;
+            echecs = 0;
+            r();
+          };
+        });
+        continue;
+      }
       if (et.modele?.pret) break;
       const dl = et.modele?.telechargement || {};
       if (dl.erreur && !dl.en_cours) {
