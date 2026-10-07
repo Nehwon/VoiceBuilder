@@ -19,7 +19,7 @@
 # téléchargé au premier lancement dans le volume `volume-model` (/models).
 
 x-app-image: &app-image
-  image: ${APP_IMAGE:-ghcr.io/nehwon/voicebuilder}:${APP_TAG:-latest}
+  image: ${APP_IMAGE:-ghcr.io/nehwon/voicebuilder-omni}:${APP_TAG:-latest}
 
 services:
   # GUI FastAPI — http://127.0.0.1:8001
