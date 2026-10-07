@@ -51,8 +51,8 @@ Chaque voix = un couple **`.wav`** (échantillon ~5–30 s, sans musique) +
 
 ```
 # [NomVoix], wav, txt[, pause_pré][, vitesse]
-[LeNarrateur],  superama_phrase_01.wav, superama_phrase_01.txt
-[Astronogeek],  Astronogeek_phrase_01.wav, Astronogeek_phrase_01.txt
+[Narrateur],  narrateur_phrase_01.wav, narrateur_phrase_01.txt
+[Lina],  lina_phrase_01.wav, lina_phrase_01.txt
 ```
 
 > La 7ᵉ colonne `moteur` historique est **lue sans effet** sur cette branche

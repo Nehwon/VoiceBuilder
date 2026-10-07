@@ -174,7 +174,7 @@ def _deepfilternet(chemins_in: Path, out: Path, progress: Callable | None) -> di
     from df.enhance import enhance, init_df
 
     # DeepFilterNet est léger : on le force sur CPU pour ne pas concurrencer
-    # Demucs / CosyVoice sur le GPU (VRAM partagée).
+    # Demucs / moteur TTS sur le GPU (VRAM partagée).
     df_enhance.get_device = lambda: "cpu"
 
     if progress:

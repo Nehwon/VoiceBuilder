@@ -1,4 +1,4 @@
-"""Gestion des voix : ``voix.txt`` et prompts CosyVoice3 (wav + txt).
+"""Gestion des voix : ``voix.txt`` et prompts (wav + txt).
 
 Chaque voix = un couple ``.wav`` (échantillon à cloner) + ``.txt`` (sa
 transcription exacte). Le fichier de listage a une entrée par ligne :
@@ -27,7 +27,7 @@ def _strip_timestamps(line: str) -> str:
 
 
 def base_nom(nom: str) -> str:
-    """Base d'un nom de voix (``Thepromisedneverland_2`` → ``Thepromisedneverland``).
+    """Base d'un nom de voix (``Lina_2`` → ``Lina``).
 
     Sert au groupement des segments candidats d'un même personnage
     (variantes ``_2``/``_3``, versions ``_clean``) pour le banc A/B (M17.2)
@@ -57,9 +57,6 @@ class Voice:
     moteur_colonne: str = ""          # valeur brute de la 7ᵉ colonne ("" = défaut)
     prompt_text: str = ""                 # transcription nettoyée
 
-    @property
-    def system_prompt(self) -> str:
-        return f"{config.COSYVOICE3_SYSTEM_PROMPT}{self.prompt_text}"
 
 
 class Voices:

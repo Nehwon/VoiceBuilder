@@ -347,49 +347,9 @@ n'apportent rien de nécessaire en local (pur statique/proxy, pas de logique Pyt
 
 ---
 
-## Phase 9 — Palier 1 : LoRA CosyVoice3 sur petit GPU (`PROJET_FINE.md` §3)
+## Phase 9 — Palier 1 : LoRA (abandonné 2026-10-07)
 
-> Fine-tuner 1–3 personnages vedettes **sans GPU 24 Go** : entraînement LoRA
-> tenant sur **12–16 Go** (qLoRA, checkpointing, accumulation, optim 8-bit,
-> freeze partiel, échelle anti-OOM), puis validation aveugle et intégration
-> à l'inférence.
-
-- [x] **M18.1 — Kit dataset LoRA (`tools/preparer_lora.py`)** (2026-09-19)
-  - [x] Depuis de longs enregistrements (+ Whisper horodaté, ou `--text`
-        corrigé au format kaldi) : segments 5–12 s (pic VRAM réduit),
-        transcriptions exactes, filtre silence, dédup, split train/dev ~5 %
-        (seed fixe) ; kaldi (`wav.scp`, `text`, `utt2spk`) + `manifest.json` ;
-        `--tokens` enchaîne `extract_speech_token` + `make_parquet_list`
-        (parquet + tokens, format `vendor/CosyVoice/tools/`) ; refuse
-        < 15 min effectives (`PROJET_FINE.md` §3.2).
-  - [x] Validé en conteneur (voix synthétique, 18,7 min sources) : 115
-        segments, split 108/7, parquet + tokens complets ( gate 15 min
-        vérifié : 11,8 min refusées).
-- [x] **M18.2 — Entraînement LoRA « petit GPU » (`tools/entrainer_lora.py`)**
-      (2026-09-19)
-  - [x] Presets `--vram 12/16/24` appliquant l'échelle anti-OOM
-        (`PROJET_FINE.md` §3.3) : rang, qLoRA 4-bit, gradient checkpointing,
-        micro-batch 1 + accumulation, optim 8-bit/paged, freeze Flow (LLM
-        seul, recette officielle), ZeRO-2/offload CPU en filet ; reprise sur
-        checkpoint (`dernier.pt`), logs CSV + courbe PNG, registre par voix
-        (poids, config, étage OOM, scores).
-  - [x] 1 voix test avant le full : smoke 2 steps CPU vert (PEFT + forward
-        CosyVoice, checkpoint, courbe, registre) ; documenter l'étage OOM
-        retenu par voix (`etage`, `--etage` pour forcer).
-  - [x] Contraintes validées : entraînement et inférence serveur ne
-        cohabitent pas sur 12 Go (OOM à double instance) ; `instruct`
-        requis dans les datasets (écrit par M18.1).
-- [x] **M18.3 — Validation + registre des LoRA**
-  - [x] Protocole `PROJET_FINE.md` §3.4 (paragraphe FR de référence,
-        `coverage` ≥ 0.85, RTF, écoute aveugle à 2+ auditeurs) ; ne garder que
-        les LoRA gagnants ; registre (poids, config, étage OOM, scores).
-- [x] **M18.4 — Intégration inférence (switch par personnage)**
-  - [x] Chargement dynamique base 0.5B + LoRA du personnage courant (PEFT,
-        fusion optionnelle), cache des adaptateurs (alternance rapide des
-        personnages), sans régression RTF ; documenter quel LoRA sert quelle
-        voix de `voix.txt`.
-
----
+> Fine-tuning CosyVoice retiré avec le moteur (branche `cosy` en legacy).
 
 ## Phase 10 — Multi-moteurs : workers locaux / distants (`PROJET_FINE.md` §4)
 

@@ -419,7 +419,7 @@ function majBoutonsPerso() {
 }
 
 // ---------------------------------------------------------------- barre d'outils émotions (M10.2)
-// Tokens CosyVoice3 — cf. docs/UTILISATION.md §4. Un seul tag par bloc (sobres).
+// Tags non-verbaux — cf. docs/UTILISATION.md §4. Un seul tag par bloc (sobres).
 const TOKENS_EMOTIONS = [
   { token: "<|HAPPY|>",   lib: "Joie",      titre: "Joie",      racc: "Alt+1" },
   { token: "<|SAD|>",     lib: "Tristesse", titre: "Tristesse", racc: "Alt+2" },
@@ -760,7 +760,7 @@ function appliquerRepliBoutons() {
 }
 
 // ---------------------------------------------------------------- modal personnages
-// Tags non-verbaux CosyVoice3 : jamais traités comme des personnages.
+// Tags non-verbaux : jamais traités comme des personnages.
 const TAGS_NON_VERBAUX = new Set([
   "sigh", "laughter", "breath", "quick_breath", "cough", "clucking",
   "hissing", "lipsmack", "noise", "vocalized-noise", "accent", "mn", "stop",

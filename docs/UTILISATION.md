@@ -57,7 +57,7 @@ Fichier de listage `voix/voix.txt`, une entrée par ligne :
 
 ```
 # [Nom], wav, txt[, pause_pré][, vitesse][, max_chars][, moteur]
-[LeNarrateur],  vb-voice/superama.wav, vb-voice/superama.txt
+[Narrateur],  vb-voice/narrateur.wav, vb-voice/narrateur.txt
 [Kaël-An],      echantillons/kael_an.wav,     echantillons/kael_an.txt, 0.3, 1.0, 200
 [Robot],        echantillons/robot.wav,        echantillons/robot.txt, , , , omnivoice
 ```
@@ -94,7 +94,7 @@ Les chemins de `voix.txt` sont résolus dans l'ordre : dossier du projet, `voix/
 puis ce dossier audio (`config.VOIX_SEARCH_DIRS`). Ex. une ligne simple :
 
 ```
-[Michel], unirreductibleathee_phrase_01.wav
+[Michel], michel_phrase_01.wav
 ```
 
 …est retrouvée dans `~/Projets/Personnel (Fabrice)/vb-voice/` si elle s'y trouve.
@@ -357,15 +357,3 @@ python -m tools.create_voix SOURCE.wav --nom LeNarrateur --start 12.5 --stop 30
 Extrait `[12.5, 30] s`, transcrit (Whisper), écrit `voix/<slug>.wav` + `.txt`,
 ajoute la ligne dans `voix/voix.txt`. Options : `--out`, `--voix`,
 `--no-transcribe`.
-## LoRA par personnage (M18.4)
-
-Quel LoRA sert quelle voix : registre `lora_registry.json`, fonction
-`engine.lora.chargeur.voix_servies(racine_dataset)`.
-
-```python
-from engine.lora.chargeur import Commutateur
-com = Commutateur()
-com.basculer(modele, "alice", "data/lora")  # charge une fois, cache ensuite
-com.zero_shot(modele)                       # retour zero-shot exact
-com.fusionner(modele, "alice", "data/lora", "alice_fusion.pt")
-```

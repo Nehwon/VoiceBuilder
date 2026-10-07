@@ -1,9 +1,9 @@
-"""Musique de fond (BGM) : CosyVoice zero-shot ne sait pas générer de lit
+"""Musique de fond (BGM) : le moteur zero-shot ne sait pas générer de lit
 musical depuis ``<|BGM|>`` (label d'annotation, pas contrôle de génération) —
 on le mixe donc nous-mêmes.
 
 Protocole : ``<|BGM|>texte<|/BGM|>`` dans l'éditeur → le texte est synthétisé
-SANS les marqueurs (retirés avant CosyVoice, sinon ils seraient vocalisés),
+SANS les marqueurs (retirés avant synthèse, sinon ils seraient vocalisés),
 puis le lit musical (fichier configuré dans ⚙️ Réglages) est bouclé sous
 l'audio au volume choisi, avec fondus d'entrée/sortie. Sans lit configuré :
 texte parlé normalement (marqueurs retirés).

@@ -1,42 +1,17 @@
-"""Chemins et valeurs par défaut du projet VoiceBuilder (moteur CosyVoice)."""
+"""Chemins et valeurs par défaut du projet VoiceBuilder (moteur OmniVoice)."""
 import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parents[1]
-
-# --- Moteur CosyVoice (sous-module git) -------------------------------------
-COSYVOICE_ROOT = PROJECT_ROOT / "vendor" / "CosyVoice"
-COSYVOICE_VENV = COSYVOICE_ROOT / "venv"
-MATCHA_TTS_DIR = COSYVOICE_ROOT / "third_party" / "Matcha-TTS"
-
-# Modèle par défaut (multilingue : français, en, zh, ja...)
-# Réglable via la variable d'environnement COSYVOICE_MODEL_DIR (utile si le
-# modèle est rangé hors du sous-module, ex. un volume Docker dédié).
-_COSYVOICE_MODEL_DIR_DEFAULT = COSYVOICE_ROOT / "pretrained_models" / "Fun-CosyVoice3-0.5B"
-COSYVOICE_MODEL_DIR = Path(
-    os.environ.get("COSYVOICE_MODEL_DIR")
-    or _COSYVOICE_MODEL_DIR_DEFAULT
-)
-COSYVOICE2_MODEL_DIR = COSYVOICE_ROOT / "pretrained_models" / "CosyVoice2-0.5B"
 
 # Nettoyage des voix (Demucs + DeepFilterNet) : dossier où ranger les modèles
 # téléchargés (poids Demucs via TORCH_HOME, poids DeepFilterNet via cache).
 # Réglable via VOICEBUILDER_ENHANCE_DIR ; en Docker : /models/enhance_models.
 ENHANCE_MODEL_DIR = Path(
     os.environ.get("VOICEBUILDER_ENHANCE_DIR")
-    or (COSYVOICE_MODEL_DIR.parent / "enhance_models")
+    or (PROJECT_ROOT / "enhance_models")
 )
-
-# Source de téléchargement du modèle au premier lancement (engine/modeles.py).
-#   - "modelscope" : FunAudioLLM/Fun-CosyVoice3-0.5B-2512 (défaut, source officielle)
-#   - "huggingface": FunAudioLLM/Fun-CosyVoice3-0.5B-2512 (miroir, si réseau bloqué)
-MODEL_SOURCE = os.environ.get("COSYVOICE_MODEL_SOURCE", "modelscope")
-MODEL_ID_COSYVOICE3 = "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
-
-# Prompt système requis par CosyVoice3 avant la transcription de référence.
-COSYVOICE3_SYSTEM_PROMPT = "You are a helpful assistant.<|endofprompt|>"
-
-# --- Moteur OmniVoice (M19.1, alternatif à CosyVoice) ---------------------------
+# --- Moteur OmniVoice (M19.1) --------------------------------------------------
 # Modèle HF "k2-fsa/OmniVoice" (fp16, 24 kHz natifs). Téléchargé au premier
 # chargement dans le cache HuggingFace, sauf si OMNIVOICE_MODEL_DIR pointe
 # vers un dossier local déjà rempli (ex. volume Docker /models/omnivoice).
@@ -75,7 +50,7 @@ VOIX_AUDIO_DIR = Path(
 VOIX_SEARCH_DIRS = (PROJECT_ROOT, VOIX_DIR, VOIX_AUDIO_DIR)
 
 # --- Musique de fond (BGM, mixée sous les segments <|BGM|>) --------------------------
-# CosyVoice zero-shot ne génère pas de lit musical : on le mixe nous-mêmes.
+# Le moteur zero-shot ne génère pas de lit musical : on le mixe nous-mêmes.
 MUSIQUE_DIR = PROJECT_ROOT / "musique"
 BGM_VOLUME_DEFAUT = 0.15
 BGM_LIT: Path | None = None      # lit actif (None = pas de musique)
@@ -115,7 +90,7 @@ def set_moteur_defaut(nom: str) -> None:
 
 
 def set_model_dir(path) -> None:
-    """Change au runtime le dossier du modèle CosyVoice3.
+    """Change au runtime le dossier du modèle TTS (legacy).
 
     Utile quand le modèle est rangé hors du sous-module (volume Docker, autre
     disque, etc.) ou téléchargé depuis l'interface.

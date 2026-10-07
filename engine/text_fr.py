@@ -1,4 +1,4 @@
-"""Normalisation du texte français avant synthèse TTS (CosyVoice).
+"""Normalisation du texte français avant synthèse TTS.
 
 Pipeline complet de conversion du texte écrit en texte lisible à voix haute :
   - Dates (ISO, barre oblique, mois écrits)
@@ -9,7 +9,7 @@ Pipeline complet de conversion du texte écrit en texte lisible à voix haute :
   - Ponctuation fine (…, —)
   - Nombres → mots français (num2words)
 
-Le patch CosyVoice 0003 désactive la conversion anglaise (`spell_out_number`) ;
+La conversion anglaise (`spell_out_number`) est désactivée ;
 ce module fournit la normalization française en amont de ``inference_zero_shot``.
 """
 from __future__ import annotations
@@ -369,7 +369,7 @@ SPAN_LANG_RE = re.compile(r"\[(en|fr)\](.*?)\[/\1\]", re.IGNORECASE | re.DOTALL)
 
 def normalize_en(text: str) -> str:
     """Normalise un passage anglais (nombres épelés en anglais via inflect,
-    comme le frontend vendor) pour que CosyVoice le prononce avec l'accent
+    comme le frontend historique) pour que le moteur le prononce avec l'accent
     anglais.
 
     Repli silencieux (texte inchangé) si ``inflect`` manque. Implémentation
