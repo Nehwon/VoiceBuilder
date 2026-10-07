@@ -165,7 +165,8 @@ def modele_en_cache() -> bool:
 
 
 _MOTS_XET = ("xet", "cas-server", "reconstruction", "middleware")
-DELAI_MAX_ESSAI_S = 600  # un essai sans aucun octet pendant 10 min = bloqué
+INACTIVITE_MAX_S = 180  # aucun octet depuis 3 min = flux bloqué
+ESSAI_MAX_S = 1800  # plafond par essai, même si ça avance (reprise ensuite)
 
 
 def _telecharger_une_fois(issue: dict) -> None:
@@ -217,14 +218,26 @@ def precacher_modele(tentatives: int = 3) -> None:
         issue: dict = {}
         fil = threading.Thread(
             target=_telecharger_une_fois, args=(issue,), daemon=True)
+        _toucher()
         fil.start()
-        fil.join(DELAI_MAX_ESSAI_S)
+        debut = time.monotonic()
+        while fil.is_alive():
+            fil.join(30)
+            if not fil.is_alive():
+                break
+            inactif = time.monotonic() - _DERNIER_OCTET
+            duree = time.monotonic() - debut
+            if inactif > INACTIVITE_MAX_S:
+                print(f"📦 flux bloqué (aucun octet depuis {int(inactif)} s), "
+                      f"nouvel essai — la reprise continue", flush=True)
+                break
+            if duree > ESSAI_MAX_S:
+                print(f"📦 essai de plus de {ESSAI_MAX_S // 60} min "
+                      f"(ça avançait : {int(inactif)} s depuis le dernier octet), "
+                      f"relève pour repartir sur une base saine", flush=True)
+                break
         if fil.is_alive():
-            _inactif = int(__import__("time").monotonic() - _DERNIER_OCTET)
-            derniere = TimeoutError(
-                f"essai de plus de {DELAI_MAX_ESSAI_S // 60} min "
-                f"(derniers octets il y a {_inactif} s — reprise au prochain)")
-            print(f"📦 {derniere}", flush=True)
+            derniere = TimeoutError("téléchargement interrompu (reprise au prochain essai)")
             if essai < tentatives:
                 time.sleep(5)
             continue  # l'essai orphelin reste en fond (reprise au prochain)
