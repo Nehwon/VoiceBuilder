@@ -293,8 +293,9 @@ $("btn-nouveau").addEventListener("click", async () => {
   cm.setValue("");
   docCourant = { fichier: d.fichier, brouillon: d.brouillon };
   personnages = {}; voixDispo = [];
-  majBoutonsPerso(); majMontage();
+  majMontage();
   await chargerDocuments();
+  await chargerPersonnagesDoc(d.fichier);
   selectDoc(d.fichier);
   $("doc-statut").textContent = `nouveau : ${d.fichier}`;
   mountVue("edit");
