@@ -15,13 +15,17 @@ déterministes :
 - 1 tentative de correction sur échec, sinon repli regex chunk par chunk
   (jamais de trou dans la sortie).
 
-Dépendance : serveur Ollama joignable (``config.OLLAMA_URL``, modèle
-``config.OLLAMA_MODELE_INCISES``). Stdlib uniquement (``urllib``).
+Dépendance : un fournisseur LLM joignable, au choix (Réglages → « LLM pour les
+incises ») : API externe compatible OpenAI (``config.LLM_URL`` + ``LLM_MODELE``
++ ``LLM_CLE``, ex. opencode-go), ou Ollama local (``config.OLLAMA_URL``,
+``config.OLLAMA_MODELE_INCISES``). En mode « auto », l'externe est prioritaire
+dès qu'il est configuré. Stdlib uniquement (``urllib``).
 """
 from __future__ import annotations
 
 import json
 import re
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
@@ -114,6 +118,96 @@ def ollama_disponible(url: Optional[str] = None) -> bool:
         return False
 
 
+def _endpoint_externe(url: Optional[str] = None) -> str:
+    """URL ``/chat/completions`` déduite de l'URL de base (tolère l'URL complète)."""
+    base = (url or config.LLM_URL).rstrip("/")
+    return base if base.endswith("/chat/completions") else f"{base}/chat/completions"
+
+
+def appeler_externe(prompt: str, systeme: str, modele: Optional[str] = None,
+                    url: Optional[str] = None,
+                    timeout: Optional[float] = None) -> str:
+    """Un appel ``/chat/completions`` (API compatible OpenAI), sortie JSON."""
+    modele = modele or config.LLM_MODELE
+    cle = config.LLM_CLE
+    timeout = timeout or config.LLM_TIMEOUT
+    if not cle:
+        raise ErreurLLM("clé API absente (Réglages → « LLM pour les incises »)")
+    endpoint = _endpoint_externe(url)
+    corps = {
+        "model": modele,
+        "messages": [{"role": "system", "content": systeme},
+                     {"role": "user", "content": prompt}],
+        "temperature": 0,
+        "stream": False,
+        "response_format": {"type": "json_object"},
+    }
+
+    def _post(payload: dict) -> dict:
+        req = urllib.request.Request(
+            endpoint, data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {cle}"})
+        with urllib.request.urlopen(req, timeout=timeout) as rep:
+            return json.loads(rep.read().decode())
+
+    try:
+        try:
+            data = _post(corps)
+        except urllib.error.HTTPError as exc:
+            # Certains serveurs compatibles refusent response_format : 2e essai sans.
+            if exc.code in (400, 404, 422):
+                corps.pop("response_format", None)
+                data = _post(corps)
+            else:
+                raise
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:  # noqa: BLE001
+            pass
+        raise ErreurLLM(f"LLM externe HTTP {exc.code} ({endpoint}, modèle {modele}) : {detail}")
+    except Exception as exc:  # noqa: BLE001
+        raise ErreurLLM(f"LLM externe injoignable ({endpoint}, modèle {modele}) : {exc}")
+    try:
+        return data["choices"][0]["message"]["content"] or ""
+    except (KeyError, IndexError, TypeError):
+        raise ErreurLLM(f"réponse externe sans 'choices' ({endpoint}) : {str(data)[:200]}")
+
+
+def fournisseur_actif() -> str:
+    """Fournisseur LLM retenu : ``openai`` (externe), ``ollama``, ou ``aucun``.
+
+    Aucune sonde réseau ici (appelée à chaque ``/api/etat``) : le choix suit la
+    configuration. Une panne réelle remonte à l'appel (``ErreurLLM``) et donne le
+    repli regex chunk par chunk.
+    """
+    fournisseur = (config.LLM_FOURNISSEUR or "auto").lower()
+    if fournisseur == "openai":
+        return "openai" if config.llm_externe_configure() else "aucun"
+    if fournisseur == "ollama":
+        return "ollama"
+    return "openai" if config.llm_externe_configure() else "ollama"
+
+
+def llm_disponible() -> bool:
+    """Vrai si un fournisseur LLM est retenu (sans garantir qu'il réponde)."""
+    return fournisseur_actif() != "aucun"
+
+
+def appeler_llm(prompt: str, systeme: str, modele: Optional[str] = None,
+                url: Optional[str] = None) -> str:
+    """Dispatch vers le fournisseur actif (externe compatible OpenAI ou Ollama)."""
+    fournisseur = fournisseur_actif()
+    if fournisseur == "openai":
+        return appeler_externe(prompt, systeme, modele, url)
+    if fournisseur == "ollama":
+        return appeler_ollama(prompt, systeme, modele, url)
+    raise ErreurLLM("Aucun LLM disponible : renseigne l'accès externe dans "
+                    "Réglages → « LLM pour les incises » (ou démarre Ollama).")
+
+
 def decouper_chunks(texte: str, max_chars: Optional[int] = None) -> List[str]:
     """Découpe aux frontières de paragraphes (jamais au milieu d'une phrase)."""
     max_chars = max_chars or config.INCISES_CHUNK_CHARS
@@ -195,7 +289,7 @@ def valider_sortie(entree: str, data: dict) -> List[str]:
 def traiter_chunk(chunk: str, connus: List[str], dernier: Optional[str],
                   narrateur: str = "Narrateur", narrateur_je: Optional[str] = None,
                   modele: Optional[str] = None, url: Optional[str] = None,
-                  appeler: Callable[..., str] = appeler_ollama) -> dict:
+                  appeler: Callable[..., str] = appeler_llm) -> dict:
     """Traite un chunk : appel LLM + 1 recadrage si invalide (lève sinon)."""
     je = narrateur_je or narrateur
     systeme = SYSTEME % (narrateur, je, narrateur, narrateur)
@@ -231,7 +325,7 @@ def _extraire_json(reponse: str) -> Optional[dict]:
 
 def traiter_replique(replique: str, locuteur: str, narrateur: str = "Narrateur",
                      modele: Optional[str] = None, url: Optional[str] = None,
-                     appeler: Callable[..., str] = appeler_ollama) -> dict:
+                     appeler: Callable[..., str] = appeler_llm) -> dict:
     """Nettoie UNE réplique au locuteur connu (lève ``ErreurLLM`` si rejetée)."""
     from .incises import _TAG_RE as _TRE
     corps = replique
@@ -289,7 +383,7 @@ def nettoyer_llm(texte: str, mapping: Optional[Dict[str, str]] = None,
                  narrateur_je: Optional[str] = None,
                  modele: Optional[str] = None, url: Optional[str] = None,
                  repli_regex: bool = True,
-                 appeler: Callable[..., str] = appeler_ollama,
+                 appeler: Callable[..., str] = appeler_llm,
                  progress: Optional[Callable[[int, int], None]] = None,
                  filtre: Optional[FiltrePersonnages] = None) -> ResultatNettoyage:
     """Nettoie les incises via LLM, chunk par chunk, avec repli regex ciblé.

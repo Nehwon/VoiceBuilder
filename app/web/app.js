@@ -944,17 +944,19 @@ async function apercuIncises() {
     const d = await r.json();
     $("incises-resultat").value = d.texte_nettoye || "";
     const s = d.stats || {};
-    const moteurTxt = d.moteur ? ` [${d.moteur}]` : "";
+    const moteurTxt = d.moteur
+      ? ` [${d.moteur}${d.fournisseur ? `·${d.fournisseur}` : ""}]` : "";
+    const repliTxt = d.repli ? " ⚠️ repli regex partiel (voir stats)" : "";
     if (s.segments_dialogue !== undefined) {
       stats.textContent =
         `${s.segments_dialogue || 0} dialogue / ${s.segments_narration || 0} narration` +
         (s.chunks_replis_regex ? ` (${s.chunks_replis_regex} repli(s) regex)` : "") +
-        `, ${(d.nouveaux_personnages || []).length} nouveau(x) personnage(s)${moteurTxt}.`;
+        `, ${(d.nouveaux_personnages || []).length} nouveau(x) personnage(s)${moteurTxt}${repliTxt}.`;
     } else {
       stats.textContent =
         `${s.incises || 0} incise(s) — ${s.parole_retirees || 0} retirée(s), ` +
         `${s.actions_narration || 0} vers narration, ` +
-        `${(d.nouveaux_personnages || []).length} nouveau(x) personnage(s)${moteurTxt}.`;
+        `${(d.nouveaux_personnages || []).length} nouveau(x) personnage(s)${moteurTxt}${repliTxt}.`;
     }
     const rejetes = d.personnages_rejetes || {};
     const nomsRejetes = Object.keys(rejetes);
@@ -1052,6 +1054,49 @@ $("btn-hf").addEventListener("click", async () => {
   $("hf-token").value = "";
   await chargerEtat();
   notifier("Clé HuggingFace enregistrée.", "ok");
+});
+
+// ---------------------------------------------------------------- LLM (incises)
+function majStatutLlm(etat) {
+  const l = etat.llm || {};
+  if (l.fournisseur) $("llm-fournisseur").value = l.fournisseur;
+  if (!$("llm-url").value && l.url) $("llm-url").value = l.url;
+  if (!$("llm-modele").value && l.modele) $("llm-modele").value = l.modele;
+  const actif = l.actif === "openai" ? "externe"
+    : (l.actif === "ollama" ? "Ollama local" : "aucun");
+  const cle = l.cle_configuree ? "🔑 clé configurée" : "⚠️ aucune clé";
+  $("llm-statut").textContent = `${cle} · moteur retenu : ${actif}`;
+}
+
+$("btn-llm-save").addEventListener("click", async () => {
+  const corps = {
+    llm_fournisseur: $("llm-fournisseur").value,
+    llm_url: $("llm-url").value.trim(),
+    llm_modele: $("llm-modele").value.trim(),
+  };
+  const cle = $("llm-cle").value.trim();
+  if (cle) corps.llm_cle = cle;          // champ vide = clé conservée
+  try {
+    const r = await fetch("/api/config", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corps),
+    });
+    if (!r.ok) { notifier((await r.json()).detail, "err"); return; }
+    $("llm-cle").value = "";
+    await chargerEtat();
+    notifier("Configuration LLM enregistrée.", "ok");
+  } catch { notifier("Enregistrement du LLM échoué.", "err"); }
+});
+
+$("btn-llm-test").addEventListener("click", async () => {
+  $("llm-statut").textContent = "test en cours…";
+  try {
+    const r = await fetch("/api/llm/tester", { method: "POST" });
+    const d = await r.json();
+    $("llm-statut").textContent = d.ok
+      ? `✅ ${d.fournisseur} · ${d.modele} · ${d.latence_ms} ms`
+      : `❌ ${d.erreur || "échec"}`;
+  } catch { $("llm-statut").textContent = "❌ test injoignable"; }
 });
 
 let _modelePret = null;  // null = inconnu (avant 1er /api/etat)
@@ -2262,6 +2307,7 @@ async function chargerEtat() {
   banniereVoix = msg;
   majBanniere();
   majStatutHf(etat);
+  majStatutLlm(etat);
 }
 
 // ---------------------------------------------------------------- bannière (voix → modèle, priorité absolue au modèle)

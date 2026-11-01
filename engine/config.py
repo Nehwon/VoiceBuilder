@@ -144,13 +144,50 @@ VERIFY_ENABLED = True              # active = +rapide (RTF ×2.4) ET meilleure c
 DEFAULT_VLLM = False               # vLLM : accélère le LLM autoregressif (batch)
 DEFAULT_TRT = False                # TensorRT : accélère le Flow (DiT, 10 pas Euler)
 
-# --- LLM local : incises & compréhension (M20.6, Ollama sur GPU 2nd) -----------------
-# Réglables via l'environnement (utile en Docker / multi-machine).
+# --- LLM pour les incises (Ollama local, ou API externe compatible OpenAI) -----------
+# Deux fournisseurs, réglables par l'environnement OU par l'écran Réglages :
+#   - Ollama local (GPU secondaire) ;
+#   - API externe compatible OpenAI (URL de base + modèle + clé), ex. opencode-go.
+# En mode « auto », l'externe gagne dès qu'il est entièrement configuré, sinon
+# Ollama local ; le moteur regex reste le dernier recours (jamais de trou).
 OLLAMA_URL = os.environ.get("VOICEBUILDER_OLLAMA_URL", "http://127.0.0.1:11434")
 OLLAMA_MODELE_INCISES = os.environ.get("VOICEBUILDER_OLLAMA_MODELE", "qwen2.5:7b-instruct")
 OLLAMA_TIMEOUT = float(os.environ.get("VOICEBUILDER_OLLAMA_TIMEOUT", "300"))
+LLM_FOURNISSEUR = os.environ.get("VOICEBUILDER_LLM_FOURNISSEUR", "auto")  # auto|openai|ollama
+LLM_URL = os.environ.get("VOICEBUILDER_LLM_URL", "")        # ex. https://opencode.ai/zen/go/v1
+LLM_MODELE = os.environ.get("VOICEBUILDER_LLM_MODELE", "")  # ex. gpt-oss-120b
+LLM_CLE: str | None = os.environ.get("VOICEBUILDER_LLM_CLE") or None
+LLM_TIMEOUT = float(os.environ.get("VOICEBUILDER_LLM_TIMEOUT", str(OLLAMA_TIMEOUT)))
 INCISES_CHUNK_CHARS = int(os.environ.get("VOICEBUILDER_INCISES_CHUNK", "2500"))
 INCISES_RAPPEL_MIN = 0.88          # rappel lexical sortie/entrée sous lequel on retente
+
+
+def set_llm(fournisseur: str | None = None, url: str | None = None,
+            modele: str | None = None, cle: str | None = None) -> None:
+    """Applique la configuration LLM (Réglages). ``None`` = inchangé, ``""`` = effacé."""
+    global LLM_FOURNISSEUR, LLM_URL, LLM_MODELE, LLM_CLE
+    if fournisseur is not None:
+        LLM_FOURNISSEUR = fournisseur if fournisseur in ("auto", "openai", "ollama") else "auto"
+    if url is not None:
+        LLM_URL = url.strip().rstrip("/")
+    if modele is not None:
+        LLM_MODELE = modele.strip()
+    if cle is not None:
+        LLM_CLE = cle.strip() or None
+
+
+def llm_externe_configure() -> bool:
+    """Vrai si l'accès externe est complet (URL + modèle + clé)."""
+    return bool(LLM_URL and LLM_MODELE and LLM_CLE)
+
+
+def llm_etat() -> dict:
+    """État public du LLM pour ``/api/etat`` — la clé n'y figure jamais."""
+    return {"fournisseur": LLM_FOURNISSEUR, "url": LLM_URL, "modele": LLM_MODELE,
+            "cle_configuree": bool(LLM_CLE),
+            "externe_configure": llm_externe_configure(),
+            "ollama_url": OLLAMA_URL, "ollama_modele": OLLAMA_MODELE_INCISES}
+
 
 
 def ensure_dirs() -> None:

@@ -91,6 +91,18 @@ def _etat_modele() -> dict:
             "telechargement": omnivoice_engine.progression_telechargement()}
 
 
+def _etat_llm() -> dict:
+    """État du LLM des incises : configuration publique + fournisseur retenu.
+
+    Aucun appel réseau ici (``/api/etat`` est interrogé toutes les 2 s par le
+    frontend) : la joignabilité réelle se teste via ``POST /api/llm/tester``.
+    """
+    from engine.incises_llm import fournisseur_actif
+    etat = config.llm_etat()
+    etat["actif"] = fournisseur_actif()
+    return etat
+
+
 def _etat() -> dict:
     """État général : dossier des voix, présence de voix.txt, liste des voix."""
     d = _charger_persistance().get("audio_dir") or str(config.VOIX_AUDIO_DIR)
@@ -117,6 +129,7 @@ def _etat() -> dict:
                     "moteur": config.MOTEUR_DEFAUT,
                     "moteurs": list(config.MOTEURS),
                     "hf_token_configuree": bool(config.hf_token()),
+                    "llm": _etat_llm(),
                     "modele": _etat_modele(), **bgm_etat}
     else:
         noms = []
@@ -124,6 +137,7 @@ def _etat() -> dict:
             "erreur": None, "moteur": config.MOTEUR_DEFAUT,
             "moteurs": list(config.MOTEURS),
             "hf_token_configuree": bool(config.hf_token()),
+            "llm": _etat_llm(),
             "modele": _etat_modele(), **bgm_etat}
 
 
@@ -142,6 +156,11 @@ def _bootstrap() -> None:
     data = _charger_persistance()
     if data.get("hf_token"):
         config.set_hf_token(data["hf_token"])
+    if any(k in data for k in ("llm_fournisseur", "llm_url", "llm_modele", "llm_cle")):
+        config.set_llm(fournisseur=data.get("llm_fournisseur"),
+                       url=data.get("llm_url"),
+                       modele=data.get("llm_modele"),
+                       cle=data.get("llm_cle"))
     if data.get("audio_dir"):
         chemin = data["audio_dir"]
         if not Path(chemin).is_dir():
@@ -243,6 +262,12 @@ class ConfigIn(BaseModel):
     audio_dir: str | None = None
     bgm_volume: float | None = None
     hf_token: str | None = None
+    # LLM des incises (Réglages) : fournisseur, URL de base compatible OpenAI,
+    # modèle et clé. La clé n'est jamais renvoyée par /api/etat.
+    llm_fournisseur: str | None = None
+    llm_url: str | None = None
+    llm_modele: str | None = None
+    llm_cle: str | None = None
 
 
 class NommageIn(BaseModel):
@@ -386,9 +411,49 @@ def api_config(payload: ConfigIn):
     if payload.hf_token:
         config.set_hf_token(payload.hf_token)
         _sauver_persistance({"hf_token": payload.hf_token.strip()})
+    if any(getattr(payload, champ) is not None for champ in
+           ("llm_fournisseur", "llm_url", "llm_modele", "llm_cle")):
+        config.set_llm(fournisseur=payload.llm_fournisseur, url=payload.llm_url,
+                       modele=payload.llm_modele, cle=payload.llm_cle)
+        _sauver_persistance({"llm_fournisseur": config.LLM_FOURNISSEUR,
+                             "llm_url": config.LLM_URL,
+                             "llm_modele": config.LLM_MODELE,
+                             "llm_cle": config.LLM_CLE or ""})
     config.ensure_dirs()
     voix.generer_voix_txt()          # (re)génère si voix.txt absent
     return _etat()
+
+
+@app.post("/api/llm/tester")
+def api_llm_tester():
+    """Teste le LLM des incises : un mini appel JSON, chronométré.
+
+    C'est le seul point qui touche réellement le réseau, pour que les Réglages
+    puissent dire « ça marche » ou « voilà l'erreur » sans lancer une génération.
+    """
+    import time
+
+    from engine.incises_llm import ErreurLLM, appeler_llm, fournisseur_actif
+    fournisseur = fournisseur_actif()
+    modele = (config.LLM_MODELE if fournisseur == "openai"
+              else config.OLLAMA_MODELE_INCISES)
+    url = (config.LLM_URL if fournisseur == "openai" else config.OLLAMA_URL)
+    if fournisseur == "aucun":
+        return {"ok": False, "fournisseur": fournisseur, "modele": modele, "url": url,
+                "latence_ms": None,
+                "erreur": "Aucun fournisseur configuré : renseigne l'URL, le modèle "
+                          "et la clé, ou démarre Ollama."}
+    debut = time.monotonic()
+    try:
+        reponse = appeler_llm(
+            'Réponds uniquement avec cet objet JSON : {"ok": true}',
+            "Tu réponds toujours en JSON strict, sans texte autour.")
+    except ErreurLLM as exc:
+        return {"ok": False, "fournisseur": fournisseur, "modele": modele, "url": url,
+                "latence_ms": int((time.monotonic() - debut) * 1000), "erreur": str(exc)}
+    latence = int((time.monotonic() - debut) * 1000)
+    return {"ok": True, "fournisseur": fournisseur, "modele": modele, "url": url,
+            "latence_ms": latence, "reponse": (reponse or "")[:200], "erreur": None}
 
 
 @app.post("/api/modele/precharger")
@@ -1445,7 +1510,7 @@ def api_incises(payload: IncisesIn):
         nettoyer as nettoyer_regex,
         synchroniser_map,
     )
-    from engine.incises_llm import nettoyer_llm, ollama_disponible
+    from engine.incises_llm import ErreurLLM, fournisseur_actif, nettoyer_llm
     if payload.mode not in ("auto", "import_roman", "nettoyer_tagge"):
         raise HTTPException(400, "Mode inconnu : auto | import_roman | nettoyer_tagge")
     if payload.keep_action not in ("narration", "garder", "supprimer"):
@@ -1462,8 +1527,13 @@ def api_incises(payload: IncisesIn):
         except (OSError, csv.Error):
             mapping = {}
     moteur = payload.moteur
+    fournisseur = fournisseur_actif()
     if moteur == "auto":
-        moteur = "llm" if ollama_disponible() else "regex"
+        moteur = "llm" if fournisseur != "aucun" else "regex"
+    if moteur == "llm" and fournisseur == "aucun":
+        raise HTTPException(503, "LLM indisponible : renseigne l'accès externe dans "
+                                 "Réglages → « LLM pour les incises » (ou démarre "
+                                 "Ollama), ou choisis le moteur « Regex ».")
     filtre = None
     if not payload.accepter_tous:
         stop_supp = {s.strip().lower()
@@ -1484,6 +1554,8 @@ def api_incises(payload: IncisesIn):
                                  voix_defaut=payload.voix_defaut or "Narrateur",
                                  narrateur_je=(payload.narrateur_je or "").strip() or None,
                                  filtre=filtre)
+    except ErreurLLM as exc:
+        raise HTTPException(503, f"LLM ({fournisseur}) en échec : {exc}")
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     propose = synchroniser_map(mapping, res.nouveaux_personnages,
@@ -1491,7 +1563,9 @@ def api_incises(payload: IncisesIn):
     return {"fichier": payload.fichier, "texte_nettoye": res.texte,
             "nouveaux_personnages": res.nouveaux_personnages,
             "personnages_rejetes": res.stats.get("personnages_rejetes") or {},
-            "mapping_propose": propose, "stats": res.stats, "moteur": moteur}
+            "mapping_propose": propose, "stats": res.stats, "moteur": moteur,
+            "fournisseur": fournisseur if moteur == "llm" else None,
+            "repli": bool(moteur == "llm" and res.stats.get("chunks_replis_regex"))}
 
 
 @app.post("/api/document/incises/appliquer")

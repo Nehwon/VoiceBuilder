@@ -421,6 +421,35 @@
       <button id="btn-hf">💾 Enregistrer la clé</button>
       <span id="hf-statut" class="voix-upload-info"></span>
 
+      <h3>LLM pour les incises</h3>
+      <p class="modal-sub">Modèle qui découpe le texte et attribue les répliques
+        (fonction « Incises »). « Auto » utilise l'accès externe dès qu'il est
+        configuré ci-dessous, sinon Ollama local. La clé est conservée côté
+        serveur et n'est jamais réaffichée.</p>
+      <label>Fournisseur
+        <select id="llm-fournisseur">
+          <option value="auto">Auto (externe si configuré, sinon Ollama local)</option>
+          <option value="openai">Externe — API compatible OpenAI</option>
+          <option value="ollama">Ollama local</option>
+        </select>
+      </label>
+      <label>URL de base
+        <input id="llm-url" type="text" autocomplete="off"
+          placeholder="https://opencode.ai/zen/go/v1" />
+      </label>
+      <label>Modèle
+        <input id="llm-modele" type="text" autocomplete="off"
+          placeholder="gpt-oss-120b" />
+      </label>
+      <label>Clé API
+        <input id="llm-cle" type="password" autocomplete="off" placeholder="sk-…" />
+      </label>
+      <div class="voix-upload">
+        <button id="btn-llm-save">💾 Enregistrer le LLM</button>
+        <button id="btn-llm-test">🔌 Tester</button>
+      </div>
+      <span id="llm-statut" class="voix-upload-info"></span>
+
       <h3>Musique de fond (BGM)</h3>
       <p class="modal-sub">Lit mixé sous les segments entourés de
         <code>&lt;|BGM|&gt;…&lt;|/BGM|&gt;</code> (le moteur ne génère pas de
