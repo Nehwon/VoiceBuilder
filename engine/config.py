@@ -1,5 +1,6 @@
 """Chemins et valeurs par défaut du projet VoiceBuilder (moteur OmniVoice)."""
 import os
+import shutil
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parents[1]
@@ -68,12 +69,27 @@ def set_bgm(lit: Path | str | None, volume: float | None = None) -> None:
 def set_audio_dir(path) -> None:
     """Change au runtime le dossier des fichiers wav/txt des voix.
 
-    Met à jour ``VOIX_AUDIO_DIR`` et ``VOIX_SEARCH_DIRS`` (utilisé par le GUI web
-    pour rendre ce dossier réglable depuis l'interface).
+    Met à jour ``VOIX_AUDIO_DIR``, ``VOIX_SEARCH_DIRS`` **et ``VOIX_FILE``**
+    (utilisé par le GUI web pour rendre ce dossier réglable depuis l'interface).
+
+    Le listage ``voix.txt`` suit le dossier des voix : il vit sur le volume
+    persistant, jamais dans l'image — sinon toute voix ajoutée par l'interface
+    est perdue à la recréation du conteneur et la liste revient à celle gravée
+    dans l'image. Au premier changement, le fichier existant est recopié une
+    fois (colonnes pause/vitesse/moteur préservées), puis il n'est plus touché.
     """
-    global VOIX_AUDIO_DIR, VOIX_SEARCH_DIRS
+    global VOIX_AUDIO_DIR, VOIX_SEARCH_DIRS, VOIX_FILE
     VOIX_AUDIO_DIR = Path(path).expanduser()
     VOIX_SEARCH_DIRS = (PROJECT_ROOT, VOIX_DIR, VOIX_AUDIO_DIR)
+    cible = VOIX_AUDIO_DIR / VOIX_FILE.name
+    if cible != VOIX_FILE:
+        if (not cible.exists() and VOIX_FILE.exists()
+                and VOIX_FILE.parent != cible.parent):
+            try:
+                shutil.copy2(VOIX_FILE, cible)
+            except OSError:
+                pass          # dossier absent/lecture seule : on garde l'ancien
+        VOIX_FILE = cible
 
 
 def set_moteur_defaut(nom: str) -> None:

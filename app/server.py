@@ -106,9 +106,12 @@ def _etat_llm() -> dict:
 def _etat() -> dict:
     """État général : dossier des voix, présence de voix.txt, liste des voix."""
     d = _charger_persistance().get("audio_dir") or str(config.VOIX_AUDIO_DIR)
+    erreur_dir = None
     if not Path(d).is_dir():
-        # dossier persisté invalide (ex. chemin hôte repris dans l'image) :
-        # on revient au défaut (VOICEBUILDER_AUDIO_DIR) au lieu de casser la résolution
+        # dossier persisté invalide (ex. chemin hôte non monté dans le conteneur) :
+        # on revient au défaut, mais on le DIT — sinon le dossier « saute » sans
+        # explication et l'interface affiche une liste de voix vide.
+        erreur_dir = f"Dossier des voix introuvable : {d}"
         d = str(config.VOIX_AUDIO_DIR)
     config.set_audio_dir(d)
     config.ensure_dirs()
@@ -130,6 +133,8 @@ def _etat() -> dict:
                     "moteurs": list(config.MOTEURS),
                     "hf_token_configuree": bool(config.hf_token()),
                     "llm": _etat_llm(),
+                    "voix_fichier": str(config.VOIX_FILE),
+                    "audio_dir_erreur": erreur_dir,
                     "modele": _etat_modele(), **bgm_etat}
     else:
         noms = []
@@ -138,6 +143,8 @@ def _etat() -> dict:
             "moteurs": list(config.MOTEURS),
             "hf_token_configuree": bool(config.hf_token()),
             "llm": _etat_llm(),
+            "voix_fichier": str(config.VOIX_FILE),
+            "audio_dir_erreur": erreur_dir,
             "modele": _etat_modele(), **bgm_etat}
 
 

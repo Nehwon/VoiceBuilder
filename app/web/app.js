@@ -391,7 +391,13 @@ $("btn-cache-ok").addEventListener("click", async () => {
 // ---------------------------------------------------------------- voix (dispo pour le selecteur)
 async function chargerVoix() {
   const r = await fetch("/api/voix");
-  if (!r.ok) { voixNoms = []; voixDispo = []; return; }
+  if (!r.ok) {
+    let detail = "liste des voix indisponible";
+    try { detail = (await r.json()).detail || detail; } catch { /* corps non-JSON */ }
+    voixNoms = []; voixDispo = [];
+    notifier(`Voix non chargées : ${detail}`, "err");
+    return;
+  }
   voixNoms = await r.json();
   voixDispo = voixNoms.map((v) => v.nom);
 }
@@ -2310,7 +2316,8 @@ async function chargerEtat() {
     $("bgm-volume-val").textContent = Number(etat.bgm_volume).toFixed(2);
   }
   let msg = null;
-  if (!etat.voix_file && etat.erreur) msg = { texte: etat.erreur, lien: "→ Régler le dossier des voix" };
+  if (etat.audio_dir_erreur) msg = { texte: etat.audio_dir_erreur, lien: "→ Régler le dossier des voix" };
+  else if (!etat.voix_file && etat.erreur) msg = { texte: etat.erreur, lien: "→ Régler le dossier des voix" };
   else if (!etat.voix_file) msg = { texte: "Aucun fichier de voix : configure le dossier des voix.", lien: "→ Régler le dossier des voix" };
   banniereVoix = msg;
   majBanniere();
