@@ -216,10 +216,11 @@ async function chargerDocuments() {
 
 async function chargerPersonnagesDoc(fichier) {
   const r = await fetch(`/api/document/personnages?fichier=${encodeURIComponent(fichier)}`);
-  if (!r.ok) return;
+  if (!r.ok) { await chargerVoix(); return; }   // document neuf/illisible : on garde les voix
   const d = await r.json();
   personnages = d.personnages || {};
   voixDispo = d.voix || [];
+  if (!voixDispo.length) await chargerVoix();   // repli : /api/voix fait référence
   majBoutonsPerso();
 }
 
@@ -258,7 +259,7 @@ $("file-local").addEventListener("change", (e) => {
   reader.onload = () => {
     docCourant = null;                       // pas d'auto-sauvegarde serveur
     personnages = {};                        // mapping en session uniquement
-    voixDispo = [];
+    chargerVoix();                           // les voix restent disponibles (jamais vidées)
     cm.setValue(reader.result);
     majMontage();
     majBoutonsPerso();
@@ -293,9 +294,10 @@ $("btn-nouveau").addEventListener("click", async () => {
   if (!d) return;
   cm.setValue("");
   docCourant = { fichier: d.fichier, brouillon: d.brouillon };
-  personnages = {}; voixDispo = [];
+  personnages = {};
   majMontage();
   await chargerDocuments();
+  await chargerVoix();                    // liste des voix : jamais vidée sans rechargement
   await chargerPersonnagesDoc(d.fichier);
   selectDoc(d.fichier);
   $("doc-statut").textContent = `nouveau : ${d.fichier}`;
@@ -787,7 +789,8 @@ function detecterPersonnagesTexte(texte) {
   return trouves;
 }
 
-function ouvrirPerso() {
+async function ouvrirPerso() {
+  if (!voixDispo.length) await chargerVoix();   // auto-réparation (nouveau doc, fichier local…)
   if (!voixDispo.length) {
     notifier("Aucune voix disponible : vérifie le dossier des voix (Réglages).", "err");
     return;
@@ -914,11 +917,12 @@ $("btn-lexique-fermer").addEventListener("click", () => fermerModal(modalLexique
 // ---------------------------------------------------------------- incises (M20)
 const modalIncises = $("modal-incises");
 
-$("btn-incises").addEventListener("click", () => {
+$("btn-incises").addEventListener("click", async () => {
   if (!docCourant) {
     notifier("Ouvre d'abord un document du projet (pas un fichier local).", "err");
     return;
   }
+  if (!voixDispo.length) await chargerVoix();   // sélecteurs de voix des nouveaux personnages
   $("incises-resultat").value = "";
   $("incises-lignes").innerHTML = "";
   $("incises-rejetes").innerHTML = "";
