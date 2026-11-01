@@ -120,6 +120,7 @@ document.addEventListener("keydown", (e) => {
     if (!$("modal-confirm").hidden) { fermerModal($("modal-confirm")); if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; } return; }
     if (!$("modal-voix-import").hidden) { fermerModal($("modal-voix-import")); return; }
     if (!modalCacheSupprimer.hidden) { fermerModal(modalCacheSupprimer); return; }
+    if (!$("modal-prononciation").hidden) { fermerModal($("modal-prononciation")); return; }
     [modalReglages, modalAide, modalPerso, modalErreur].forEach((m) => { if (!m.hidden) fermerModal(m); });
   }
 });
@@ -570,7 +571,7 @@ function insererPause(duree) {
 // Chaque groupe est un bloc déplaçable (drag-n-drop natif), repliable et masquable ;
 // l'ordre et l'état sont persistés côté client et restaurés à l'ouverture.
 const CLE_GROUPES = "vb-toolbar-groupes";
-const ORDRE_DEFAUT = ["personnages", "emotions", "sons", "pauses", "emphase", "langue", "ambiances"];
+const ORDRE_DEFAUT = ["personnages", "prononciation", "emotions", "sons", "pauses", "emphase", "langue", "ambiances"];
 let groupeDrag = null;
 
 function rendreGroupesModulables() {
@@ -857,6 +858,52 @@ $("btn-perso-fermer").addEventListener("click", () => {
   remplirLignesPerso();      // annule les saisies non enregistrées
   fermerModal(modalPerso);
 });
+
+// ---------------------------------------------------------------- lexique de prononciation (par document)
+const modalLexique = $("modal-prononciation");
+
+$("btn-prononciation").addEventListener("click", async () => {
+  if (!docCourant) {
+    notifier("Ouvre d'abord un document du projet (pas un fichier local).", "err");
+    return;
+  }
+  $("lexique-fichier-label").textContent = `Lexique de ${docCourant.fichier} (.lexique)`;
+  $("lexique-texte").value = "";
+  $("lexique-erreurs").hidden = true;
+  ouvrirModal(modalLexique);
+  try {
+    const r = await fetch(`/api/document/lexique?fichier=${encodeURIComponent(docCourant.fichier)}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+    $("lexique-texte").value = d.contenu || "";
+    if ((d.erreurs || []).length) {
+      $("lexique-erreurs").textContent = d.erreurs.join(" ");
+      $("lexique-erreurs").hidden = false;
+    }
+  } catch (e) {
+    notifier(`Lecture du lexique impossible : ${e.message}`, "err");
+    fermerModal(modalLexique);
+  }
+});
+
+$("btn-lexique-save").addEventListener("click", async () => {
+  if (!docCourant) return;
+  try {
+    const r = await fetch("/api/document/lexique", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fichier: docCourant.fichier, contenu: $("lexique-texte").value }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+    fermerModal(modalLexique);
+    notifier(`${d.regles.length} règle(s) de prononciation enregistrée(s).`, "ok");
+  } catch (e) {
+    $("lexique-erreurs").textContent = e.message;
+    $("lexique-erreurs").hidden = false;
+  }
+});
+
+$("btn-lexique-fermer").addEventListener("click", () => fermerModal(modalLexique));
 
 // ---------------------------------------------------------------- incises (M20)
 const modalIncises = $("modal-incises");

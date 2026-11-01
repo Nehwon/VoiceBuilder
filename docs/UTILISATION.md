@@ -357,3 +357,18 @@ python -m tools.create_voix SOURCE.wav --nom LeNarrateur --start 12.5 --stop 30
 Extrait `[12.5, 30] s`, transcrit (Whisper), écrit `voix/<slug>.wav` + `.txt`,
 ajoute la ligne dans `voix/voix.txt`. Options : `--out`, `--voix`,
 `--no-transcribe`.
+
+---
+
+## 8. Lexique de prononciation (par document)
+
+Un mot mal prononcé (ex. un prénom) se corrige sans toucher au texte :
+bouton **Prononciation…** dans la barre d'outils de l'éditeur. Une règle
+par ligne — `Mot => prononciation` (ex. `Ben => Bène`) — enregistrée dans
+`texte/<nom>.lexique`, à côté du `.md` et du `.map` : chaque document garde
+ses propres prononciations (copié, renommé et archivé avec lui).
+
+Appliqué mots entiers, sans tenir compte de la casse, en toute première
+étape de la normalisation et au seul texte à synthétiser (jamais au prompt
+de la voix) : le document affiché reste inchangé, la régénération d'un bloc
+réutilise le lexique courant du document.

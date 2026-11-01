@@ -39,7 +39,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engine import bench
-from engine import config, multi, omnivoice_engine, voix
+from engine import config, lexique, multi, omnivoice_engine, voix
 from engine.voix import load_voix
 from engine import audio_extract
 
@@ -286,6 +286,11 @@ class PersonnagesSaveIn(BaseModel):
     personnages: dict[str, str]
 
 
+class LexiqueSaveIn(BaseModel):
+    fichier: str
+    contenu: str = ""
+
+
 class IncisesIn(BaseModel):
     fichier: str
     mode: str = "auto"            # auto | import_roman | nettoyer_tagge (regex seul)
@@ -460,12 +465,14 @@ def api_generer(payload: GenererIn):
     if document:
         # Cas 1 de vidage du cache (M16) : nouvelle génération demandée.
         _cache_effacer(document)
+    regles_lexique = _lexique_document(document)
     job = {"status": "running", "queue": q, "result": None,
            "error": None, "tmp": tmp, "out": sortie, "bloc_dir": str(bloc_dir),
            "pause": payload.pause, "vitesse": payload.vitesse,
            "max_chars": payload.max_chars, "verify": payload.verify,
            "device": payload.device, "personnages": payload.personnages,
            "document": document, "multi_prompt": payload.multi_prompt,
+           "lexique": regles_lexique,
            "stop_event": threading.Event(), "stopped": False,
            "file_regen": queue.Queue()}
     _jobs[jid] = job
@@ -498,6 +505,7 @@ def api_generer(payload: GenererIn):
                 load_vllm=payload.load_vllm, load_trt=payload.load_trt,
                 file_regen=job["file_regen"],
                 multi_prompt=job.get("multi_prompt", False),
+                lexique=job.get("lexique") or [],
             )
             job["result"] = res
             job["blocs"] = res.get("blocs", [])
@@ -866,7 +874,8 @@ def api_bloc_regenerer(jid: int, bid: int):
     model, sr = multi.load(device=job["device"], fp16=False)
     audio = multi.synth_bloc(voix, bloc["texte"], model, sr,
                              block_chars=job["max_chars"],
-                             speed=job["vitesse"], verify=job["verify"])
+                             speed=job["vitesse"], verify=job["verify"],
+                             lexique=_lexique_job(job))
     omnivoice_engine.save(audio, sr, bloc["wav"])
     bloc["duree"] = round(len(audio) / sr, 2)
     _cache_ecrire(job)  # M16 : le cache suit les retouches
@@ -919,7 +928,8 @@ def api_bloc_diviser(jid: int, bid: int):
     for h, suffix in zip(halves, (nextid, nextid + 1)):
         audio = multi.synth_bloc(voix, h["texte"], model, sr,
                                  block_chars=job["max_chars"],
-                                 speed=job["vitesse"], verify=job["verify"])
+                                 speed=job["vitesse"], verify=job["verify"],
+                                 lexique=_lexique_job(job))
         wav = str(Path(original["wav"]).with_name(f"bloc_{suffix}.wav"))
         omnivoice_engine.save(audio, sr, wav)
         results.append({"id": suffix, "personnage": original["personnage"],
@@ -1362,6 +1372,59 @@ def api_personnages_save(payload: PersonnagesSaveIn):
 
 
 # ---------------------------------------------------------------------------
+# Lexique de prononciation par document (texte/<nom>.lexique)
+# ---------------------------------------------------------------------------
+
+def _fichier_lexique(fichier: str) -> Path:
+    """Chemin du lexique d'un document (``nom.md`` → ``nom.lexique``).
+
+    Même dossier que le ``.map`` : à côté du texte, donc copié / renommé /
+    archivé avec lui — chaque projet garde ses propres prononciations.
+    """
+    _chemin_projet(fichier)                       # valide le nom
+    return lexique.chemin_pour(fichier)
+
+
+def _lexique_document(document: str | None) -> list:
+    """Règles ``[(mot, remplacement)]`` du document (vide si aucun)."""
+    if not document:
+        return []
+    try:
+        _chemin_projet(document)
+    except HTTPException:
+        return []
+    _contenu, regles, _erreurs = lexique.lire(document)
+    return regles
+
+
+def _lexique_job(job: dict) -> list:
+    """Lexique effectif d'un job : celui de la génération, sinon relecture
+    du fichier (un lexique modifié après coup s'applique aux régénérations)."""
+    return job.get("lexique") or _lexique_document(job.get("document"))
+
+
+@app.get("/api/document/lexique")
+def api_lexique_get(fichier: str):
+    _fichier_lexique(fichier)
+    contenu, regles, erreurs = lexique.lire(fichier)
+    return {"fichier": fichier, "contenu": contenu,
+            "regles": [{"mot": m, "prononciation": r} for m, r in regles],
+            "erreurs": erreurs}
+
+
+@app.post("/api/document/lexique")
+def api_lexique_save(payload: LexiqueSaveIn):
+    _fichier_lexique(payload.fichier)
+    contenu = payload.contenu or ""
+    regles, erreurs = lexique.analyser(contenu)
+    if erreurs:
+        raise HTTPException(400, "Lexique invalide : " + " ".join(erreurs))
+    lexique.ecrire(payload.fichier, contenu)
+    return {"fichier": payload.fichier,
+            "regles": [{"mot": m, "prononciation": r} for m, r in regles]}
+
+
+# ---------------------------------------------------------------------------
 # Incises de dialogue (M20) : prévisualisation + application (jamais auto)
 # ---------------------------------------------------------------------------
 
@@ -1486,6 +1549,7 @@ def _details_document(p: Path) -> dict:
     try:
         st = p.stat()
         map_p = config.TEXTE_DIR / (p.stem + ".map")
+        lex_p = lexique.chemin_pour(p.name)
         brouillon = _BROUILLONS / p.name
         return {
             "fichier": p.name,
@@ -1493,11 +1557,12 @@ def _details_document(p: Path) -> dict:
             "modifie": int(st.st_mtime),
             "modifie_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime)),
             "map": map_p.exists(),
+            "lexique": lex_p.exists(),
             "brouillon": brouillon.exists(),
             "archived": False,
         }
     except OSError:
-        return {"fichier": p.name, "taille": 0, "modifie": 0, "modifie_iso": "", "map": False, "brouillon": False, "archived": False}
+        return {"fichier": p.name, "taille": 0, "modifie": 0, "modifie_iso": "", "map": False, "lexique": False, "brouillon": False, "archived": False}
 
 
 def _details_archive(p: Path) -> dict:
@@ -1525,14 +1590,17 @@ def api_documents_details():
 @app.post("/api/document/supprimer")
 def api_document_supprimer(payload: DocumentActionIn):
     p = _chemin_projet(payload.fichier)
-    # supprime : fichier + .map + brouillon
+    # supprime : fichier + .map + .lexique + brouillon
     try:
         map_p = config.TEXTE_DIR / (p.stem + ".map")
+        lex_p = lexique.chemin_pour(p.name)
         brouillon = _BROUILLONS / p.name
         arch_map = _ARCHIVES / map_p.name if _ARCHIVES.is_dir() else None
         p.unlink()
         if map_p.exists():
             map_p.unlink()
+        if lex_p.exists():
+            lex_p.unlink()
         if brouillon.exists():
             brouillon.unlink()
         # aussi en archives si doublon
@@ -1552,10 +1620,13 @@ def api_document_archiver(payload: DocumentActionIn):
         raise HTTPException(409, f"Archive déjà existante : {dest.name}")
     try:
         shutil.move(str(p), str(dest))
-        # déplace aussi le .map et le brouillon si présents
+        # déplace aussi le .map, le .lexique et le brouillon si présents
         map_src = config.TEXTE_DIR / (p.stem + ".map")
         if map_src.exists():
             shutil.move(str(map_src), str(_ARCHIVES / map_src.name))
+        lex_src = lexique.chemin_pour(p.name)
+        if lex_src.exists():
+            shutil.move(str(lex_src), str(_ARCHIVES / lex_src.name))
         brouillon = _BROUILLONS / p.name
         if brouillon.exists():
             shutil.move(str(brouillon), str(_ARCHIVES / brouillon.name))
@@ -1582,6 +1653,9 @@ def api_document_desarchiver(payload: DocumentActionIn):
         map_arch = _ARCHIVES / (arch.stem + ".map")
         if map_arch.exists():
             shutil.move(str(map_arch), str(config.TEXTE_DIR / map_arch.name))
+        lex_arch = _ARCHIVES / (arch.stem + lexique.EXTENSION)
+        if lex_arch.exists():
+            shutil.move(str(lex_arch), str(config.TEXTE_DIR / lex_arch.name))
         brouillon_arch = _ARCHIVES / arch.name
         # le brouillon a le même nom que le doc ; déjà déplacé si présent en archive
         # si pas, rien à faire
@@ -1617,6 +1691,9 @@ def api_document_dupliquer(payload: DocumentDupliquerIn):
         map_src = config.TEXTE_DIR / (p.stem + ".map")
         if map_src.exists():
             shutil.copy(str(map_src), str(config.TEXTE_DIR / (dest.stem + ".map")))
+        lex_src = lexique.chemin_pour(p.name)
+        if lex_src.exists():
+            shutil.copy(str(lex_src), str(lexique.chemin_pour(dest.name)))
     except OSError as exc:
         raise HTTPException(500, f"Duplication échouée : {exc}")
     return {"original": p.name, "copie": dest.name}
@@ -1636,6 +1713,9 @@ def api_document_renommer(payload: DocumentRenommerIn):
         map_src = config.TEXTE_DIR / (p.stem + ".map")
         if map_src.exists():
             map_src.rename(config.TEXTE_DIR / (dest.stem + ".map"))
+        lex_src = lexique.chemin_pour(p.name)
+        if lex_src.exists():
+            lex_src.rename(lexique.chemin_pour(dest.name))
         brouillon = _BROUILLONS / p.name
         if brouillon.exists():
             brouillon.rename(_BROUILLONS / dest.name)

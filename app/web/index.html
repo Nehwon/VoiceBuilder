@@ -97,6 +97,17 @@
               <span id="perso-boutons" class="perso-boutons"></span>
             </span>
           </div>
+          <div class="groupe-toolbar" data-groupe="prononciation">
+            <span class="groupe-tete">
+              <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
+              <span class="groupe-label">Prononciation</span>
+              <button type="button" class="groupe-replier" title="Replier / déplier le groupe">▾</button>
+              <button type="button" class="groupe-masquer" title="Masquer ce groupe">✕</button>
+            </span>
+            <span class="groupe-corps">
+              <button id="btn-prononciation" title="Fixer la prononciation de mots du document courant (ex. Ben → Bène)">Prononciation…</button>
+            </span>
+          </div>
           <div class="groupe-toolbar" data-groupe="emotions">
             <span class="groupe-tete">
               <span class="grip" draggable="true" title="Déplacer le groupe">⠿</span>
@@ -466,6 +477,25 @@
       <div class="modal-actions">
         <button id="btn-perso-fermer">Fermer</button>
         <button id="btn-perso-save" class="primaire">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : prononciation (lexique du document) -->
+  <div id="modal-prononciation" class="modal" hidden>
+    <div class="modal-boite modal-large">
+      <h2>Prononciation du document</h2>
+      <p class="modal-sub">Une règle par ligne : <code>Mot =&gt; prononciation</code>
+        (ex. <code>Ben =&gt; Bène</code>). Appliqué mots entiers, sans tenir
+        compte de la casse, au moment de la synthèse — le texte du document
+        reste inchangé. Chaque document a son propre lexique.</p>
+      <label for="lexique-texte" class="modal-sub" id="lexique-fichier-label"></label>
+      <textarea id="lexique-texte" rows="10" spellcheck="false"
+        placeholder="Ben => Bène" style="width:100%"></textarea>
+      <p class="modal-sub" id="lexique-erreurs" hidden></p>
+      <div class="modal-actions">
+        <button id="btn-lexique-fermer">Fermer</button>
+        <button id="btn-lexique-save" class="primaire">Enregistrer</button>
       </div>
     </div>
   </div>

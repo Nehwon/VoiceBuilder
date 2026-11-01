@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from . import adaptive, config, omnivoice_engine, verifier
+from . import adaptive, config, lexique as lexique_mod, omnivoice_engine, verifier
 from .tagging import PAUSE, parse_texte, regrouper
 from .voix import Voices, base_nom, grouper_candidats
 
@@ -20,7 +20,7 @@ def _read_text(path: str) -> str:
 
 def _synthesize_for(
     text: str, moteurs: dict, sr_montage, voice, block_chars, speed, verify,
-    should_stop=None,
+    should_stop=None, lexique=None,
 ) -> np.ndarray:
     """Synthetise un bloc pour une voix donnée (avec découpage adaptatif vérifié).
 
@@ -28,18 +28,22 @@ def _synthesize_for(
     est chargé à la volée (repli, paramètres par défaut). L'engine sort
     déjà au ``sr_montage`` (``out_sr``), sans rééchantillonnage ici.
     Branche omni : moteur unique, ``voice.moteur`` (7ᵉ colonne) est ignoré.
+    ``lexique`` : règles de prononciation du document — substituées ici
+    pour que la vérification Whisper compare le texte réellement parlé
+    (le moteur ré-applique, sans effet — une passe).
     """
     moteur = "omnivoice"
     if moteur not in moteurs:
         moteurs[moteur] = omnivoice_engine.load()
     model, sr = moteurs[moteur]
     prompt = voice.prompt_text
+    texte_eff = lexique_mod.appliquer(text, lexique) if lexique else text
     def synth(t: str, _pw="", _pt=""):
         return omnivoice_engine.synthesize(
             t, str(voice.wav), voice.prompt_text,
-            model, sr, speed=speed, out_sr=sr_montage)
+            model, sr, speed=speed, out_sr=sr_montage, lexique=lexique)
     audio = adaptive.synthesize_verified(
-        text, str(voice.wav), prompt, synth, sr_montage,
+        texte_eff, str(voice.wav), prompt, synth, sr_montage,
         max_chars=block_chars, verify=verify, should_stop=should_stop,
     )
     return audio
@@ -58,16 +62,19 @@ def load(device: Optional[str] = None, fp16: Optional[bool] = None,
 
 def synth_bloc(
     voice, text: str, model, sample_rate, block_chars=None, speed=None, verify=None,
+    lexique=None,
 ) -> np.ndarray:
     """Synthetise un seul bloc pour une voix (réutilisable pour la régénération).
 
     Branche omni : OmniVoice direct (``voice.moteur`` ignoré).
+    ``lexique`` : règles de prononciation du document.
     """
     block_chars = voice.max_block_chars or block_chars or config.DEFAULT_MAX_BLOCK_CHARS
     spd = voice.speed if voice.speed is not None else (speed or config.DEFAULT_SPEED)
     chk = config.VERIFY_ENABLED if verify is None else verify
     return _synthesize_for(text, {"omnivoice": (model, sample_rate)},
-                           sample_rate, voice, block_chars, spd, chk)
+                           sample_rate, voice, block_chars, spd, chk,
+                           lexique=lexique)
 
 
 def generate(
@@ -90,8 +97,13 @@ def generate(
     file_regen=None,
     multi_prompt: bool = False,
     max_prompts: int = 2,
+    lexique=None,
 ) -> dict:
     """Génère l'audio complet pour un texte taggé et une liste de voix.
+
+    ``lexique`` : règles de prononciation du document (``[(mot,
+    remplacement)]``) — substituées à la synthèse, texte affiché
+    inchangé.
 
     Les balises du texte sont des **noms de personnages**. ``personnages`` est un
     mapping ``{personnage: nom_de_voix}``. S'il est absent, on suppose que chaque
@@ -195,23 +207,26 @@ def generate(
         """Synthétise un bloc, en multi-prompt avec chaque candidat si activé.
 
         Renvoie ``(audio, prompt_gagnant | None, couverture | None)``.
+        Le lexique du document est substitué avant comparaison pour que
+        la couverture Whisper porte sur le texte réellement parlé.
         """
+        t_eff = lexique_mod.appliquer(t, lexique) if lexique else t
         if not multi_prompt:
-            return (_synthesize_for(t, moteurs, sr, voice, block_chars, block_speed,
-                                    verify, arret_demande), None, None)
+            return (_synthesize_for(t_eff, moteurs, sr, voice, block_chars, block_speed,
+                                    verify, arret_demande, lexique), None, None)
         noms = groupes_prompts.get(base_nom(voice.name), [voice.name])
         noms = [n for n in noms if n in voices][:max(1, max_prompts)]
         if len(noms) < 2:
-            return (_synthesize_for(t, moteurs, sr, voice, block_chars, block_speed,
-                                    verify, arret_demande), None, None)
+            return (_synthesize_for(t_eff, moteurs, sr, voice, block_chars, block_speed,
+                                    verify, arret_demande, lexique), None, None)
         meilleur, couv_max, gagnant = None, -1.0, noms[0]
         for nom in noms:
             cand = voices.get(nom)
             bc = cand.max_block_chars or block_chars
             spd = cand.speed if cand.speed is not None else block_speed
-            audio = _synthesize_for(t, moteurs, sr, cand, bc, spd, False,
-                                    arret_demande)
-            couv = verifier.coverage(t, audio, sr)
+            audio = _synthesize_for(t_eff, moteurs, sr, cand, bc, spd, False,
+                                    arret_demande, lexique)
+            couv = verifier.coverage(t_eff, audio, sr)
             if verbose:
                 print(f"  [prompt {nom}] couverture {couv:.0%}")
             if couv > couv_max:
@@ -267,7 +282,7 @@ def generate(
                     blocs_report[bid - 1]["couverture"] = couv
             else:
                 audio = _synthesize_for(t, moteurs, sr, voice, block_chars, block_speed,
-                                        verify, arret_demande)
+                                        verify, arret_demande, lexique)
             parts[positions[bid - 1]] = audio
             dur = len(audio) / sr
             blocs_report[bid - 1]["duree"] = round(dur, 2)
@@ -327,7 +342,7 @@ def generate(
             audio, prompt, couv = _synth_choisir(t, voice, block_chars, block_speed)
         else:
             audio = _synthesize_for(t, moteurs, sr, voice, block_chars, block_speed,
-                                    verify, arret_demande)
+                                    verify, arret_demande, lexique)
             prompt, couv = None, None
         parts.append(audio)
         pers_precedent = pers

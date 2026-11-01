@@ -323,11 +323,16 @@ def load(device: str = None) -> "tuple":
     return _model, NATIVE_SR
 
 
-def _preparer(text: str, prompt_text: str) -> tuple:
-    """Normalisation FR + BGM (commune aux deux modes)."""
+def _preparer(text: str, prompt_text: str, lexique=None) -> tuple:
+    """Normalisation FR + BGM (commune aux deux modes).
+
+    ``lexique`` : règles de prononciation du document — appliquées au
+    seul texte à synthétiser (jamais au prompt de la voix, qui doit
+    rester la transcription exacte du wav de référence).
+    """
     text, veut_bgm = bgm.preparer_texte(text)
     prompt_text = bgm.preparer_texte(prompt_text)[0]
-    text = text_fr.normalize(_LANGUES_RE.sub("", text))
+    text = text_fr.normalize(_LANGUES_RE.sub("", text), lexique=lexique)
     prompt_text = text_fr.normalize(_LANGUES_RE.sub("", prompt_text))
     return text, prompt_text, veut_bgm
 
@@ -360,16 +365,19 @@ def synthesize(
     speed: float = config.DEFAULT_SPEED,
     stream: bool = False,
     out_sr: Optional[int] = None,
+    lexique=None,
 ) -> np.ndarray:
     """Génère le TTS de ``text`` en clonant ``prompt_wav/prompt_text``.
 
     ``prompt_text`` = transcription **brute**. Renvoie un array mono
     float32 à ``out_sr`` Hz (``sample_rate`` du montage par défaut,
     rééchantillonné depuis les 24 kHz natifs si différent).
+    ``lexique`` : règles de prononciation du document (une passe, texte
+    seul — voir ``_preparer``).
     """
     if model is None:
         model, _ = load()
-    text, prompt_text, veut_bgm = _preparer(text, prompt_text)
+    text, prompt_text, veut_bgm = _preparer(text, prompt_text, lexique=lexique)
     sr_cible = out_sr or sample_rate or NATIVE_SR
 
     audio = model.generate(text=text, ref_audio=str(prompt_wav),

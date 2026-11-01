@@ -391,39 +391,47 @@ def normalize_en(text: str) -> str:
                   re.sub(r"\d[\d,]*", _mots_en, text)).strip()
 
 
-def normalize_multilangue(text: str) -> str:
+def normalize_multilangue(text: str, lexique=None) -> str:
     """Normalise en routant chaque passage vers sa langue (``[en]``/``[fr]``).
 
     Sans marqueur : strictement identique à ``normalize()``.
+    ``lexique`` (lexique de prononciation du document) ne s'applique
+    qu'aux passages français (dont le texte sans marqueur).
     """
     if not SPAN_LANG_RE.search(text):
-        return normalize(text)
+        return normalize(text, lexique=lexique)
     morceaux = []
     pos = 0
     for m in SPAN_LANG_RE.finditer(text):
         avant = text[pos:m.start()].strip()
         if avant:
-            morceaux.append(normalize(avant))
+            morceaux.append(normalize(avant, lexique=lexique))
         langue = m.group(1).lower()
         contenu = m.group(2).strip()
         if contenu:
             morceaux.append(normalize_en(contenu) if langue == "en"
-                            else normalize(contenu))
+                            else normalize(contenu, lexique=lexique))
         pos = m.end()
     apres = text[pos:].strip()
     if apres:
-        morceaux.append(normalize(apres))
+        morceaux.append(normalize(apres, lexique=lexique))
     return re.sub(r"  +", " ", " ".join(morceaux)).strip()
 
 
-def normalize(text: str) -> str:
+def normalize(text: str, lexique=None) -> str:
     """Normalise le texte français pour la synthèse TTS.
 
-    Ordre : dates → heures → abréviations → devises → romains →
-    ponctuation → nombres → mots.
+    Ordre : lexique de prononciation → dates → heures → abréviations →
+    devises → romains → ponctuation → nombres → mots.
     Les étapes les plus spécifiques passent en premier pour éviter les
     conflits avec la normalisation générique des nombres.
+    ``lexique`` : règles ``[(mot, remplacement)]`` du document
+    (``engine/lexique.py``), appliquées en premier pour que la graphie
+    de remplacement suive elle-même le pipeline.
     """
+    if lexique:
+        from .lexique import appliquer
+        text = appliquer(text, lexique)
     text = _normalize_dates(text)
     text = _normalize_times(text)
     text = _normalize_abbreviations(text)
