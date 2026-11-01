@@ -158,14 +158,33 @@ LLM_URL = os.environ.get("VOICEBUILDER_LLM_URL", "")        # ex. https://openco
 LLM_MODELE = os.environ.get("VOICEBUILDER_LLM_MODELE", "")  # ex. gpt-oss-120b
 LLM_CLE: str | None = os.environ.get("VOICEBUILDER_LLM_CLE") or None
 LLM_TIMEOUT = float(os.environ.get("VOICEBUILDER_LLM_TIMEOUT", str(OLLAMA_TIMEOUT)))
+
+
+def _lire_entetes(brut: str | None) -> dict:
+    """Analyse des en-têtes « Nom: valeur » (une par ligne)."""
+    entetes: dict = {}
+    for ligne in (brut or "").splitlines():
+        if ":" not in ligne:
+            continue
+        nom, valeur = ligne.split(":", 1)
+        if nom.strip():
+            entetes[nom.strip()] = valeur.strip()
+    return entetes
+
+
+# En-têtes HTTP supplémentaires pour l'API externe (proxys à en-tête maison,
+# passerelles étatiques…). Les hôtes opencode.ai reçoivent en plus leur
+# x-opencode-session automatiquement (cf. engine/incises_llm).
+LLM_ENTETES: dict = _lire_entetes(os.environ.get("VOICEBUILDER_LLM_ENTETES"))
 INCISES_CHUNK_CHARS = int(os.environ.get("VOICEBUILDER_INCISES_CHUNK", "2500"))
 INCISES_RAPPEL_MIN = 0.88          # rappel lexical sortie/entrée sous lequel on retente
 
 
 def set_llm(fournisseur: str | None = None, url: str | None = None,
-            modele: str | None = None, cle: str | None = None) -> None:
+            modele: str | None = None, cle: str | None = None,
+            entetes: str | None = None) -> None:
     """Applique la configuration LLM (Réglages). ``None`` = inchangé, ``""`` = effacé."""
-    global LLM_FOURNISSEUR, LLM_URL, LLM_MODELE, LLM_CLE
+    global LLM_FOURNISSEUR, LLM_URL, LLM_MODELE, LLM_CLE, LLM_ENTETES
     if fournisseur is not None:
         LLM_FOURNISSEUR = fournisseur if fournisseur in ("auto", "openai", "ollama") else "auto"
     if url is not None:
@@ -174,6 +193,8 @@ def set_llm(fournisseur: str | None = None, url: str | None = None,
         LLM_MODELE = modele.strip()
     if cle is not None:
         LLM_CLE = cle.strip() or None
+    if entetes is not None:
+        LLM_ENTETES = _lire_entetes(entetes)
 
 
 def llm_externe_configure() -> bool:
@@ -186,6 +207,7 @@ def llm_etat() -> dict:
     return {"fournisseur": LLM_FOURNISSEUR, "url": LLM_URL, "modele": LLM_MODELE,
             "cle_configuree": bool(LLM_CLE),
             "externe_configure": llm_externe_configure(),
+            "entetes": "\n".join(f"{k}: {v}" for k, v in LLM_ENTETES.items()),
             "ollama_url": OLLAMA_URL, "ollama_modele": OLLAMA_MODELE_INCISES}
 
 

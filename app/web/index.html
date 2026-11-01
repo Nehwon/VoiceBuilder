@@ -444,6 +444,12 @@
       <label>Clé API
         <input id="llm-cle" type="password" autocomplete="off" placeholder="sk-…" />
       </label>
+      <label>En-têtes supplémentaires
+        <textarea id="llm-entetes" rows="2" spellcheck="false"
+          placeholder="Nom: valeur, un par ligne (facultatif)"></textarea>
+      </label>
+      <p class="modal-sub">Sur opencode.ai, l'en-tête de session
+        <code>x-opencode-session</code> est ajouté automatiquement.</p>
       <div class="voix-upload">
         <button id="btn-llm-save">💾 Enregistrer le LLM</button>
         <button id="btn-llm-test">🔌 Tester</button>

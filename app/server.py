@@ -156,11 +156,13 @@ def _bootstrap() -> None:
     data = _charger_persistance()
     if data.get("hf_token"):
         config.set_hf_token(data["hf_token"])
-    if any(k in data for k in ("llm_fournisseur", "llm_url", "llm_modele", "llm_cle")):
+    if any(k in data for k in ("llm_fournisseur", "llm_url", "llm_modele",
+                               "llm_cle", "llm_entetes")):
         config.set_llm(fournisseur=data.get("llm_fournisseur"),
                        url=data.get("llm_url"),
                        modele=data.get("llm_modele"),
-                       cle=data.get("llm_cle"))
+                       cle=data.get("llm_cle"),
+                       entetes=data.get("llm_entetes"))
     if data.get("audio_dir"):
         chemin = data["audio_dir"]
         if not Path(chemin).is_dir():
@@ -268,6 +270,7 @@ class ConfigIn(BaseModel):
     llm_url: str | None = None
     llm_modele: str | None = None
     llm_cle: str | None = None
+    llm_entetes: str | None = None
 
 
 class NommageIn(BaseModel):
@@ -412,13 +415,15 @@ def api_config(payload: ConfigIn):
         config.set_hf_token(payload.hf_token)
         _sauver_persistance({"hf_token": payload.hf_token.strip()})
     if any(getattr(payload, champ) is not None for champ in
-           ("llm_fournisseur", "llm_url", "llm_modele", "llm_cle")):
+           ("llm_fournisseur", "llm_url", "llm_modele", "llm_cle", "llm_entetes")):
         config.set_llm(fournisseur=payload.llm_fournisseur, url=payload.llm_url,
-                       modele=payload.llm_modele, cle=payload.llm_cle)
+                       modele=payload.llm_modele, cle=payload.llm_cle,
+                       entetes=payload.llm_entetes)
         _sauver_persistance({"llm_fournisseur": config.LLM_FOURNISSEUR,
                              "llm_url": config.LLM_URL,
                              "llm_modele": config.LLM_MODELE,
-                             "llm_cle": config.LLM_CLE or ""})
+                             "llm_cle": config.LLM_CLE or "",
+                             "llm_entetes": config.llm_etat()["entetes"]})
     config.ensure_dirs()
     voix.generer_voix_txt()          # (re)génère si voix.txt absent
     return _etat()

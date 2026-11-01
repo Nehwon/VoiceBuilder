@@ -26,7 +26,9 @@ from __future__ import annotations
 import json
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
+import uuid
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
 
@@ -124,6 +126,30 @@ def _endpoint_externe(url: Optional[str] = None) -> str:
     return base if base.endswith("/chat/completions") else f"{base}/chat/completions"
 
 
+# OpenCode Go/Zen refuse toute requête sans ``x-opencode-session`` (400
+# MissingSessionID) : valeur opaque et stable pour le processus, ce qui garde
+# le cache de prompt chaud d'un chunk à l'autre.
+_SESSION_OPENCODE = f"voicebuilder-{uuid.uuid4().hex[:16]}"
+# urllib s'annonce « Python-urllib/x », ce que les frontaux bloquent (403
+# Cloudflare « error code: 1010 » sur opencode.ai) : on s'identifie.
+_UA_EXTERNE = "VoiceBuilder/1.0 (TTS; +https://github.com/Nehwon/VoiceBuilder)"
+
+
+def _entetes_http(endpoint: str, cle: str) -> dict:
+    """En-têtes de l'appel externe : UA, auth, en-têtes libres, session OpenCode."""
+    entetes = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {cle}",
+        "User-Agent": _UA_EXTERNE,
+    }
+    entetes.update(config.LLM_ENTETES or {})
+    hote = urllib.parse.urlsplit(endpoint).netloc.lower()
+    if hote.endswith("opencode.ai") and not any(
+            nom.lower() == "x-opencode-session" for nom in entetes):
+        entetes["x-opencode-session"] = _SESSION_OPENCODE
+    return entetes
+
+
 def appeler_externe(prompt: str, systeme: str, modele: Optional[str] = None,
                     url: Optional[str] = None,
                     timeout: Optional[float] = None) -> str:
@@ -146,8 +172,7 @@ def appeler_externe(prompt: str, systeme: str, modele: Optional[str] = None,
     def _post(payload: dict) -> dict:
         req = urllib.request.Request(
             endpoint, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {cle}"})
+            headers=_entetes_http(endpoint, cle))
         with urllib.request.urlopen(req, timeout=timeout) as rep:
             return json.loads(rep.read().decode())
 

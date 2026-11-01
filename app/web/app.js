@@ -1062,6 +1062,7 @@ function majStatutLlm(etat) {
   if (l.fournisseur) $("llm-fournisseur").value = l.fournisseur;
   if (!$("llm-url").value && l.url) $("llm-url").value = l.url;
   if (!$("llm-modele").value && l.modele) $("llm-modele").value = l.modele;
+  if (!$("llm-entetes").value && l.entetes) $("llm-entetes").value = l.entetes;
   const actif = l.actif === "openai" ? "externe"
     : (l.actif === "ollama" ? "Ollama local" : "aucun");
   const cle = l.cle_configuree ? "🔑 clé configurée" : "⚠️ aucune clé";
@@ -1073,6 +1074,7 @@ $("btn-llm-save").addEventListener("click", async () => {
     llm_fournisseur: $("llm-fournisseur").value,
     llm_url: $("llm-url").value.trim(),
     llm_modele: $("llm-modele").value.trim(),
+    llm_entetes: $("llm-entetes").value,
   };
   const cle = $("llm-cle").value.trim();
   if (cle) corps.llm_cle = cle;          // champ vide = clé conservée

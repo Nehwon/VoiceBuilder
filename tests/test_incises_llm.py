@@ -205,12 +205,13 @@ class _EtatLLM:
         from engine import config
         self.config = config
         self.sauve = (config.LLM_FOURNISSEUR, config.LLM_URL,
-                      config.LLM_MODELE, config.LLM_CLE)
+                      config.LLM_MODELE, config.LLM_CLE, dict(config.LLM_ENTETES))
         return config
 
     def __exit__(self, *a):
         c = self.config
-        c.LLM_FOURNISSEUR, c.LLM_URL, c.LLM_MODELE, c.LLM_CLE = self.sauve
+        (c.LLM_FOURNISSEUR, c.LLM_URL, c.LLM_MODELE,
+         c.LLM_CLE, c.LLM_ENTETES) = self.sauve
         return False
 
 
@@ -332,3 +333,47 @@ class TestAppelExterne:
                     assert "401" in str(exc)
                     return
         raise AssertionError("ErreurLLM attendue")
+
+
+class TestEntetes:
+    """Agent utilisateur, session OpenCode et en-têtes libres."""
+
+    @staticmethod
+    def _capturer(cfg, url, entetes="", cle="sk-test"):
+        from unittest.mock import patch
+        vu = {}
+
+        def faux_urlopen(req, timeout=None):
+            vu.update({k.lower(): v for k, v in req.header_items()})
+            return _FausseReponse(json.dumps({
+                "choices": [{"message": {"content": "{}"}}]}).encode())
+
+        cfg.set_llm(fournisseur="openai", url=url, modele="m", cle=cle,
+                    entetes=entetes)
+        with patch("urllib.request.urlopen", faux_urlopen):
+            llm.appeler_llm("P", "S")
+        return vu
+
+    def test_agent_utilisateur_identifie(self):
+        """urllib s'annonce « Python-urllib » : bloqué par Cloudflare (403/1010)."""
+        with _EtatLLM() as cfg:
+            vu = self._capturer(cfg, "https://exemple.test/v1")
+        assert vu["user-agent"].startswith("VoiceBuilder/")
+        assert "python-urllib" not in vu["user-agent"].lower()
+
+    def test_session_opencode_automatique(self):
+        with _EtatLLM() as cfg:
+            vu = self._capturer(cfg, "https://opencode.ai/zen/go/v1")
+        assert vu["x-opencode-session"].startswith("voicebuilder-")
+
+    def test_pas_de_session_hors_opencode(self):
+        with _EtatLLM() as cfg:
+            vu = self._capturer(cfg, "https://exemple.test/v1")
+        assert "x-opencode-session" not in vu
+
+    def test_entetes_libres_et_priorite(self):
+        with _EtatLLM() as cfg:
+            vu = self._capturer(cfg, "https://opencode.ai/zen/go/v1",
+                                entetes="x-opencode-session: ma-session\nX-Autre: 1")
+        assert vu["x-opencode-session"] == "ma-session"   # l'explicite gagne
+        assert vu["x-autre"] == "1"
