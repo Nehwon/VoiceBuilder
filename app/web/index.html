@@ -547,8 +547,9 @@
       <div class="incises-options">
         <label>Moteur
           <select id="incises-moteur">
-            <option value="auto">Auto (LLM si dispo)</option>
-            <option value="llm">LLM local</option>
+            <option value="auto">Auto (LLM en priorité, externe d'abord)</option>
+            <option value="llm:openai">LLM externe (API compatible OpenAI)</option>
+            <option value="llm:ollama">Ollama local</option>
             <option value="regex">Regex (hors-ligne)</option>
           </select>
         </label>

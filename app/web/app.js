@@ -923,6 +923,12 @@ $("btn-incises").addEventListener("click", () => {
   apercuIncises();
 });
 
+// « auto » | « llm:openai » | « llm:ollama » | « regex » → {moteur, fournisseur}
+function moteurChoisi() {
+  const [moteur, fournisseur] = ($("incises-moteur").value || "auto").split(":");
+  return { moteur, fournisseur: fournisseur || "auto" };
+}
+
 async function apercuIncises() {
   const stats = $("incises-stats");
   stats.textContent = "Analyse…";
@@ -933,7 +939,7 @@ async function apercuIncises() {
         fichier: docCourant.fichier,
         mode: $("incises-mode").value,
         keep_action: $("incises-action").value,
-        moteur: $("incises-moteur").value,
+        ...moteurChoisi(),
         min_repliques: parseInt($("incises-min-repliques").value, 10) || 2,
         preuve_incise: !$("incises-sans-preuve").checked,
         verif_minuscule: !$("incises-sans-minuscule").checked,

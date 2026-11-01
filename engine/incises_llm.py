@@ -233,6 +233,20 @@ def appeler_llm(prompt: str, systeme: str, modele: Optional[str] = None,
                     "Réglages → « LLM pour les incises » (ou démarre Ollama).")
 
 
+def appelant(fournisseur: Optional[str] = None) -> Callable[..., str]:
+    """Fonction d'appel pour un fournisseur imposé (boîte incises).
+
+    ``openai``/``ollama`` forcent ce fournisseur, ``auto`` (ou vide) suit la
+    configuration. À injecter dans ``nettoyer_llm(appeler=…)``.
+    """
+    nom = (fournisseur or "auto").lower()
+    if nom == "openai":
+        return appeler_externe
+    if nom == "ollama":
+        return appeler_ollama
+    return appeler_llm
+
+
 def decouper_chunks(texte: str, max_chars: Optional[int] = None) -> List[str]:
     """Découpe aux frontières de paragraphes (jamais au milieu d'une phrase)."""
     max_chars = max_chars or config.INCISES_CHUNK_CHARS

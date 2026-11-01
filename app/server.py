@@ -325,7 +325,8 @@ class IncisesIn(BaseModel):
     keep_action: str = "narration"  # narration | garder | supprimer (regex seul)
     voix_defaut: str = "Narrateur"
     narrateur_je: str | None = None
-    moteur: str = "auto"          # auto | llm | regex (auto = LLM si Ollama répond)
+    moteur: str = "auto"          # auto | llm | regex (auto = LLM si un fournisseur est configuré)
+    fournisseur: str = "auto"     # auto | openai | ollama (force le LLM pour cet aperçu)
     min_repliques: int = 2        # répliques minimum pour créer un personnage
     preuve_incise: bool = True    # exige une incise explicite « dit X » en source
     verif_minuscule: bool = True  # écarte les noms présents en minuscules (noms communs)
@@ -1515,13 +1516,15 @@ def api_incises(payload: IncisesIn):
         nettoyer as nettoyer_regex,
         synchroniser_map,
     )
-    from engine.incises_llm import ErreurLLM, fournisseur_actif, nettoyer_llm
+    from engine.incises_llm import ErreurLLM, appelant, fournisseur_actif, nettoyer_llm
     if payload.mode not in ("auto", "import_roman", "nettoyer_tagge"):
         raise HTTPException(400, "Mode inconnu : auto | import_roman | nettoyer_tagge")
     if payload.keep_action not in ("narration", "garder", "supprimer"):
         raise HTTPException(400, "keep_action inconnu : narration | garder | supprimer")
     if payload.moteur not in ("auto", "llm", "regex"):
         raise HTTPException(400, "Moteur inconnu : auto | llm | regex")
+    if payload.fournisseur not in ("auto", "openai", "ollama"):
+        raise HTTPException(400, "Fournisseur inconnu : auto | openai | ollama")
     _chemin_projet(payload.fichier)
     contenu = _contenu_travail(payload.fichier)
     p = _fichier_personnages(payload.fichier)
@@ -1532,7 +1535,12 @@ def api_incises(payload: IncisesIn):
         except (OSError, csv.Error):
             mapping = {}
     moteur = payload.moteur
-    fournisseur = fournisseur_actif()
+    # Le fournisseur explicite de la boîte incises prime sur les Réglages ;
+    # « auto » suit la configuration globale (externe prioritaire, sinon Ollama).
+    fournisseur = (payload.fournisseur if payload.fournisseur != "auto"
+                   else fournisseur_actif())
+    if fournisseur == "openai" and not config.llm_externe_configure():
+        fournisseur = "aucun"
     if moteur == "auto":
         moteur = "llm" if fournisseur != "aucun" else "regex"
     if moteur == "llm" and fournisseur == "aucun":
@@ -1552,6 +1560,7 @@ def api_incises(payload: IncisesIn):
             res = nettoyer_llm(contenu, mapping=mapping,
                                voix_defaut=payload.voix_defaut or "Narrateur",
                                narrateur_je=(payload.narrateur_je or "").strip() or None,
+                               appeler=appelant(fournisseur),
                                filtre=filtre)
         else:
             res = nettoyer_regex(contenu, mode=payload.mode,

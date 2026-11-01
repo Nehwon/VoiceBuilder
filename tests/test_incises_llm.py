@@ -377,3 +377,17 @@ class TestEntetes:
                                 entetes="x-opencode-session: ma-session\nX-Autre: 1")
         assert vu["x-opencode-session"] == "ma-session"   # l'explicite gagne
         assert vu["x-autre"] == "1"
+
+
+class TestAppelant:
+    """Forçage du fournisseur depuis la boîte incises."""
+
+    def test_force_externe(self):
+        assert llm.appelant("openai") is llm.appeler_externe
+
+    def test_force_ollama(self):
+        assert llm.appelant("ollama") is llm.appeler_ollama
+
+    def test_auto_suit_la_configuration(self):
+        assert llm.appelant("auto") is llm.appeler_llm
+        assert llm.appelant(None) is llm.appeler_llm
