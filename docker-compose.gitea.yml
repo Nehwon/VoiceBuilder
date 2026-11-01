@@ -26,6 +26,8 @@ services:
   gui:
     <<: *app-image
     container_name: voicebuilder-gui
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: python -m app.server --host 0.0.0.0 --port 8000
     ports:
       - "${HOST_PORT:-8001}:8000"
@@ -42,6 +44,11 @@ services:
       - HF_HUB_DISABLE_XET=1
       # Réglages persistants sur volume (sinon reset à chaque recreate, M19.1).
       - VOICEBUILDER_SETTINGS_FILE=/app/tmp/voicebuilder_settings.json
+      # LLM local (incises M20) : Ollama de l'hôte (conteneur ollama-3050,
+      # épinglé GPU 1), joint par la passerelle du bridge Docker. ufw autorise
+      # 172.18.0.0/16 -> 11434 ; surchargeable via .env.gitea.
+      - VOICEBUILDER_OLLAMA_URL=${VOICEBUILDER_OLLAMA_URL:-http://host.docker.internal:11434}
+      - VOICEBUILDER_OLLAMA_MODELE=${VOICEBUILDER_OLLAMA_MODELE:-qwen2.5:7b-instruct}
       # Warmup au démarrage (modèle + Whisper préchargés, 1re inférence sans latence) : 1 pour activer.
       - VOICEBUILDER_WARMUP=${VOICEBUILDER_WARMUP:-0}
     volumes:
